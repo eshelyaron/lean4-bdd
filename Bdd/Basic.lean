@@ -71,7 +71,7 @@ def Proper {n m} (v : Vec (Node n m) m) := (∀ nod ∈ v, nod.RespectsOrder v)
 
 def Pointer.Reachable {n m} (w : Vec (Node n m) m) := Relation.ReflTransGen (Edge w)
 
-/-- `B.RelevantPointer` is the subtype of pointers reachable from `B.point`. -/
+/-- `B.RelevantPointer` is the subtype of pointers reachable from `B.root`. -/
 def Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
 
 instance Bdd.instDecidableEqRelevantPointer : DecidableEq (Bdd.RelevantPointer B) :=
