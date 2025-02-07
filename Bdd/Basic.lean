@@ -1,6 +1,8 @@
 import Mathlib.Data.Vector.Basic
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Tactic.DeriveFintype
+import Mathlib.Tactic.Linarith
+import Mathlib.Data.Fintype.Vector
 open List renaming Vector → Vec
 
 /-- Pointer to a BDD node or terminal -/
@@ -70,6 +72,10 @@ def Node.RespectsOrder {n m} (v : Vec (Node n m) m) (nod : Node n m) := ∀ (j :
 def Proper {n m} (v : Vec (Node n m) m) := (∀ nod ∈ v, nod.RespectsOrder v)
 
 def Pointer.Reachable {n m} (w : Vec (Node n m) m) := Relation.ReflTransGen (Edge w)
+
+@[trans]
+theorem Pointer.Reachable.trans (hab : Reachable v a b) (hbc : Reachable v b c) : Reachable v a c := Relation.ReflTransGen.trans hab hbc
+
 
 /-- `B.RelevantPointer` is the subtype of pointers reachable from `B.root`. -/
 def Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
@@ -178,7 +184,10 @@ instance OBdd.instDecidableEq {n m} : DecidableEq (OBdd n m) :=
 def OEdge {n m} (B C : OBdd n m) := B.1.heap = C.1.heap ∧ Edge B.1.heap B.1.root C.1.root
 
 @[simp]
-def OBdd.var {n m} (B : OBdd n m) : Nat := B.1.root.toVar B.1.heap
+def Bdd.var {n m} (B : Bdd n m) : Nat := B.root.toVar B.heap
+
+@[simp]
+def OBdd.var {n m} (O : OBdd n m) : Nat := O.1.var
 
 @[simp]
 def OBdd.rav {n m} (B : OBdd n m) : Nat := n - B.var
@@ -196,7 +205,7 @@ theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
     simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
     simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
     rcases hp : x.root
-    case terminal => simp_all
+    case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]; exact h3
     case node j => rcases hq : y.root <;> simp_all
   exact Subrelation.wf this (InvImage.wf _ (Nat.lt_wfRel.wf))
 
@@ -551,18 +560,104 @@ lemma OBdd.reduced_of_relevant {n m} (O : OBdd n m) (S : O.1.RelevantPointer) {h
 /-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
 def independentOf (f : Vec α n → β) (i : Fin n) := ∀ a, ∀ x, f x = f (Vec.set x i a)
 
+def dependentOn (f : Vec α n → β) (i : Fin n) := ¬ independentOf f i
+
+instance instDecidableIndependentOf' [Fintype α] (f : Vec α n → β) : DecidablePred (fun a ↦ ∀ (x : List.Vector α n), f x = f (x.set i a)) := by
+  intro a
+  simp
+  exact Fintype.decidableForallFintype
+
+instance instDecidableIndependentOf [Fintype α] [DecidableEq β] (f : Vec α n → β) : Decidable (independentOf f i) :=
+  Fintype.decidableForallFintype
+
+instance instDecidableDependentOn [Fintype α] [DecidableEq β] (f : Vec α n → β) : Decidable (dependentOn f i) := instDecidableNot
+
+def minDep [Fintype α] [DecidableEq β] (f : Vec α n → β) : Fin n.succ :=
+  match Fin.find (dependentOn f) with
+  | none => n
+  | some i => i
+
+lemma minDep_spec [Fintype α] [DecidableEq β] (f : Vec α n → β) (h : (minDep f) ≠ Fin.last n) : dependentOn f (Fin.castPred (minDep f) h) := by
+  cases hh : Fin.find (dependentOn f)
+  case none =>
+    simp [minDep] at h
+    simp_rw [hh] at h
+    contradiction
+  case some j =>
+    simp [minDep]
+    simp_rw [hh]
+    apply Fin.find_spec
+    simp_rw [hh]
+    simp
+
+lemma OBdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
+lemma OBdd.ordered_of_edge {O : OBdd n m} {h : O.1.heap = v} {r : O.1.root = q} (p) : Edge v q p → Bdd.Ordered {heap := v, root := p} := by
+  rw [← h]
+  rw [← r]
+  intro e
+  exact ordered_of_relevant O ⟨p, reachable_of_edge e⟩
+
+lemma OBdd.ordered_of_low_edge : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].low} := by
+  intro o x y h
+  apply ordered_of_relevant ⟨{ heap := v, root := node j }, o⟩ ⟨v[j].low, (reachable_of_edge (Edge.low rfl))⟩
+  simpa
+
+lemma OBdd.ordered_of_high_edge : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].high} := by
+  intro o x y h
+  apply ordered_of_relevant ⟨{ heap := v, root := node j }, o⟩ ⟨v[j].high, (reachable_of_edge (Edge.high rfl))⟩
+  simpa
+
 /-- Spell out `OBdd.evaluate` for non-terminals. -/
 @[simp]
 lemma OBdd.evaluate_node {n m} {v : Vec (Node n m) m} {I : Vec Bool n} {j : Fin m} {h} : OBdd.evaluate ⟨{ heap := v, root := node j }, h⟩ I =
     if I[v[j].var]
-    then OBdd.evaluate ⟨{ heap := v, root := v[j].high }, ordered_of_relevant ⟨{ heap := v, root := node j }, h⟩ ⟨v[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩⟩ I
-    else OBdd.evaluate ⟨{ heap := v, root := v[j].low }, ordered_of_relevant ⟨{ heap := v, root := node j }, h⟩ ⟨v[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩⟩ I := by
+    then OBdd.evaluate ⟨{ heap := v, root := v[j].high }, ordered_of_high_edge h⟩ I
+    else OBdd.evaluate ⟨{ heap := v, root := v[j].low }, ordered_of_low_edge h⟩ I := by
+    -- else OBdd.evaluate ⟨{ heap := v, root := v[j].low }, ordered_of_low_edge ordered_of_relevant ⟨{ heap := v, root := node j }, h⟩ ⟨v[j].low, (reachable_of_edge (Edge.low rfl))⟩⟩ I := by
       conv =>
         lhs
         simp only [OBdd.evaluate, Function.comp_apply]
         unfold OBdd.toTree
         simp only [Fin.getElem_fin, Ordered, DecisionTree.evaluate]
       rfl
+
+lemma OBdd.evaluate_node' {n m} {v : Vec (Node n m) m} {j : Fin m} {h} : OBdd.evaluate ⟨{ heap := v, root := node j }, h⟩ = fun I ↦
+    if I[v[j].var]
+    then OBdd.evaluate ⟨{ heap := v, root := v[j].high }, ordered_of_high_edge h⟩ I
+    else OBdd.evaluate ⟨{ heap := v, root := v[j].low }, ordered_of_low_edge h⟩ I := by
+      conv =>
+        lhs
+        simp only [OBdd.evaluate, Function.comp_apply]
+        unfold OBdd.toTree
+        simp only [Fin.getElem_fin, Ordered, DecisionTree.evaluate]
+      rfl
+
+/-- Spell out `OBdd.evaluate` for terminals. -/
+@[simp]
+lemma OBdd.evaluate_terminal {n m} {v : Vec (Node n m) m} {h} : OBdd.evaluate ⟨{ heap := v, root := terminal b }, h⟩ = Function.const _ b := by
+  simp only [evaluate, Function.comp_apply, toTree, DecisionTree.evaluate]
+  rfl
+
+lemma OBdd.evaluate_terminal' {n m} {O : OBdd n m} : O.1.root = terminal b → O.evaluate = Function.const _ b := by
+  intro h
+  rcases O with ⟨⟨heap, root⟩, ho⟩
+  simp_all
+
+@[simp]
+lemma OBdd.toTree_terminal {n m} {v : Vec (Node n m) m} {h} : OBdd.toTree ⟨{ heap := v, root := terminal b }, h⟩ = .leaf b := by simp [toTree]
+
+lemma OBdd.toTree_terminal' {n m} {O : OBdd n m} : O.1.root = terminal b → O.toTree = .leaf b := by
+  intro h
+  rcases O with ⟨⟨heap, root⟩, ho⟩
+  simp_all [toTree]
+
+lemma OBdd.toTree_node' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.toTree = .branch O.1.heap[j].var (toTree ⟨{heap := O.1.heap, root := O.1.heap[j].low }, ordered_of_low_edge (by rw [← h]; exact O.2)⟩ ) (toTree ⟨{heap := O.1.heap, root := O.1.heap[j].high }, ordered_of_high_edge (by rw [← h]; exact O.2)⟩) := by
+  rcases O with ⟨⟨heap, root⟩, ho⟩
+  simp at h
+  simp_rw [h]
+  conv =>
+    lhs
+    unfold toTree
 
 private lemma aux {O : OBdd n m} {i : Fin m} :
     O.1.heap[i.1].var = Fin.castPred (toVar O.1.heap (node i)) (Fin.exists_castSucc_eq.mp ⟨O.1.heap[i.1].var, by simp⟩) :=
@@ -609,6 +704,8 @@ lemma OBdd.Independence {O : OBdd n m} (j : Fin (O.1.root.toVar O.1.heap)) :
           have hyp := h (show Bdd.GraphEdge { heap := O.1.heap, root := node i } ⟨(node i), Relation.ReflTransGen.refl⟩ ⟨O.1.heap[↑i].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ by exact (Edge.low rfl))
           assumption
         aesop
+
+lemma OBdd.Independence' {O : OBdd n m} (j : Fin O.var) : independentOf (OBdd.evaluate O) ⟨j.1, (Fin.val_lt_of_le j (Fin.is_le _))⟩ := Independence j
 
 lemma OBdd.expand_high {n m} {v : Vec (Node n m) m} {j : Fin m} {h : Bdd.Ordered { heap := v, root := v[j].high } } {h' : Bdd.Ordered { heap := v, root := v[j].low }} :
     OBdd.evaluate ⟨{ heap := v, root := v[j].high }, h⟩ = fun I ↦ if true then ((OBdd.evaluate ⟨{ heap := v, root := v[j].high }, h⟩) I) else ((OBdd.evaluate ⟨{ heap := v, root := v[j].low }, h'⟩) I) := by simp
@@ -692,49 +789,49 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
     rw [this, that]
 
 
-
+-- CANONICITY: induction on O, cases on U, show that they have the same variable with a mutually inductive theorem that says that the function of a reduced bdd has the root variable as its minimal dependency, then transport across assumption that functions are equal.
 -- Experiments towards canonicity follow.
 
-theorem OBdd.Canonicity1 {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O.Isomorphic U := by
-  intro OR UR h
-  rcases O with ⟨B, OB⟩
-  rcases U with ⟨C, OC⟩
-  simp_all only [Reduced, Ordered, evaluate, Function.comp_apply, Isomorphic, InvImage]
-  cases p : B.root
-  case terminal b =>
-    have this : ({heap := B.heap, root := terminal b} : Bdd n m).Ordered := by rw [← p]; assumption
-    have foo : toTree ⟨B, OB⟩ = DecisionTree.leaf b := by
-      calc toTree ⟨B, OB⟩
-        _ = toTree ⟨{heap := B.heap, root := terminal b}, this⟩ := by simp_all only [← p]
-        _ = DecisionTree.leaf b := OBdd.toTree_of_terminal
-    cases q : C.root
-    case terminal c =>
-      have that : ({heap := C.heap, root := terminal c} : Bdd n m).Ordered := by rw [← q]; assumption
-      have bar : toTree ⟨C, OC⟩ = DecisionTree.leaf c := by
-        calc toTree ⟨C, OC⟩
-          _ = toTree ⟨{heap := C.heap, root := terminal c}, that⟩ := by simp_all only [← q]
-          _ = DecisionTree.leaf c := OBdd.toTree_of_terminal
-      rw [foo, bar] at h
-      simp_all only [Ordered, DecisionTree.evaluate, DecisionTree.leaf.injEq]
-      exact eq_of_constant_eq h
-    case node j =>
-      have that : ({heap := C.heap, root := node j} : Bdd n m).Ordered := by rw [← q]; assumption
-      have bar : toTree ⟨C, OC⟩ = toTree ⟨{heap := C.heap, root := node j}, that⟩ := by
-        calc toTree ⟨C, OC⟩
-          _ = toTree ⟨{heap := C.heap, root := node j}, that⟩ := by simp_all only [← q]
-      rw [foo] at h
-      simp_all only [DecisionTree.evaluate, Ordered]
-      unfold toTree at h
-      simp_all only [DecisionTree.evaluate, Fin.getElem_fin, Ordered]
-      -- We need a lemma that shows that h is a contradiction since C is reduced.
-      -- Idea: show that the two sub-bdds evaluate to the same function, so they
-      -- are isomorphic (by recursion), contradicting C.Reduced.
-      have contra {h1 : ({ heap := C.heap, root := C.heap[j.1].low } : Bdd n m).Ordered} {h2 : ({ heap := C.heap, root := C.heap[j.1].high } : Bdd n m).Ordered} :
-          (toTree ⟨{ heap := C.heap, root := C.heap[j.1].low }, h1⟩).evaluate = (toTree ⟨{ heap := C.heap, root := C.heap[j.1].high }, h2⟩).evaluate := by
-        sorry
-      -- Now recursively apply Canonicity to contra to obtain a proof of isomorphism between the two sub-bdds...
-      sorry
-  case node i => sorry
+-- theorem OBdd.Canonicity1 {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O.Isomorphic U := by
+--   intro OR UR h
+--   rcases O with ⟨B, OB⟩
+--   rcases U with ⟨C, OC⟩
+--   simp_all only [Reduced, Ordered, evaluate, Function.comp_apply, Isomorphic, InvImage]
+--   cases p : B.root
+--   case terminal b =>
+--     have this : ({heap := B.heap, root := terminal b} : Bdd n m).Ordered := by rw [← p]; assumption
+--     have foo : toTree ⟨B, OB⟩ = DecisionTree.leaf b := by
+--       calc toTree ⟨B, OB⟩
+--         _ = toTree ⟨{heap := B.heap, root := terminal b}, this⟩ := by simp_all only [← p]
+--         _ = DecisionTree.leaf b := OBdd.toTree_of_terminal
+--     cases q : C.root
+--     case terminal c =>
+--       have that : ({heap := C.heap, root := terminal c} : Bdd n m).Ordered := by rw [← q]; assumption
+--       have bar : toTree ⟨C, OC⟩ = DecisionTree.leaf c := by
+--         calc toTree ⟨C, OC⟩
+--           _ = toTree ⟨{heap := C.heap, root := terminal c}, that⟩ := by simp_all only [← q]
+--           _ = DecisionTree.leaf c := OBdd.toTree_of_terminal
+--       rw [foo, bar] at h
+--       simp_all only [Ordered, DecisionTree.evaluate, DecisionTree.leaf.injEq]
+--       exact eq_of_constant_eq h
+--     case node j =>
+--       have that : ({heap := C.heap, root := node j} : Bdd n m).Ordered := by rw [← q]; assumption
+--       have bar : toTree ⟨C, OC⟩ = toTree ⟨{heap := C.heap, root := node j}, that⟩ := by
+--         calc toTree ⟨C, OC⟩
+--           _ = toTree ⟨{heap := C.heap, root := node j}, that⟩ := by simp_all only [← q]
+--       rw [foo] at h
+--       simp_all only [DecisionTree.evaluate, Ordered]
+--       unfold toTree at h
+--       simp_all only [DecisionTree.evaluate, Fin.getElem_fin, Ordered]
+--       -- We need a lemma that shows that h is a contradiction since C is reduced.
+--       -- Idea: show that the two sub-bdds evaluate to the same function, so they
+--       -- are isomorphic (by recursion), contradicting C.Reduced.
+--       have contra {h1 : ({ heap := C.heap, root := C.heap[j.1].low } : Bdd n m).Ordered} {h2 : ({ heap := C.heap, root := C.heap[j.1].high } : Bdd n m).Ordered} :
+--           (toTree ⟨{ heap := C.heap, root := C.heap[j.1].low }, h1⟩).evaluate = (toTree ⟨{ heap := C.heap, root := C.heap[j.1].high }, h2⟩).evaluate := by
+--         sorry
+--       -- Now recursively apply Canonicity to contra to obtain a proof of isomorphism between the two sub-bdds...
+--       sorry
+--   case node i => sorry
 
 
 lemma OBdd.toTree_respects_Isomorphism {n m} (O U : OBdd n m) (h : OBdd.Isomorphic O U) : O.toTree = U.toTree := by simpa [OBdd.Isomorphic, InvImage]
@@ -743,21 +840,762 @@ instance OBdd.instSetoid : Setoid (OBdd n m) := ⟨OBdd.Isomorphic, OBdd.Isomorp
 
 def AbstractBdd {n m} := @Quotient (OBdd n m) (by infer_instance)
 
-theorem OBdd.Canonicity2 {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
-  intro h1 h2 h3
-  induction O using init_inductionOn
-  case base b =>
-    induction U using init_inductionOn
-    case base c =>
-      simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, toTree]
-      congr
-      simp only [evaluate, Function.comp, toTree, DecisionTree.evaluate] at h3
-      exact eq_of_constant_eq h3
-    case step i => sorry
-  case step j =>
-    induction U using init_inductionOn with
-    | base b => sorry
-    | step i hl _ hh _ h => sorry
+-- theorem OBdd.Canonicity_aux {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → Pointer.toVar O.1.heap O.1.root = Pointer.toVar U.1.heap U.1.root := by
+--   intro O_reduced U_reduced h
+--   induction O using init_inductionOn generalizing U U_reduced with
+--   | base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     rw [h]
+--     simp
+--   | step j hl ihl hh ihh ho =>
+--     rcases U with ⟨⟨heap, root⟩, ordered⟩
+--     cases root with
+--     | terminal b => sorry
+--     | node i =>
+--       simp
+--       -- Show that the function of a reduced BDD depends on its root variable.
+--       sorry
+
+theorem Vec.get_set_same' (v : Vec α n) (i : Fin n) (a : α) : (v.set i a)[i] = a := by
+  cases v; cases i
+  simp [Fin.getElem_fin, List.Vector.getElem_def, List.Vector.toList_set, List.getElem_set_self, ↓reduceIte, Ordered, Fin.eta]
+
+-- theorem OBdd.Canonicity3 {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   cases O_root_def : O.1.root with
+--   | terminal b => sorry
+--   | node j =>
+--     cases U_root_def : U.1.root with
+--     | terminal c => sorry
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+--       have U_def : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [O_root_def] at O_def
+--       simp_rw [U_root_def] at U_def
+--       rw [O_def, U_def]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       apply eq_iff_le_not_lt.mpr
+--       constructor
+--       · apply le_of_not_lt
+--         intro contra
+--         have := Independence (O := O) ⟨U.1.heap[i].var.1, by rw [O_root_def]; simpa⟩
+--         rw [h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].high } := ordered_of_relevant U ⟨U.1.heap[i].high, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].low  } := ordered_of_relevant U ⟨U.1.heap[i].low,  by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+--         have taht : OBdd.Isomorphic ⟨{ heap := U.1.heap, root := U.1.heap[i].high }, hord⟩ ⟨{ heap := U.1.heap, root := U.1.heap[i].low }, lord⟩ :=
+--           Canonicity3 (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].high, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ U_reduced)
+--                       (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].low,  by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced)
+--                       (by sorry)
+--         sorry
+--       · sorry
+--       sorry
+-- termination_by U
+-- decreasing_by
+--   simp [flip]
+--   constructor
+--   simp
+--   rw [U_root_def]
+--   exact Edge.low rfl
+
+-- theorem OBdd.Canonicity5 {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≤ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       · simp [OBdd.var] at lt
+--         simp_rw [U_root_def] at lt
+--         simp [toVar] at lt
+--         apply eq_iff_le_not_lt.mpr
+--         constructor
+--         assumption
+--         intro contra
+--         have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [U_root_def]; simpa⟩
+--         rw [← h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].high } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].low } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+--         cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].high }) (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low })
+--         case isFalse hf =>
+--           sorry
+--         case isTrue ht =>
+--           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+--             apply ihh
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             assumption
+--             sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--       · constructor
+--         · apply ihl
+--           · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced)
+--           · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+--           · sorry -- this one's a problem.
+--           · sorry
+--         · sorry
+
+-- theorem OBdd.Canonicity7 {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≤ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       · simp [OBdd.var] at lt
+--         simp_rw [U_root_def] at lt
+--         simp [toVar] at lt
+--         apply Fin.eq_of_val_eq
+--         apply Nat.eq_iff_le_and_ge.mpr
+--         constructor
+--         assumption
+--         intro contra
+--         have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [U_root_def]; simpa⟩
+--         rw [← h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].high } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].low } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+
+--         cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].high }) (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low })
+--         case isFalse hf =>
+--           simp at hf
+--           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩  := by
+--             apply ihl
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--             apply le_of_lt; assumption
+--             sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--         case isTrue ht =>
+--           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+--             apply ihh
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             assumption
+--             sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--       · constructor
+--         · cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+--           case isFalse hff =>
+--             simp at hff
+--             symm
+--             -- apply Canonicity6'' (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             --                     (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+--             --                     (by apply le_of_lt hff)
+--             --                     (by sorry)
+--             sorry
+--           case isTrue htt =>
+--           apply ihl
+--           · apply OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced
+--           · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+--           · simpa
+--           · sorry
+--         · sorry
+-- termination_by O
+-- decreasing_by sorry
+
+
+
+-- mutual
+-- theorem OBdd.Canonicity6 {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≤ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       · simp [OBdd.var] at lt
+--         simp_rw [U_root_def] at lt
+--         simp [toVar] at lt
+--         apply eq_iff_le_not_lt.mpr
+--         constructor
+--         assumption
+--         intro contra
+--         have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [U_root_def]; simpa⟩
+--         rw [← h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].high } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].low } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+
+--         cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].high }) (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low })
+--         case isFalse hf =>
+--           simp at hf
+--           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩  := by
+--             apply ihl
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--             apply le_of_lt; assumption
+--             sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--         case isTrue ht =>
+--           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+--             apply ihh
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             assumption
+--             sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--       · constructor
+--         · cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+--           case isFalse hff =>
+--             simp at hff
+--             symm
+--             apply Canonicity6'' (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--                                 (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+--                                 (by apply le_of_lt hff)
+--                                 (by sorry)
+--           case isTrue htt =>
+--           apply ihl
+--           · apply OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced
+--           · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+--           · simpa
+--           · sorry
+--         · sorry
+-- termination_by O
+-- decreasing_by sorry
+
+-- theorem OBdd.Canonicity6'' {U : OBdd n m} (U_reduced : U.Reduced) {O : OBdd n m} (O_reduced : O.Reduced) (lt : O.var ≤ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       · simp [OBdd.var] at lt
+--         simp_rw [U_root_def] at lt
+--         simp [toVar] at lt
+--         apply eq_iff_le_not_lt.mpr
+--         constructor
+--         assumption
+--         intro contra
+--         have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [U_root_def]; simpa⟩
+--         rw [← h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].high } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].low } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+--         cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].high }) (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low })
+--         case isFalse hf =>
+--           sorry
+--         case isTrue ht =>
+--           sorry
+--           -- have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+--           --   apply ihh
+--           --   exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--           --   exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--           --   assumption
+--           --   sorry
+--           -- refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           -- constructor
+--           -- have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           -- exact O_reduced.2 foo
+--       · constructor
+--         · cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+--           case isFalse hff =>
+--             simp at hff
+--             apply Canonicity6
+--                               (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+--                               (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--                               (by simp; apply le_of_lt hff)
+--                               (by sorry)
+--           case isTrue htt => sorry
+--           -- apply ihl
+--           -- · apply OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced
+--           -- · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+--           -- · simpa
+--           -- · sorry
+--         · sorry
+-- termination_by O
+-- decreasing_by sorry
+
+-- theorem OBdd.Canonicity6' {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≥ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   rw [ge_iff_le] at lt
+--   apply symm
+--   symm at h
+--   exact Canonicity6 U_reduced O_reduced lt h
+-- termination_by O
+-- decreasing_by sorry
+
+-- theorem OBdd.Canonicity6' {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≥ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   rw [ge_iff_le] at lt
+--   apply symm
+--   symm at h
+--   exact Canonicity6 U_reduced O_reduced lt h
+-- termination_by O
+-- decreasing_by sorry
+-- theorem OBdd.Canonicity6' {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (lt : O.var ≥ U.var) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       · simp [OBdd.var] at lt
+--         simp_rw [U_root_def] at lt
+--         simp [toVar] at lt
+--         symm
+--         apply eq_iff_le_not_lt.mpr
+--         constructor
+--         assumption
+--         intro contra
+--         have := Independence (O := ⟨{heap := O.1.heap, root := node j}, ho⟩) ⟨U.1.heap[i].var.1, by simpa⟩
+--         rw [h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].high } := ordered_of_relevant U ⟨U.1.heap[i].high, by rw [that]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].low  } := ordered_of_relevant U ⟨U.1.heap[i].low,  by rw [that]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩
+--         cases Nat.decLe (Bdd.var { heap := U.1.heap, root := U.1.heap[i].high }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+--         case isFalse hf =>
+--           simp at hf
+--           have taht : OBdd.Isomorphic ⟨{ heap := U.1.heap, root := U.1.heap[i].low }, lord⟩ ⟨{ heap := U.1.heap, root := U.1.heap[i].high }, hord⟩ :=
+--             Canonicity6 (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+--                         (OBdd.reduced_of_relevant U ⟨U.1.heap[i].high, (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl)))⟩ U_reduced)
+--                         (by apply le_of_lt hf)
+--                         (by simp; sorry) -- use `this`
+--           sorry
+--         case isTrue ht =>
+--           -- have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+--           --   apply ihh
+--           --   exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--           --   exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--           --   assumption
+--           --   sorry
+--           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+--           constructor
+--           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--           exact O_reduced.2 foo
+--       · constructor
+--         · cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+--           case isFalse hff => sorry
+--             -- apply Canonicity6' (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+--             --                    (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+--             --                    (by simp at hff; rw [ge_iff_le]; apply le_of_lt hff)
+--             --                    (by sorry)
+--           case isTrue htt =>
+--           apply ihl
+--           · apply OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced
+--           · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+--           · sorry
+--           · sorry
+--         · sorry
+-- termination_by O
+-- decreasing_by sorry
+
+-- --   induction U using init_inductionOn generalizing O O_reduced
+-- --   case base b =>
+-- --     rw [evaluate_terminal] at h
+-- --     apply terminal_of_constant O O_reduced at h
+-- --     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+-- --     rw [OBdd.toTree_terminal' h]
+-- --   case step j hl ihl hh ihh ho =>
+-- --     cases O_root_def : O.1.root with
+-- --     | terminal b =>
+-- --       rw [evaluate_terminal' O_root_def] at h
+-- --       symm at h
+-- --       apply terminal_of_constant ⟨{ heap := U.1.heap, root := node j }, ho⟩ U_reduced at h
+-- --       contradiction
+-- --     | node i =>
+-- --       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+-- --       have that : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+-- --       simp_rw [O_root_def] at that
+-- --       rw [that]
+-- --       unfold toTree
+-- --       simp only [Ordered, DecisionTree.branch.injEq]
+-- --       constructor
+-- --       · simp [OBdd.var] at lt
+-- --         simp_rw [O_root_def] at lt
+-- --         simp [toVar] at lt
+-- --         symm
+-- --         apply eq_iff_le_not_lt.mpr
+-- --         constructor
+-- --         assumption
+-- --         intro contra
+-- --         have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [O_root_def]; simpa⟩
+-- --         rw [← h] at this
+-- --         simp only [Ordered, Fin.eta] at this
+-- --         simp only [independentOf] at this
+-- --         have hord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].high } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+-- --         have lord : Bdd.Ordered { heap := O.1.heap, root := O.1.heap[j].low } := ordered_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+-- --         cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].high }) (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low })
+-- --         case isFalse hf =>
+-- --           sorry
+-- --         case isTrue ht =>
+-- --           have taht : OBdd.Isomorphic ⟨{ heap := O.1.heap, root := O.1.heap[j].high }, hord⟩ ⟨{ heap := O.1.heap, root := O.1.heap[j].low }, lord⟩ := by
+-- --             apply ihh
+-- --             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+-- --             exact (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+-- --             assumption
+-- --             sorry
+-- --           refine O_reduced.1 (⟨node j, Relation.ReflTransGen.refl⟩) ?_
+-- --           constructor
+-- --           have foo : GraphIsomorphic ⟨{ heap :=  O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+-- --           exact O_reduced.2 foo
+-- --       · constructor
+-- --         · cases Nat.decLe (Bdd.var { heap := O.1.heap, root := O.1.heap[j].low }) (Bdd.var { heap := U.1.heap, root := U.1.heap[i].low })
+-- --           case isFalse hff =>
+-- --             apply Canonicity6' (OBdd.reduced_of_relevant ⟨{ heap := O.1.heap, root := node j }, ho⟩ ⟨O.1.heap[j].low,  (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl))⟩ O_reduced)
+-- --                                (OBdd.reduced_of_relevant U ⟨U.1.heap[i].low,  (by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low  rfl)))⟩ U_reduced)
+-- --                                (by simp at hff; rw [ge_iff_le]; apply le_of_lt hff)
+-- --                                (by sorry)
+-- --           case isTrue htt =>
+-- --           apply ihl
+-- --           · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced)
+-- --           · apply OBdd.reduced_of_relevant U ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced
+-- --           · simpa
+-- --           · sorry
+-- --         · sorry
+-- -- termination_by O
+-- -- decreasing_by sorry
+
+-- end
+
+
+-- mutual
+-- def foo : Nat → Nat
+--   | Nat.zero => Nat.zero
+--   | Nat.succ p => bar p
+
+-- def bar : Nat → Nat
+--   | Nat.zero => Nat.zero
+--   | Nat.succ p => foo p
+-- end
+
+
+
+
+
+
+
+
+-- theorem OBdd.Canonicity4 {O : OBdd n m} (O_reduced : O.Reduced) {U : OBdd n m} (U_reduced : U.Reduced) (h : O.evaluate = U.evaluate) : O ≈ U := by
+--   cases O_root_def : O.1.root with
+--   | terminal b => sorry
+--   | node j =>
+--     induction U using init_inductionOn generalizing O O_reduced j O_root_def with
+--     | base b => sorry
+--     | step i hl ihl hh ihh ho =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+--       simp_rw [O_root_def] at O_def
+--       rw [O_def]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       apply eq_iff_le_not_lt.mpr
+--       constructor
+--       · apply le_of_not_lt
+--         intro contra
+--         have := Independence (O := O) ⟨U.1.heap[i].var.1, by rw [O_root_def]; simpa⟩
+--         rw [h] at this
+--         simp only [Ordered, Fin.eta] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].high } := ordered_of_relevant ⟨{ heap := U.1.heap, root := node i }, ho⟩ ⟨U.1.heap[i].high, by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].low  } := ordered_of_relevant ⟨{ heap := U.1.heap, root := node i }, ho⟩ ⟨U.1.heap[i].low,  by exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+--         have taht : OBdd.Isomorphic ⟨{ heap := U.1.heap, root := U.1.heap[i].high }, hord⟩ ⟨{ heap := U.1.heap, root := U.1.heap[i].low }, lord⟩ := by
+--           simp only [HasEquiv.Equiv, instSetoid] at ihl
+--           simp only [HasEquiv.Equiv, instSetoid] at ihh
+
+--         sorry
+--       · sorry
+--       · sorry
+
+-- mutual
+-- theorem OBdd.evaluate_minDep {O : OBdd n m} : O.Reduced →  minDep O.evaluate = O.1.var := by
+--   intro h
+--   cases O_root_def : O.1.root with
+--   | terminal _ => sorry
+--   | node j =>
+--     let low  : OBdd n m := ⟨{heap := O.1.heap, root := O.1.heap[j].low}, sorry⟩
+--     let high : OBdd n m := ⟨{heap := O.1.heap, root := O.1.heap[j].high}, sorry⟩
+--     have := Canonicity (O := low) (U := high)
+--     have : dependentOn O.evaluate O.1.heap[j].var := by sorry
+--     have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+--     sorry
+-- termination_by O
+-- decreasing_by sorry
+--   --   simp [O_root_def]
+--   --   symm
+--   --   apply eq_iff_le_not_lt.mpr
+--   --   constructor
+--   --   · sorry
+--   --     --by_contra contra
+--   -- --    simp at contra
+--   --     --have := Independence ⟨minDep O.evaluate, contra⟩
+--   --   -- have that := minDep_spec O.evaluate (Fin.ne_last_of_lt (b := n) (by trans (toVar O.1.heap O.1.root); exact contra; simp))
+--   --   · intro contra
+--   --     have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+
+
+
+--   --     rw [evaluate_node']
+
+-- theorem OBdd.evaluate_minDep' {O : OBdd n m} : O.Reduced →  (minDep O.evaluate).1 = O.1.var := by
+--   intro h
+--   rw [evaluate_minDep h]
+--   simp
+-- termination_by O
+-- decreasing_by sorry
+
+-- theorem OBdd.Canonicity {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
+--   intro O_reduced U_reduced h
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       apply Fin.eq_of_val_eq
+--       calc O.1.heap[j].var.1
+--         _ = Bdd.var { heap := O.1.heap, root := node j } := by simp
+--         _ = minDep (OBdd.evaluate ⟨{ heap := O.1.heap, root := node j }, ho⟩) := by symm; apply evaluate_minDep' O_reduced
+--         _ = minDep (OBdd.evaluate U) := by rw [h]
+--         _ = Bdd.var U.1 := by apply evaluate_minDep' U_reduced
+--         _ = U.1.heap[i].var.1 := by simp only [Bdd.var, Nat.succ_eq_add_one, Ordered, Fin.getElem_fin]; rw [U_root_def]; simp
+--       · constructor
+--         · apply ihl
+--           · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced)
+--           · apply (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].low, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced)
+--           · sorry
+--         · apply ihh
+--           · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--           · apply (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].high, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ U_reduced)
+--           · sorry
+-- termination_by O
+-- decreasing_by sorry; sorry
+-- end
+
+-- theorem OBdd.Canonicity2 {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
+--   intro O_reduced U_reduced h
+--   induction O using init_inductionOn generalizing U U_reduced
+--   case base b =>
+--     rw [evaluate_terminal] at h
+--     symm at h
+--     apply terminal_of_constant U U_reduced at h
+--     simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, OBdd.toTree_terminal]
+--     rw [OBdd.toTree_terminal' h]
+--   case step j hl ihl hh ihh ho =>
+--     cases U_root_def : U.1.root with
+--     | terminal b =>
+--       rw [evaluate_terminal' U_root_def] at h
+--       apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--       contradiction
+--     | node i =>
+--       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--       have that : U = ⟨{heap := U.1.heap, root := U.1.root}, U.2⟩ := rfl
+--       simp_rw [U_root_def] at that
+--       rw [that]
+--       unfold toTree
+--       simp only [Ordered, DecisionTree.branch.injEq]
+
+--     -- induction U using init_inductionOn generalizing O O_reduced j with
+--     -- | base b => sorry
+--     -- | step i uhl uihl uhh uihh uh => sorry
+--     -- rcases U with ⟨⟨heap, root⟩, ordered⟩
+--     -- cases root with
+--     -- | terminal b =>
+--     --   rw [evaluate_terminal] at h
+--     --   apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, ho⟩ O_reduced at h
+--     --   contradiction
+--     -- | node i =>
+--     --   simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--     --   unfold toTree
+--     --   simp only [Ordered, DecisionTree.branch.injEq]
+--       constructor
+--       apply eq_iff_le_not_lt.mpr
+--       constructor
+--       · apply le_of_not_lt
+--         intro contra
+--         have := Independence (O := ⟨{ heap := O.1.heap, root := node j }, ho⟩) ⟨U.1.heap[i].var.1, by simpa⟩
+--         rw [h] at this
+--         simp only [Ordered, Fin.eta] at this
+--     -- --     -- rw [evaluate_node'] at this
+--         simp only [independentOf] at this
+--         have hord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].high } := ordered_of_relevant U ⟨U.1.heap[i].high, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩
+--         have lord : Bdd.Ordered { heap := U.1.heap, root := U.1.heap[i].low  } := ordered_of_relevant U ⟨U.1.heap[i].low,  by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩
+--         have taht : OBdd.Isomorphic ⟨{ heap := U.1.heap, root := U.1.heap[i].high }, hord⟩ ⟨{ heap := U.1.heap, root := U.1.heap[i].low }, lord⟩ :=
+--           Canonicity2 (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].high, by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ U_reduced)
+--                       (OBdd.reduced_of_relevant _ ⟨U.1.heap[i].low,  by rw [U_root_def]; exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced)
+--                       (by sorry)
+
+--           -- apply Canonicity2
+--           -- apply (OBdd.reduced_of_relevant _ ⟨heap[i].high,     (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ U_reduced)
+--           -- apply (OBdd.reduced_of_relevant _ ⟨heap[i].low,     (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced)
+--           -- ext I
+--           -- rw [OBdd.Independence ⟨heap[i].var, by simp; sorry⟩ false I]
+--           -- rw [OBdd.expand_high]
+--           -- beta_reduce
+--           -- conv =>
+--           --   lhs
+--           --   fun; intro; arg 1; lhs; rw [(show true = (Vec.set I heap[i].var true)[heap[i].var] by simp [Vec.getElem_def])]
+--           -- calc _
+--           --   _ = OBdd.evaluate ⟨{ heap := heap, root := node i }, ordered⟩ (Vec.set I heap[i].var true) := by
+--           --     conv =>
+--           --       rhs
+--           --       rw [OBdd.evaluate_node]
+--           --     simp only [Fin.getElem_fin, List.Vector.getElem_def, List.Vector.toList_set, List.getElem_set_self, ↓reduceIte, Ordered, Fin.eta]
+--           --     sorry
+--           -- rw [← this true]
+--           -- rw [this false]
+--           -- simp only [evaluate_node, List.Vector.get_set_same]
+--           -- rw [get_set_same' I heap[i].var]
+--           -- simp only [Bool.false_eq_true, ↓reduceIte, Ordered]
+--           -- rw [← OBdd.Independence ⟨heap[i].var, by sorry⟩ false I]
+--           -- sorry
+--           -- refine ordered_of_relevant ⟨{ heap := heap, root := node i }, ordered⟩ ⟨heap[i].low, ?_⟩
+--           -- simp only [Fin.getElem_fin]
+--           -- exact (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))
+--         refine U_reduced.1 (⟨U.1.root, Relation.ReflTransGen.refl⟩) ?_
+--         sorry
+--       sorry
+--       sorry
+--         -- simp [Redundant]
+--         -- constructor
+--         -- have foo : GraphIsomorphic ⟨{ heap := heap, root := node i }, ordered⟩ ⟨heap[i].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ ⟨heap[i].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ := sorry
+--         -- apply U_reduced.2 foo
+--       --   sorry
+--       -- · sorry
+--       -- · constructor
+--       --   · apply ihl
+--       --     · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ O_reduced)
+--       --     · apply (OBdd.reduced_of_relevant _ ⟨heap[i].low,     (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ U_reduced)
+--       --     · sorry
+--       --   · apply ihh
+--       --     · apply (OBdd.reduced_of_relevant _ ⟨O.1.heap[j].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ O_reduced)
+--       --     · apply (OBdd.reduced_of_relevant _ ⟨heap[i].high,     (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ U_reduced)
+--       --     · sorry
+
+--     -- induction U using init_inductionOn generalizing O j with
+--     -- | base b =>
+--     --   rw [evaluate_terminal] at h3
+--     --   apply terminal_of_constant ⟨{ heap := O.1.heap, root := node j }, h⟩ h1 at h3
+--     --   contradiction
+--     -- | step i uhl uihl uhh uihh uh =>
+--     --   simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+--     --   unfold toTree
+--     --   simp only [Ordered, DecisionTree.branch.injEq]
+--     --   simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage, Ordered, DecisionTree.branch.injEq] at ihl
+--     --   constructor
+--     --   · sorry
+--     --   · constructor
+--     --     · apply uihl
+--     --     · sorry
+-- termination_by U
+-- decreasing_by sorry
+
 
 def DecisionTree.size {n} : DecisionTree n → Nat
   | leaf _ => 0
@@ -773,16 +1611,16 @@ lemma OBdd.size_zero_of_terminal : OBdd.isTerminal O → O.size = 0 := by
   unfold toTree
   rfl
 
-theorem OBdd.minimal_of_reduced {O U : OBdd n m} : O.evaluate = U.evaluate → O.Reduced → O.size ≤ U.size := by
-  intro O_U R
-  induction O using init_inductionOn generalizing U with
-  | base b => rw [size_zero_of_terminal] <;> simp [isTerminal]
-  | step j hl ihl hh ihh h =>
-    induction U using init_inductionOn with
-    | base c => sorry -- easy contradiction
-    | step i uhl uihl uhh uihh uh => -- this needs some thinking, Bryant proves this differently, without induction.
-      sorry
-      -- simp [size]
+-- theorem OBdd.minimal_of_reduced {O U : OBdd n m} : O.evaluate = U.evaluate → O.Reduced → O.size ≤ U.size := by
+--   intro O_U R
+--   induction O using init_inductionOn generalizing U with
+--   | base b => rw [size_zero_of_terminal] <;> simp [isTerminal]
+--   | step j hl ihl hh ihh h =>
+--     induction U using init_inductionOn with
+--     | base c => sorry -- easy contradiction
+--     | step i uhl uihl uhh uihh uh => -- this needs some thinking, Bryant proves this differently, without induction.
+--       sorry
+--       -- simp [size]
       -- unfold toTree
       -- simp only [DecisionTree.size, Ordered]
       -- rw [add_assoc, add_assoc]
@@ -824,3 +1662,273 @@ theorem OBdd.minimal_of_reduced {O U : OBdd n m} : O.evaluate = U.evaluate → O
       -- sorry
       -- sorry
       -- sorry
+
+def Bdd.low {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
+  fun _ ↦ {heap := B.heap, root := B.heap[j].low}
+
+lemma Bdd.edge_of_low {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.low h).root := by
+  simp [low, h]
+  exact Edge.low rfl
+
+def Bdd.high {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
+  fun _ ↦ {heap := B.heap, root := B.heap[j].high}
+
+lemma Bdd.edge_of_high {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.high h).root := by
+  simp [high, h]
+  exact Edge.high rfl
+
+lemma Bdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
+
+lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Reachable v q p → Bdd.Ordered {heap := v, root := p} := by
+  intro o r_q_p
+  simp_all only [Ordered]
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ e
+  simp_all only [Ordered, GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp at hx
+  simp at hy
+  have : GraphEdge B ⟨x, (by trans p <;> aesop)⟩
+                     ⟨y, (by trans p <;> aesop)⟩ := by
+    simp only [GraphEdge]
+    rw [h]
+    assumption
+  apply o at this
+  rw [← h]
+  exact this
+
+lemma Bdd.ordered_of_edge {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Edge v q p → Bdd.Ordered {heap := v, root := p} := by
+  rw [← h]
+  rw [← r]
+  intro o e
+  apply ordered_of_relevant' o
+  apply reachable_of_edge e
+  rfl
+  rfl
+
+lemma Bdd.high_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.high h).Ordered := by
+  intro o
+  apply Bdd.ordered_of_edge
+  rfl
+  exact h
+  exact o
+  convert edge_of_high B
+  · symm; assumption
+  · assumption
+
+def OBdd.high {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
+  fun h ↦ ⟨O.1.high h, Bdd.high_ordered h O.2⟩
+
+lemma OBdd.high_reduced {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced → (O.high h).Reduced := by
+  intro o
+  apply reduced_of_relevant O ⟨O.1.heap[j].high, ?_⟩ o
+  apply reachable_of_edge
+  rw [h]
+  exact Edge.high rfl
+
+lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low h).Ordered := by
+  intro o
+  apply Bdd.ordered_of_edge
+  rfl
+  exact h
+  exact o
+  convert edge_of_low B
+  · symm; assumption
+  · assumption
+
+def OBdd.low {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
+  fun h ↦ ⟨O.1.low h, Bdd.low_ordered h O.2⟩
+
+lemma OBdd.low_reduced {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced → (O.low h).Reduced := by
+  intro o
+  apply reduced_of_relevant O ⟨O.1.heap[j].low, ?_⟩ o
+  apply reachable_of_edge
+  rw [h]
+  exact Edge.low rfl
+
+lemma OBdd.toTree_node {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.toTree = .branch O.1.heap[j].var (toTree (O.low h)) (toTree (O.high h)) := by
+  rcases O with ⟨⟨heap, root⟩, ho⟩
+  simp at h
+  simp_rw [h]
+  conv =>
+    lhs
+    unfold toTree
+  simp [low,high]
+  constructor <;> rfl
+
+lemma OBdd.size_node {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.size = 1 + (O.low h).size + (O.high h).size := by
+  simp [size]
+  rw [toTree_node h]
+  rfl
+
+-- lemma OBdd.expand_high' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+--     OBdd.evaluate (O.high h) = fun I ↦ if true then OBdd.evaluate (O.high h) I else OBdd.evaluate (O.low h) I := sorry
+
+-- lemma OBdd.expand_low' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+--     OBdd.evaluate (O.low h) = fun I ↦ if false then OBdd.evaluate (O.high h) I else OBdd.evaluate (O.low h) I := sorry
+
+
+lemma OBdd.evaluate_node'' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
+    O.evaluate = fun I ↦ if I[O.1.heap[j].var] then (O.high h).evaluate I else (O.low h).evaluate I := by
+  simp only [evaluate, Function.comp_apply]
+  rw [toTree_node h]
+  simp [DecisionTree.evaluate]
+
+lemma OBdd.var_lt_high_var {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.var < (O.high h).var := by
+  have e := Bdd.edge_of_high (h := h) O.1
+  exact @O.2 O.1.toRelevantPointer ⟨(O.high h).1.root, reachable_of_edge e⟩ e
+
+lemma OBdd.var_lt_low_var  {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.var < (O.low  h).var := by
+  have e := Bdd.edge_of_low (h := h) O.1
+  exact @O.2 O.1.toRelevantPointer ⟨(O.low h).1.root, reachable_of_edge e⟩ e
+
+lemma OBdd.evaluate_high_eq_evaluate_low_of_independentOf_root {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+    independentOf O.evaluate O.1.heap[j].var → (O.high h).evaluate = (O.low h).evaluate := by
+  intro i
+  ext I
+  trans O.evaluate I
+  · rw [i true I]
+    rw [evaluate_node'' h]
+    simp only [Vec.get_set_same']
+    exact (Independence' (O := O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩) true I
+  · rw [i false I]
+    rw [evaluate_node'' h]
+    simp only [Vec.get_set_same']
+    symm
+    exact (Independence' (O := O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var  (O := O); simp; rw [h]; simp)⟩) false I
+
+lemma OBdd.evaluate_high_eq_evaluate_set_true {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+    (O.high h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var true := by
+  ext I
+  simp only [Function.comp_apply]
+  nth_rw 2 [evaluate_node'' (j := j)]
+  beta_reduce
+  rw [Vec.get_set_same']
+  simp only [↓reduceIte]
+  have := var_lt_high_var (h := h)
+  simp [var] at this
+  rw [h] at this
+  simp at this
+  apply Independence (O := (O.high h)) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩
+
+lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+    (O.low h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var false := by
+  ext I
+  simp only [Function.comp_apply]
+  nth_rw 2 [evaluate_node'' (j := j)]
+  beta_reduce
+  rw [Vec.get_set_same']
+  simp only [Bool.false_eq_true, ↓reduceIte]
+  have := var_lt_high_var (h := h)
+  simp [var] at this
+  rw [h] at this
+  simp at this
+  apply Independence (O := (O.low h)) ⟨O.1.heap[j].var, (by convert var_lt_low_var (O := O); simp; rw [h]; simp)⟩
+
+lemma OBdd.evaluate_high_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+    O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.high ho).evaluate = (U.high hu).evaluate := by
+  intro h eq
+  rw [evaluate_high_eq_evaluate_set_true, h, eq ,← evaluate_high_eq_evaluate_set_true]
+
+
+lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+  O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.low ho).evaluate = (U.low hu).evaluate := by
+  intro h eq
+  rw [evaluate_low_eq_evaluate_set_false, h, eq ,← evaluate_low_eq_evaluate_set_false]
+
+lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+    Isomorphic (O.high h) (O.low h) → ¬ O.Reduced := by
+  intro iso R
+  apply R.1 O.1.toRelevantPointer
+  simp [toRelevantPointer]
+  rw [h]
+  constructor
+  have giso : GraphIsomorphic O ⟨(O.high h).1.root, reachable_of_edge (edge_of_high (h := h) O.1)⟩
+                                ⟨(O.low  h).1.root, reachable_of_edge (edge_of_low  (h := h) O.1)⟩ := iso
+  exact (symm (R.2 giso))
+
+theorem OBdd.Canonicity' {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
+  intro O_reduced U_reduced h
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    cases U_root_def : U.1.root with
+    | terminal c =>
+      simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+      rcases O with ⟨⟨heap, root⟩, o⟩
+      rcases U with ⟨⟨ueap, uoot⟩, u⟩
+      simp_all
+    | node i =>
+      rw [evaluate_terminal' O_root_def] at h
+      have : (U.high U_root_def).evaluate = (U.low U_root_def).evaluate := by
+        ext I
+        trans b
+        · rw [evaluate_high_eq_evaluate_set_true]
+          rw [← h]
+          simp
+        · rw [evaluate_low_eq_evaluate_set_false]
+          rw [← h]
+          simp
+      absurd U_reduced
+      apply not_reduced_of_iso_high_low (h := U_root_def)
+      apply Canonicity' (high_reduced U_reduced) (low_reduced U_reduced) this
+  | node j =>
+    cases U_root_def : U.1.root with
+    | terminal c =>
+      rw [evaluate_terminal' U_root_def] at h
+      have : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate := by
+        ext I
+        trans c
+        · rw [evaluate_high_eq_evaluate_set_true]
+          rw [h]
+          simp
+        · rw [evaluate_low_eq_evaluate_set_false]
+          rw [h]
+          simp
+      absurd O_reduced
+      apply not_reduced_of_iso_high_low (h := O_root_def)
+      apply Canonicity' (high_reduced O_reduced) (low_reduced O_reduced) this
+    | node i =>
+      simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+      rw [toTree_node O_root_def, toTree_node U_root_def]
+      simp only [Ordered, DecisionTree.branch.injEq]
+      have same_var : O.1.heap[j].var = U.1.heap[i].var := by
+        apply eq_iff_le_not_lt.mpr
+        · constructor
+          · apply le_of_not_lt
+            intro contra
+            have := Independence (O := O) ⟨U.1.heap[i].var.1, by rw [O_root_def]; simpa⟩
+            rw [h] at this
+            simp only [Fin.eta] at this
+            simp only [independentOf] at this
+            have that : OBdd.Isomorphic (U.high U_root_def) (U.low U_root_def) :=
+              Canonicity' (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+            apply U_reduced.1 U.1.toRelevantPointer
+            simp [toRelevantPointer]
+            rw [U_root_def]
+            constructor
+            have iso : GraphIsomorphic U  ⟨(U.high U_root_def).1.root, reachable_of_edge (edge_of_high (h := U_root_def) U.1)⟩
+                                          ⟨(U.low  U_root_def).1.root, reachable_of_edge (edge_of_low  (h := U_root_def) U.1)⟩ := that
+            exact (symm (U_reduced.2 iso))
+          · intro contra
+            have := Independence (O := U) ⟨O.1.heap[j].var.1, by rw [U_root_def]; simpa⟩
+            rw [← h] at this
+            simp only [Ordered, Fin.eta] at this
+            simp only [independentOf] at this
+            have that : OBdd.Isomorphic (O.high O_root_def) (O.low O_root_def) :=
+              Canonicity' (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+            apply O_reduced.1 O.1.toRelevantPointer
+            simp [toRelevantPointer]
+            rw [O_root_def]
+            constructor
+            have iso : GraphIsomorphic O  ⟨(O.high O_root_def).1.root, reachable_of_edge (edge_of_high (h := O_root_def) O.1)⟩
+                                          ⟨(O.low  O_root_def).1.root, reachable_of_edge (edge_of_low  (h := O_root_def) O.1)⟩ := that
+            exact (symm (O_reduced.2 iso))
+      constructor
+      · assumption
+      · constructor
+        · apply Canonicity' (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq  h same_var)
+        · apply Canonicity' (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq h same_var)
+termination_by O.size + U.size
+decreasing_by
+  simp [size_node U_root_def]; linarith
+  simp [size_node O_root_def]; linarith
+  all_goals
+    simp [size_node O_root_def, size_node U_root_def]; linarith
