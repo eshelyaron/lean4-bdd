@@ -184,7 +184,7 @@ instance OBdd.instDecidableEq {n m} : DecidableEq (OBdd n m) :=
 def OEdge {n m} (B C : OBdd n m) := B.1.heap = C.1.heap ∧ Edge B.1.heap B.1.root C.1.root
 
 @[simp]
-def Bdd.var {n m} (B : Bdd n m) : Nat := B.root.toVar B.heap
+def Bdd.var {n m} (B : Bdd n m) : Fin n.succ := B.root.toVar B.heap
 
 @[simp]
 def OBdd.var {n m} (O : OBdd n m) : Nat := O.1.var
@@ -205,7 +205,7 @@ theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
     simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
     simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
     rcases hp : x.root
-    case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]; exact h3
+    case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]
     case node j => rcases hq : y.root <;> simp_all
   exact Subrelation.wf this (InvImage.wf _ (Nat.lt_wfRel.wf))
 
@@ -1024,3 +1024,484 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
     exact R
 
 -- theorem OBdd.minimal_of_reduced {O U : OBdd n m} : O.evaluate = U.evaluate → O.Reduced → O.size ≤ U.size := by sorry
+
+@[simp]
+lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
+
+@[simp]
+lemma high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
+
+
+lemma oedge_of_low {h : O.1.root = node j} : OEdge O (O.low h) := ⟨rfl, edge_of_low (h := h)⟩
+lemma oedge_of_high {h : O.1.root = node j} : OEdge O (O.high h) := ⟨rfl, edge_of_high (h := h)⟩
+
+def OBdd.collect_helper (O : OBdd n m) : Vec Bool m × List (Fin m) → Vec Bool m × List (Fin m) := by
+  cases h : O.1.root with
+  | terminal b => exact id
+  | node j =>
+    let v := O.1.heap[j].var
+    intro I
+    exact if I.1.get j then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩)
+termination_by O
+decreasing_by
+  exact oedge_of_high
+  exact oedge_of_low
+
+/-- Return a list of all reachable node indices. -/
+def OBdd.collect : OBdd n m → List (Fin m) :=
+  fun O ↦ (collect_helper O ⟨Vec.replicate m false, []⟩).2
+
+
+lemma OBdd.collect_helper_terminal {v : Vec (Node n m) m} {h : Bdd.Ordered {heap := v, root := terminal b}} :
+    collect_helper ⟨{heap := v, root := terminal b}, h⟩ I = I := by
+  conv =>
+    lhs
+    unfold collect_helper
+  congr
+
+lemma OBdd.collect_helper_terminal' (O : OBdd n m) (h : O.1.root = terminal b) :
+    collect_helper O I = I := by
+  have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+  have := collect_helper_terminal (h := (show Bdd.Ordered {heap := O.1.heap, root := terminal b} by simp_rw [← h]; exact O.2)) (I := I)
+  simp_rw [h] at O_def
+  simp_rw [← O_def] at this
+  rw [this]
+
+lemma OBdd.collect_helper_node {v : Vec (Node n m) m} {h : Bdd.Ordered {heap := v, root := node j}} :
+    collect_helper ⟨{heap := v, root := node j}, h⟩ I =
+      if I.1.get j
+      then I
+      else collect_helper ⟨{heap := v, root := v[j].high}, ordered_of_relevant ⟨{heap := v, root := node j}, h⟩ ⟨v[j].high, reachable_of_edge (Edge.high rfl)⟩⟩
+                          (collect_helper ⟨{heap := v, root := v[j].low}, ordered_of_relevant ⟨{heap := v, root := node j}, h⟩ ⟨v[j].low, reachable_of_edge (Edge.low rfl)⟩⟩
+                                          ⟨I.1.set j true, j :: I.2⟩) := by
+  conv =>
+    lhs
+    unfold collect_helper
+  congr
+
+lemma OBdd.collect_helper_node' (O : OBdd n m) {j : Fin m} (h : O.1.root = node j) :
+    collect_helper O I = if I.1.get j then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩) := by
+  have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
+  have := collect_helper_node (h := (show Bdd.Ordered {heap := O.1.heap, root := node j} by simp_rw [← h]; exact O.2)) (I := I)
+  simp_rw [h] at O_def
+  simp_rw [← O_def] at this
+  rw [this]
+  congr
+
+theorem OBdd.collect_helper_retains_found {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
+    j ∈ I.2 → j ∈ (collect_helper O I).2 := by
+  intro h
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    rw [collect_helper_terminal' O O_root_def]
+    assumption
+  | node i =>
+    rw [collect_helper_node' O O_root_def]
+    cases I.1.get i
+    case true  => simpa
+    case false =>
+      simp only [Bool.false_eq_true, ↓reduceIte]
+      have : j ∈ ((O.low O_root_def).collect_helper (I.1.set i true, i :: I.2)).2 := by
+        apply collect_helper_retains_found
+        simp only []
+        cases decEq j i with
+        | isFalse hf => right; assumption
+        | isTrue ht => rw [ht]; left
+      exact collect_helper_retains_found this
+termination_by O
+decreasing_by
+  · exact oedge_of_low
+  · exact oedge_of_high
+
+theorem OBdd.collect_helper_retains_marked {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
+    I.1.get j = true → (collect_helper O I).1.get j = true := by
+  intro h
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    rw [collect_helper_terminal' O O_root_def]
+    assumption
+  | node i =>
+    rw [collect_helper_node' O O_root_def]
+    cases I.1.get i
+    case true  => simpa
+    case false =>
+      simp only [Bool.false_eq_true, ↓reduceIte]
+      have : ((O.low O_root_def).collect_helper (I.1.set i true, i :: I.2)).1.get j = true := by
+        apply collect_helper_retains_marked
+        simp only []
+        cases decEq i j with
+        | isFalse hf => rw [List.Vector.get_set_of_ne hf]; assumption
+        | isTrue ht => rw [ht]; simp
+      exact collect_helper_retains_marked this
+termination_by O
+decreasing_by
+  · exact oedge_of_low
+  · exact oedge_of_high
+
+theorem OBdd.collect_helper_spec''' {O : OBdd n m} :
+    (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ I.2) →
+    (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ (collect_helper O I).2) := by
+  intro h re ma
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    have : (⟨node i, re⟩ : O.1.RelevantPointer).1  = terminal b := by
+      apply eq_terminal_of_relevant
+      rw [← O_root_def]
+    contradiction
+  | node j =>
+    rw [collect_helper_node' O O_root_def]
+    cases hh : I.1.get j with
+    | true => exact h re ma
+    | false =>
+      simp
+      apply collect_helper_retains_found
+      apply collect_helper_retains_found
+      simp only []
+      right
+      exact h re ma
+
+theorem OBdd.collect_helper_only_marks_reachable {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
+    I.1.get j = false → (collect_helper O I).1.get j = true → Reachable O.1.heap O.1.root (node j) := by
+  intro h1 h2
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    rw [collect_helper_terminal' O O_root_def, h1] at h2; contradiction
+  | node i =>
+    cases decEq i j with
+    | isTrue ht  => rw [ht]; exact Relation.ReflTransGen.refl
+    | isFalse hf =>
+      rw [collect_helper_node' O O_root_def] at h2
+      cases hh : I.1.get i with
+      | true => rw [hh] at h2; simp at h2; rw [h1] at h2; contradiction
+      | false =>
+        rw [hh] at h2
+        simp at h2
+        rw [← O_root_def]
+        cases hhh : ((O.low O_root_def).collect_helper (I.1.set i true, i :: I.2)).1.get j with
+        | false =>
+          have : Reachable (O.high O_root_def).1.heap (O.high O_root_def).1.root (node j) := by
+            apply collect_helper_only_marks_reachable (I := ((O.low O_root_def).collect_helper (I.1.set i true, i :: I.2)))
+            · assumption
+            · assumption
+          simp at this
+          trans (O.high O_root_def).1.root
+          · exact reachable_of_edge (edge_of_high (h := O_root_def) O.1)
+          · assumption
+        | true =>
+          have : Reachable (O.low O_root_def).1.heap (O.low O_root_def).1.root (node j) := by
+            apply collect_helper_only_marks_reachable (I := (I.1.set i true, i :: I.2))
+            · simp; rw [List.Vector.get_set_of_ne hf]; assumption
+            · assumption
+          simp at this
+          trans (O.low O_root_def).1.root
+          · exact reachable_of_edge (edge_of_low (h := O_root_def) O.1)
+          · assumption
+termination_by O
+decreasing_by
+  exact oedge_of_high
+  exact oedge_of_low
+
+theorem OBdd.collect_helper_spec' {O : OBdd n m} :
+    (∀ i, (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ I.2)) →
+    ∀ i, (Reachable O.1.heap O.1.root (node i) → (collect_helper O I).1.get i → i ∈ (collect_helper O I).2) := by
+  intro h j re ma
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    have : (⟨node j, re⟩ : O.1.RelevantPointer).1  = terminal b := by
+      apply eq_terminal_of_relevant
+      rw [← O_root_def]
+    contradiction
+  | node k =>
+    rw [collect_helper_node' O O_root_def] at ma
+    rw [collect_helper_node' O O_root_def]
+    cases hh : I.1.get k with
+    | true =>
+      rw [hh] at ma
+      simp at ma
+      simp
+      exact h j re ma
+    | false =>
+      rw [hh] at ma
+      simp at ma
+      simp
+      cases decEq k j with
+      | isTrue hht =>
+        apply collect_helper_retains_found
+        apply collect_helper_retains_found
+        rw [hht]
+        left
+      | isFalse hhf =>
+        cases hhh : I.1.get j with
+        | true =>
+          apply collect_helper_retains_found
+          apply collect_helper_retains_found
+          right
+          apply h <;> assumption
+        | false=>
+          cases hhhh : ((O.low O_root_def).collect_helper (I.1.set k true, k :: I.2)).1.get j with
+          | true =>
+            have : j ∈ ((O.low O_root_def).collect_helper (I.1.set k true, k :: I.2)).2 := by
+              apply collect_helper_spec'
+              · intro i' re' ma'
+                simp at ma'
+                simp at re'
+                simp only
+                cases decEq k i' with
+                | isFalse hff =>
+                  rw [List.Vector.get_set_of_ne hff] at ma'
+                  right
+                  apply h
+                  exact Reachable.trans (reachable_of_edge (edge_of_low (h := O_root_def) O.1)) re'
+                  exact ma'
+                | isTrue  htt => rw [htt]; left
+              · have : (I.1.set k true, k :: I.2).1.get j = false := by simp only; rw [List.Vector.get_set_of_ne hhf]; exact hhh
+                apply collect_helper_only_marks_reachable this hhhh
+              · exact hhhh
+            apply collect_helper_retains_found this
+          | false=>
+            apply collect_helper_spec'
+            · intro i' re' ma'
+              simp at ma' re'
+              have := h i' (Reachable.trans (reachable_of_edge (edge_of_high (h := O_root_def) O.1)) re')
+              cases hhhhh : I.1.get i' with
+              | true =>
+                apply this at hhhhh
+                have : i' ∈ (I.1.set k true, k :: I.2).2 := by simp only; right; exact hhhhh
+                apply collect_helper_retains_found this
+              | false=>
+                cases decEq k i' with
+                | isTrue hhtt =>
+                  apply collect_helper_retains_found
+                  rw [hhtt]
+                  left
+                | isFalse hhff =>
+                  have that : (I.1.set k true, k :: I.2).1.get i' = false := by simp only; rw [List.Vector.get_set_of_ne hhff]; exact hhhhh
+                  apply collect_helper_spec'
+                  · intro i'' re'' ma''
+                    simp at ma''
+                    simp at re''
+                    simp only
+                    cases decEq k i'' with
+                    | isFalse hfff =>
+                      rw [List.Vector.get_set_of_ne hfff] at ma''
+                      right
+                      apply h
+                      exact Reachable.trans (reachable_of_edge (edge_of_low (h := O_root_def) O.1)) re''
+                      exact ma''
+                    | isTrue  htt => rw [htt]; left
+
+                  · apply collect_helper_only_marks_reachable that ma'
+                  · exact ma'
+            · apply collect_helper_only_marks_reachable hhhh ma
+            · assumption
+termination_by O
+decreasing_by
+  exact oedge_of_low
+  exact oedge_of_high
+  exact oedge_of_low
+
+lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachable O.1.heap U.1.root O.1.root := by
+  rintro ⟨same_heap, e⟩ contra
+  apply Relation.reflTransGen_iff_eq_or_transGen.mp at contra
+  cases contra with
+  | inl h =>
+    rw [← h] at e
+    have : GraphEdge O.1 O.1.toRelevantPointer O.1.toRelevantPointer := e
+    apply O.2 at this
+    simp at this
+  | inr h =>
+    apply transGen_iff_single_and_reflTransGen.mp at h
+    rcases h with ⟨c, h1, h2⟩
+    rw [same_heap] at h1
+    let V : OBdd n m := ⟨{heap := U.1.heap, root := c}, ordered_of_edge (r := rfl) (h := rfl) c h1⟩
+    have : c = V.1.root := rfl
+    rw [this] at h1 h2
+    apply not_oedge_reachable ⟨by rfl, h1⟩
+    trans O.1.root
+    rw [same_heap] at h2; exact h2
+    rw [← same_heap]; exact reachable_of_edge e
+termination_by O
+
+lemma OBdd.reachable_or_eq_low_high {O : OBdd n m} :
+    Reachable O.1.heap O.1.root p → (O.1.root = p ∨ (∃ j, ∃ (h : O.1.root = node j), (Reachable O.1.heap (O.low h).1.root p ∨ Reachable O.1.heap (O.high h).1.root p))) := by
+  intro r
+  cases (Relation.reflTransGen_swap.mp r) with
+  | refl => left; rfl
+  | tail t e =>
+    rcases O_def: O with ⟨⟨heap, root⟩, o⟩
+    simp only
+    have O_root_def : O.1.root = root := by rw [O_def]
+    cases root with
+    | terminal b =>
+      rw [O_root_def] at e
+      contradiction
+    | node j =>
+      right
+      use j
+      use rfl
+      rw [O_root_def] at e
+      cases e with
+      | low h =>
+        left
+        apply (Relation.reflTransGen_swap.mp) at t
+        rw [← h] at t
+        simp_rw [← O_def]
+        have O_heap_def : O.1.heap = heap := by rw [O_def]
+        nth_rw 1 [O_heap_def] at t
+        exact t
+      | high h =>
+        right
+        apply (Relation.reflTransGen_swap.mp) at t
+        rw [← h] at t
+        simp_rw [← O_def]
+        have O_heap_def : O.1.heap = heap := by rw [O_def]
+        nth_rw 1 [O_heap_def] at t
+        exact t
+
+lemma OBdd.collect_spec' {O : OBdd n m} {j : Fin m} {I : Vec Bool m × List (Fin m)} :
+    Reachable O.1.heap O.1.root (node j) → (∀ i, (Reachable O.1.heap O.1.root (node i) → Reachable O.1.heap (node i) (node j) → I.1.get i = false)) → (O.collect_helper I).1.get j = true := by
+  intro h1 h2
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    have : (⟨node j, h1⟩ : O.1.RelevantPointer).1  = terminal b := by
+      apply eq_terminal_of_relevant
+      rw [← O_root_def]
+    contradiction
+  | node i =>
+    rw [collect_helper_node' O O_root_def]
+    have : I.1.get i = false := by
+      apply h2 i
+      · rw [← O_root_def]
+        exact Relation.ReflTransGen.refl
+      · rw [← O_root_def]
+        exact h1
+    rw [this]
+    simp only [Bool.false_eq_true, ↓reduceIte]
+    cases decEq i j with
+    | isTrue h =>
+      apply collect_helper_retains_marked
+      apply collect_helper_retains_marked
+      rw [h]
+      simp
+    | isFalse hij =>
+      cases Pointer.instDecidableReachable (O.low O_root_def) (node j) with
+      | isTrue ht  =>
+        apply collect_helper_retains_marked
+        apply collect_spec'
+        · exact ht
+        · intro i' re1 re2
+          simp only
+          cases decEq i i' with
+          | isTrue h =>
+            exfalso
+            apply not_oedge_reachable (oedge_of_low (h := O_root_def))
+            rw [← h] at re1
+            rw [O_root_def]
+            exact re1
+          | isFalse h =>
+            rw [List.Vector.get_set_of_ne h]
+            apply h2
+            exact Reachable.trans (reachable_of_edge (edge_of_low (h := O_root_def) O.1)) re1
+            exact re2
+      | isFalse hf =>
+        apply collect_spec'
+        · cases (reachable_or_eq_low_high (p := node j) h1) with
+        | inl h => rw [O_root_def] at h; simp at h; contradiction
+        | inr h =>
+          rcases h with ⟨j', h', d⟩
+          have same : i = j' := by rw [O_root_def] at h'; simp at h'; assumption
+          subst same
+          cases d with
+          | inl => contradiction
+          | inr => assumption
+        · intro i' re ma
+          contrapose! hf
+          simp only [Bool.not_eq_false] at hf
+          apply collect_helper_only_marks_reachable (I := (I.1.set i true, i :: I.2))
+          rw [List.Vector.get_set_of_ne hij]
+          apply h2
+          · exact Reachable.trans (reachable_of_edge (edge_of_high (h := O_root_def) O.1)) (Reachable.trans re ma)
+          · exact Relation.ReflTransGen.refl
+          · apply collect_spec'
+            · have that : Reachable (O.low O_root_def).1.heap (O.low O_root_def).1.root (node i') := by
+                apply collect_helper_only_marks_reachable (I := (I.1.set i true, i :: I.2))
+                · cases decEq i i' with
+                  | isFalse hff =>
+                    rw [List.Vector.get_set_of_ne hff]
+                    apply h2 i' (Reachable.trans (reachable_of_edge (edge_of_high (h := O_root_def) O.1)) re) ma
+                  | isTrue htt =>
+                    exfalso
+                    apply not_oedge_reachable (oedge_of_high (h := O_root_def))
+                    rw [htt] at O_root_def
+                    rw [O_root_def]
+                    exact re
+                · assumption
+              exact Reachable.trans that ma
+            · intro i'' re1 re2
+              simp only
+              cases decEq i i'' with
+              | isTrue h =>
+                rw [← h] at re1
+                exfalso
+                apply not_oedge_reachable (oedge_of_low (h := O_root_def))
+                rw [O_root_def]
+                exact re1
+              | isFalse h =>
+                rw [List.Vector.get_set_of_ne h]
+                apply h2
+                exact Reachable.trans (reachable_of_edge (edge_of_low (h := O_root_def) O.1)) re1
+                exact re2
+termination_by O
+decreasing_by
+  · exact oedge_of_low
+  · exact oedge_of_high
+  · exact oedge_of_low
+
+/-- `collect` is correct. -/
+theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.root (node j) → j ∈ collect O := by
+  intro h
+  simp [collect]
+  apply collect_helper_spec'
+  · intro i re ma
+    rw [List.Vector.get_replicate false i] at ma
+    contradiction
+  · assumption
+  · apply collect_spec' h
+    intro i re1 re2
+    exact List.Vector.get_replicate false i
+
+def OBdd.discover_helper : List (Fin m) → Vec (Node n m ) m → Vec (List (Fin m)) n → Vec (List (Fin m)) n
+  | [], _, I => I
+  | head :: tail, v, I => discover_helper tail v (I.set v[head].var (head :: I.get v[head].var))
+
+lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vec (List (Fin m)) n} : j ∈ I.get i → j ∈ (discover_helper l v I).get i := by
+  intro h
+  cases l with
+  | nil => assumption
+  | cons head tail =>
+    simp [discover_helper]
+    apply discover_helper_retains_found O
+    cases decEq v[head.1].var i with
+    | isFalse hf => rw [List.Vector.get_set_of_ne hf]; assumption
+    | isTrue  ht => subst ht; rw [List.Vector.get_set_same]; right; assumption
+
+lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vec (List (Fin m)) n} : j ∈ l → j ∈ (discover_helper l v I).get v[j].var := by
+  intro h
+  cases h with
+  | head as =>
+    simp [discover_helper]
+    apply discover_helper_retains_found O
+    rw [List.Vector.get_set_same]
+    left
+  | tail b ih =>
+    simp [discover_helper]
+    apply discover_helper_spec O ih
+
+/-- Return a vector whose `v`th entry is a list of node indices with variable index `v`. -/
+def OBdd.discover (O : OBdd n m) : Vec (List (Fin m)) n := discover_helper (collect O) O.1.heap (Vec.replicate n [])
+
+/-- `discover` is correct. -/
+theorem OBdd.discover_spec {O : OBdd n m} {j : Fin m} :
+  (Reachable O.1.heap O.1.root (node j)) → j ∈ (discover O).get O.1.heap[j].var := (discover_helper_spec O) ∘ collect_spec
+
+--#eval OBdd.discover example_bdd
