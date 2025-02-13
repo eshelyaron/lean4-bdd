@@ -1,15 +1,44 @@
 import Mathlib.Data.Vector.Basic
 import Mathlib.Data.Fintype.Basic
+import Init.Data.ToString.Basic
 import Mathlib.Tactic.DeriveFintype
 import Mathlib.Tactic.Linarith
 import Mathlib.Data.Fintype.Vector
 open List renaming Vector → Vec
+
+instance {α : Type u} [ToString α] : ToString (Vec α k) := ⟨fun v ↦ v.1.toString⟩
 
 /-- Pointer to a BDD node or terminal -/
 inductive Pointer m where
   | terminal : Bool  → Pointer _
   | node : Fin m → Pointer m
 deriving Fintype, DecidableEq, Repr
+
+instance Pointer.instToString : ToString (Pointer m) := ⟨fun p =>
+  match p with
+  | .terminal true => "⊤"
+  | .terminal false => "⊥"
+  | .node j => "→" ++ toString j⟩
+
+inductive Pointer.le : Pointer m → Pointer m → Prop where
+  | terminal_le_terminal : b ≤ c → le (terminal b) (terminal c)
+  | terminal_le_node : le (terminal b) (node j)
+  | node_le_node : j ≤ i → le (node j) (node i)
+
+instance Pointer.instLE : LE (Pointer m) := {le := Pointer.le}
+
+instance Pointer.instDecidableLe : DecidableLE (Pointer m) :=
+  fun p q ↦ match p with
+  | terminal b => match q with
+    | terminal c => match Bool.instDecidableLe b c with
+      | isTrue ht => isTrue  (.terminal_le_terminal ht)
+      | isFalse hf => isFalse (by intro contra; cases contra; contradiction)
+    | node i => isTrue (.terminal_le_node)
+  | node j => match q with
+    | terminal c => isFalse (by intro contra; contradiction)
+    | node i => match Fin.decLe j i with
+      | isTrue ht => isTrue (.node_le_node ht)
+      | isFalse hf => isFalse (by intro contra; cases contra; contradiction)
 
 open Pointer
 
@@ -20,11 +49,15 @@ structure Node (n) (m) where
   high : Pointer m
 deriving DecidableEq, Repr
 
+instance Node.instToString : ToString (Node n m) := ⟨fun N => "⟨" ++ (toString N.var) ++ ", " ++ (toString N.low) ++ ", " ++ (toString N.high) ++ "⟩"⟩
+
 /-- Raw BDD -/
 structure Bdd (n) (m) where
   heap : Vec (Node n m) m
   root : Pointer m
 deriving DecidableEq
+
+instance Bdd.instToString : ToString (Bdd n m) := ⟨fun B => "⟨" ++ (toString B.heap) ++ ", " ++ (toString B.root)  ++ "⟩"⟩
 
 open Bdd
 
@@ -75,7 +108,6 @@ def Pointer.Reachable {n m} (w : Vec (Node n m) m) := Relation.ReflTransGen (Edg
 
 @[trans]
 theorem Pointer.Reachable.trans (hab : Reachable v a b) (hbc : Reachable v b c) : Reachable v a c := Relation.ReflTransGen.trans hab hbc
-
 
 /-- `B.RelevantPointer` is the subtype of pointers reachable from `B.root`. -/
 def Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
@@ -906,6 +938,7 @@ lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} {h : O.1
                                 ⟨(O.low  h).1.root, reachable_of_edge (edge_of_low  (h := h) O.1)⟩ := iso
   exact (symm (R.2 giso))
 
+/-- Reduced OBDDs are canonical.  -/
 theorem OBdd.Canonicity {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
   intro O_reduced U_reduced h
   cases O_root_def : O.1.root with
@@ -1023,8 +1056,6 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
     apply Canonicity (high_reduced R) (low_reduced R) this
     exact R
 
--- theorem OBdd.minimal_of_reduced {O U : OBdd n m} : O.evaluate = U.evaluate → O.Reduced → O.size ≤ U.size := by sorry
-
 @[simp]
 lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
 
@@ -1050,7 +1081,6 @@ decreasing_by
 /-- Return a list of all reachable node indices. -/
 def OBdd.collect : OBdd n m → List (Fin m) :=
   fun O ↦ (collect_helper O ⟨Vec.replicate m false, []⟩).2
-
 
 lemma OBdd.collect_helper_terminal {v : Vec (Node n m) m} {h : Bdd.Ordered {heap := v, root := terminal b}} :
     collect_helper ⟨{heap := v, root := terminal b}, h⟩ I = I := by
@@ -1138,28 +1168,6 @@ decreasing_by
   · exact oedge_of_low
   · exact oedge_of_high
 
-theorem OBdd.collect_helper_spec''' {O : OBdd n m} :
-    (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ I.2) →
-    (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ (collect_helper O I).2) := by
-  intro h re ma
-  cases O_root_def : O.1.root with
-  | terminal b =>
-    have : (⟨node i, re⟩ : O.1.RelevantPointer).1  = terminal b := by
-      apply eq_terminal_of_relevant
-      rw [← O_root_def]
-    contradiction
-  | node j =>
-    rw [collect_helper_node' O O_root_def]
-    cases hh : I.1.get j with
-    | true => exact h re ma
-    | false =>
-      simp
-      apply collect_helper_retains_found
-      apply collect_helper_retains_found
-      simp only []
-      right
-      exact h re ma
-
 theorem OBdd.collect_helper_only_marks_reachable {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
     I.1.get j = false → (collect_helper O I).1.get j = true → Reachable O.1.heap O.1.root (node j) := by
   intro h1 h2
@@ -1201,7 +1209,7 @@ decreasing_by
   exact oedge_of_high
   exact oedge_of_low
 
-theorem OBdd.collect_helper_spec' {O : OBdd n m} :
+theorem OBdd.collect_helper_spec {O : OBdd n m} :
     (∀ i, (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ I.2)) →
     ∀ i, (Reachable O.1.heap O.1.root (node i) → (collect_helper O I).1.get i → i ∈ (collect_helper O I).2) := by
   intro h j re ma
@@ -1241,7 +1249,7 @@ theorem OBdd.collect_helper_spec' {O : OBdd n m} :
           cases hhhh : ((O.low O_root_def).collect_helper (I.1.set k true, k :: I.2)).1.get j with
           | true =>
             have : j ∈ ((O.low O_root_def).collect_helper (I.1.set k true, k :: I.2)).2 := by
-              apply collect_helper_spec'
+              apply collect_helper_spec
               · intro i' re' ma'
                 simp at ma'
                 simp at re'
@@ -1259,7 +1267,7 @@ theorem OBdd.collect_helper_spec' {O : OBdd n m} :
               · exact hhhh
             apply collect_helper_retains_found this
           | false=>
-            apply collect_helper_spec'
+            apply collect_helper_spec
             · intro i' re' ma'
               simp at ma' re'
               have := h i' (Reachable.trans (reachable_of_edge (edge_of_high (h := O_root_def) O.1)) re')
@@ -1276,7 +1284,7 @@ theorem OBdd.collect_helper_spec' {O : OBdd n m} :
                   left
                 | isFalse hhff =>
                   have that : (I.1.set k true, k :: I.2).1.get i' = false := by simp only; rw [List.Vector.get_set_of_ne hhff]; exact hhhhh
-                  apply collect_helper_spec'
+                  apply collect_helper_spec
                   · intro i'' re'' ma''
                     simp at ma''
                     simp at re''
@@ -1300,6 +1308,7 @@ decreasing_by
   exact oedge_of_high
   exact oedge_of_low
 
+/-- An acyclicity lemma: an edge from `O` to `U` implies that `O` is not reachable from `U`.  -/
 lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachable O.1.heap U.1.root O.1.root := by
   rintro ⟨same_heap, e⟩ contra
   apply Relation.reflTransGen_iff_eq_or_transGen.mp at contra
@@ -1461,7 +1470,7 @@ decreasing_by
 theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.root (node j) → j ∈ collect O := by
   intro h
   simp [collect]
-  apply collect_helper_spec'
+  apply collect_helper_spec
   · intro i re ma
     rw [List.Vector.get_replicate false i] at ma
     contradiction
@@ -1469,39 +1478,3 @@ theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.ro
   · apply collect_spec' h
     intro i re1 re2
     exact List.Vector.get_replicate false i
-
-def OBdd.discover_helper : List (Fin m) → Vec (Node n m ) m → Vec (List (Fin m)) n → Vec (List (Fin m)) n
-  | [], _, I => I
-  | head :: tail, v, I => discover_helper tail v (I.set v[head].var (head :: I.get v[head].var))
-
-lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vec (List (Fin m)) n} : j ∈ I.get i → j ∈ (discover_helper l v I).get i := by
-  intro h
-  cases l with
-  | nil => assumption
-  | cons head tail =>
-    simp [discover_helper]
-    apply discover_helper_retains_found O
-    cases decEq v[head.1].var i with
-    | isFalse hf => rw [List.Vector.get_set_of_ne hf]; assumption
-    | isTrue  ht => subst ht; rw [List.Vector.get_set_same]; right; assumption
-
-lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vec (List (Fin m)) n} : j ∈ l → j ∈ (discover_helper l v I).get v[j].var := by
-  intro h
-  cases h with
-  | head as =>
-    simp [discover_helper]
-    apply discover_helper_retains_found O
-    rw [List.Vector.get_set_same]
-    left
-  | tail b ih =>
-    simp [discover_helper]
-    apply discover_helper_spec O ih
-
-/-- Return a vector whose `v`th entry is a list of node indices with variable index `v`. -/
-def OBdd.discover (O : OBdd n m) : Vec (List (Fin m)) n := discover_helper (collect O) O.1.heap (Vec.replicate n [])
-
-/-- `discover` is correct. -/
-theorem OBdd.discover_spec {O : OBdd n m} {j : Fin m} :
-  (Reachable O.1.heap O.1.root (node j)) → j ∈ (discover O).get O.1.heap[j].var := (discover_helper_spec O) ∘ collect_spec
-
---#eval OBdd.discover example_bdd
