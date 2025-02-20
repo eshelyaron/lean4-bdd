@@ -138,6 +138,13 @@ lemma Bdd.Ordered_of_terminal {n m} {v : Vec (Node n m) m} {b} : Bdd.Ordered {he
   rcases q with ⟨q, hq⟩
   cases Relation.reflTransGen_swap.mp hp <;> exfalso <;> apply not_terminal_edge <;> assumption
 
+lemma Bdd.Ordered_of_terminal' {n m} {B : Bdd n m} {b} : B.root = terminal b → B.Ordered := by
+  intro h
+  have : B = {heap := B.heap, root := B.root} := rfl
+  have : B = {heap := B.heap, root := terminal b} := by rw [this, h]
+  rw [this]
+  apply Ordered_of_terminal
+
 lemma Ordered_of_Proper (B : Bdd n m) : Proper B.heap → Ordered B := by
   rintro h ⟨p, hp⟩ ⟨q, hq⟩ e
   simp_all only [GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
@@ -1478,3 +1485,56 @@ theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.ro
   · apply collect_spec' h
     intro i re1 re2
     exact List.Vector.get_replicate false i
+
+-- def OBdd.collect_helper (O : OBdd n m) : Vec Bool m × List (Fin m) → Vec Bool m × List (Fin m) := by
+--   cases h : O.1.root with
+--   | terminal b => exact id
+--   | node j =>
+--     let v := O.1.heap[j].var
+--     intro I
+--     exact if I.1.get j then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩)
+-- termination_by O
+-- decreasing_by
+--   exact oedge_of_high
+--   exact oedge_of_low
+
+-- theorem OBdd.collect_helper_spec_reverse {O : OBdd n m} :
+--     (∀ i ∈ I.2, Reachable O.1.heap O.1.root (node i)) →
+--     ∀ i ∈ (collect_helper O I).2, Reachable O.1.heap O.1.root (node i) := by
+--   intro h1 i h2
+--   cases h : O.1.root with
+--   | terminal b =>
+--     rw [collect_helper_terminal' O h] at h2
+--     rw [h] at h1
+--     exact h1 i h2
+--   | node j =>
+--     rw [collect_helper_node' O h] at h2
+--     split at h2
+--     next ht =>
+--       rw [h] at h1
+--       exact h1 i h2
+--     next hf =>
+--       cases List.instDecidableMemOfLawfulBEq i (j :: I.2) with
+--       | isTrue htt =>
+--         cases htt with
+--         | head as => left
+--         | tail b hin =>
+--           rw [h] at h1
+--           exact h1 i hin
+--       | isFalse hff =>
+--         cases List.instDecidableMemOfLawfulBEq i ((O.low h).collect_helper (I.1.set j true, j :: I.2)).2 with
+--         | isFalse hhf => sorry
+--         | isTrue hht =>
+--           rw [← h]
+--           suffices s : (Reachable O.1.heap (O.low h).1.root (node i)) from Relation.ReflTransGen.trans (reachable_of_edge (edge_of_low (h := h) O.1)) s
+--           rw [← low_heap_eq_heap (h := h)]
+--           apply collect_helper_spec_reverse _ i hht
+--           · intro i' hi'
+--             simp only at hi'
+--             sorry
+
+-- theorem OBdd.collect_spec_reverse {O : OBdd n m} {j : Fin m} : j ∈ collect O → Reachable O.1.heap O.1.root (node j) := by
+--   intro h
+--   simp only [collect] at h
+--   unfold collect_helper at h
+--   sorry
