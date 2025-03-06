@@ -845,3 +845,8 @@ private lemma ordered_after_reduce : (Reduce.reduce example_not_reduced_bdd).Ord
 
 example : ¬ OBdd.Reduced                 example_not_reduced_bdd                         := by decide (config := {kernel := true})
 example :   OBdd.Reduced ⟨(Reduce.reduce example_not_reduced_bdd), ordered_after_reduce⟩ := by decide (config := {kernel := true})
+
+
+--#eval Reduce.reduce example_not_reduced_bdd
+--#eval! (OBdd.numPointers (⟨Reduce.reduce example_not_reduced_bdd, Reduce.reduce_spec.1⟩))
+--#eval! (Compactify.compactify (⟨Reduce.reduce example_not_reduced_bdd, Reduce.reduce_spec.1⟩))
