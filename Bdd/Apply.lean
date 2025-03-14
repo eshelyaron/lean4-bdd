@@ -1,6 +1,6 @@
 import Bdd.Basic
 import Bdd.Reduce
--- import Std.HashMap.Basic
+import Std.Data.HashMap.Lemmas
 
 open List renaming Vector → Vec
 
@@ -21,7 +21,13 @@ structure State (n) (m) (m') where
   heap : Vec (Node n (p2t m m')) (p2t m m')
   next : Fin (p2t m m')
 
--- def threeval (op : (Bool → Bool → Bool)): Pointer m → Pointer m' → (Option Bool)
+def GoodState (op : Bool → Bool → Bool) (Ov : Vec (Node n m) m) (Uv : Vec (Node n m') m') : State n m m' → Prop := fun s ↦
+  ∀ key (hk : key ∈ s.cache),
+  ∃ (o : Bdd.Ordered ⟨s.heap, s.cache[key]'hk⟩) (o1 : Bdd.Ordered ⟨Ov, key.1⟩) (o2 : Bdd.Ordered ⟨Uv, key.2⟩),
+  ∀ I,
+  (op (OBdd.evaluate ⟨⟨Ov, key.1⟩, o1⟩ I) (OBdd.evaluate ⟨⟨Uv, key.2⟩, o2⟩ I)) = OBdd.evaluate ⟨⟨s.heap, s.cache[key]'hk⟩, o⟩ I
+
+-- def threeval (op : (Bool → Bool → Bool)) : Pointer m → Pointer m' → (Option Bool)
 --   | .terminal b => fun
 --     | .terminal b' => op b b'
 --     | .node _ => if (op b false) = (op b true) then some (op b false) else none
@@ -63,6 +69,14 @@ def cache_get {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') :
     StateM (State n m m') (Option (Pointer (p2t m m'))) := fun s ↦
   ⟨(s.cache.get? ⟨O_root, U_root⟩), s⟩
 
+lemma mem_cache_of_cache_get_eq_some : (cache_get l r s).1.isSome → ⟨l, r⟩ ∈ s.cache := by
+  simp only [cache_get]
+  intro h
+  simp_all only [Std.HashMap.get?_eq_getElem?, isSome_getElem?]
+
+lemma cache_get_preserves_state : (cache_get l r s).2 = s := by
+  simp only [cache_get]
+
 def cache_put {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (val : Pointer (p2t m m')) :
     StateM (State n m m') Unit := fun s ↦
   ⟨(), ⟨s.cache.insert ⟨O_root, U_root⟩ val, s.heap, s.next⟩⟩
@@ -71,9 +85,7 @@ def heap_push {n m m' : Nat} (N : Node n (p2t m m')) :
     StateM (State n m m') Unit := fun s ↦
   ⟨(), ⟨s.cache, s.heap.set s.next N, s.next + 1⟩⟩
 
-def next : StateM (State n m m') (Fin (p2t m m')) := do
-  let s ← get
-  pure s.next
+def next : StateM (State n m m') (Fin (p2t m m')) := fun s ↦ ⟨s.next, s⟩
 
 def apply_helper {n m m' : Nat} (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n m') :
     StateM (State n m m') (Pointer (p2t m m')) := do
@@ -146,8 +158,132 @@ def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n
   let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.empty, Vec.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
   ⟨state.heap, root⟩
 
-theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.succ m} {U : OBdd n.succ m'} : ∃ (o : Bdd.Ordered (apply op O U)), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨apply op O U, o⟩ I := by
-  sorry
+-- theorem apply_helper_spec' {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {s : State n m m'} :
+--     GoodState op O.1.heap U.1.heap s →
+--     let ⟨root, s'⟩ := apply_helper op O U s
+--     ∃ (o : Bdd.Ordered ⟨s'.heap, root⟩), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨⟨s'.heap, root⟩, o⟩ I := by
+--   intro sg
+--   split
+--   next final_root final_state h =>
+--     unfold apply_helper at h
+--     simp only [bind, StateT.bind] at h
+--     split at h
+--     next hit s' heq =>
+--       cases hit with
+--       | some val =>
+--         simp only [pure, StateT.pure] at h
+--         rw [Prod.mk.injEq] at h
+--         have := sg ⟨O.1.root, U.1.root⟩ (mem_cache_of_cache_get_eq_some (Option.isSome_iff_exists.mpr ⟨val, (by rw [heq])⟩))
+--         simp only at this
+--         rw [show { heap := O.1.heap, root := O.1.root } = O.1 by rfl] at this
+--         sorry
+--       | none =>
+--         sorry
+
+theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {s : State n m m'} :
+    GoodState op O.1.heap U.1.heap s →
+    let ⟨root, s'⟩ := apply_helper op O U s
+    GoodState op O.1.heap U.1.heap s' ∧
+    ∃ (o : Bdd.Ordered ⟨s'.heap, root⟩), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨⟨s'.heap, root⟩, o⟩ I := by
+  intro sg
+  split
+  next final_root final_state h =>
+    unfold apply_helper at h
+    split at h
+    next b heq =>
+      split at h
+      next b' heqq =>
+        simp only [bind, StateT.bind] at h
+        split at h
+        next a s'' heqqq =>
+          split at h
+          next root =>
+            -- cache hit!
+            simp only [pure, StateT.pure] at h
+            rw [Prod.mk.injEq] at h
+            have := (mem_cache_of_cache_get_eq_some (Option.isSome_iff_exists.mpr ⟨root, (by rw [heqqq])⟩))
+            rcases (sg ⟨O.1.root, U.1.root⟩ this) with ⟨h1, h2, h3, h4⟩
+            have that : s.cache[(O.1.root, U.1.root)]'this = root := by
+              simp [cache_get] at heqqq
+              rw [Prod.mk.injEq] at heqqq
+              rw [Std.HashMap.getElem?_eq_some_getElem (h' := this)] at heqqq
+              rcases heqqq with ⟨hh1, hh2⟩
+              injection hh1 with hhh1
+            rw [that] at h1
+            rw [← h.1, ← h.2]
+            have : s'' = (cache_get O.1.root U.1.root s).2 := by rw [heqqq]
+            rw [cache_get_preserves_state] at this
+            rw [this]
+            constructor
+            · assumption
+            · use h1
+              intro I
+              have := h4 I
+              convert this
+              exact symm that
+          next =>
+            -- cache miss...
+            simp only [StateT.bind, cache_put, Bdd.Ordered.eq_1, pure, StateT.pure, Id.bind_eq] at h
+            rw [Prod.mk.injEq] at h
+            rw [← h.1, ← h.2]
+            simp only
+            have : s'' = (cache_get O.1.root U.1.root s).2 := by rw [heqqq]
+            rw [cache_get_preserves_state] at this
+            rw [this]
+            rw [this] at h heqqq
+            constructor
+            · simp only [GoodState]
+              intro key hk
+              rw [Std.HashMap.getElem_insert]
+              split
+              next hh =>
+                simp at hh
+                use Bdd.Ordered_of_terminal
+                simp_rw [← hh]
+                use O.2
+                use U.2
+                have : ⟨{ heap := O.1.heap, root := O.1.root }, O.2⟩ = O := rfl
+                simp_rw [this]
+                have : ⟨{ heap := U.1.heap, root := U.1.root }, U.2⟩ = U := rfl
+                simp_rw [this]
+                intro I
+                rw [OBdd.evaluate_terminal' heq, OBdd.evaluate_terminal' heqq]
+                simp
+              next hh =>
+                have : key ∈ s.cache := by
+                  apply Std.HashMap.mem_of_mem_insert hk
+                  simp_all only [beq_eq_false_iff_ne]
+                exact sg key this
+            · use Bdd.Ordered_of_terminal
+              intro I
+              rw [OBdd.evaluate_terminal' heq, OBdd.evaluate_terminal' heqq]
+              simp
+      next j' heqq =>
+        simp only [bind, StateT.bind] at h
+        split at h
+        next a s heqqq =>
+          split at h
+          next root => sorry --cache hit
+          next =>
+            simp only [StateT.bind, Id.bind_eq, pure, StateT.pure] at h
+--            generalize hh : (apply_helper op O (U.low heqq) s) = sss at h
+            rcases hh : (apply_helper op O (U.low heqq) s) with ⟨ll, s'⟩
+            rcases hhh : (apply_helper op O (U.high heqq) s') with ⟨hl, s''⟩
+            rw [hh, hhh] at h
+            simp only [next] at h
+
+
+            sorry
+    next j heq =>
+      split at h
+      next => sorry
+      next =>
+        split at h
+        sorry
+        sorry
+
+theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.succ m} {U : OBdd n.succ m'} : ∃ (o : Bdd.Ordered (apply op O U)), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨apply op O U, o⟩ I :=
+  (apply_helper_spec sorry).2
 
 end Apply
 
