@@ -81,9 +81,14 @@ def cache_put {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (val : P
     StateM (State n m m') Unit := fun s ↦
   ⟨(), ⟨s.cache.insert ⟨O_root, U_root⟩ val, s.heap, s.next⟩⟩
 
-def heap_push {n m m' : Nat} (N : Node n (p2t m m')) :
-    StateM (State n m m') Unit := fun s ↦
-  ⟨(), ⟨s.cache, s.heap.set s.next N, s.next + 1⟩⟩
+-- TODO: also call cache_put in heap_push
+-- def heap_push {n m m' : Nat} (N : Node n (p2t m m')) :
+--     StateM (State n m m') Unit := fun s ↦
+--   ⟨(), ⟨s.cache, s.heap.set s.next N, s.next + 1⟩⟩
+
+def heap_push {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (N : Node n (p2t m m')) :
+    StateM (State n m m') (Pointer (p2t m m')) := fun s ↦
+  ⟨.node s.next, ⟨s.cache.insert ⟨O_root, U_root⟩ (.node s.next), s.heap.set s.next N, s.next + 1⟩⟩
 
 def next : StateM (State n m m') (Fin (p2t m m')) := fun s ↦ ⟨s.next, s⟩
 
@@ -103,44 +108,29 @@ def apply_helper {n m m' : Nat} (op : (Bool → Bool → Bool)) (O : OBdd n m) (
       | .node j' =>
         let l ← apply_helper op O (U.low  U_root_def)
         let h ← apply_helper op O (U.high U_root_def)
-        let nid ← next
-        cache_put O.1.root U.1.root (.node nid)
-        heap_push ⟨U.1.heap[j'].var, l, h⟩
-        pure (.node nid)
+        heap_push O.1.root U.1.root ⟨U.1.heap[j'].var, l, h⟩
     | .node j =>
       match U_root_def : U.1.root with
       | .terminal b' =>
         let l ← apply_helper op (O.low  O_root_def) U
         let h ← apply_helper op (O.high O_root_def) U
-        let nid ← next
-        cache_put O.1.root U.1.root (.node nid)
-        heap_push ⟨O.1.heap[j].var, l, h⟩
-        pure (.node nid)
+        heap_push O.1.root U.1.root ⟨O.1.heap[j].var, l, h⟩
       | .node j' =>
         if O.1.heap[j].var < U.1.heap[j'].var
         then
           let l ← apply_helper op (O.low  O_root_def) U
           let h ← apply_helper op (O.high O_root_def) U
-          let nid ← next
-          cache_put O.1.root U.1.root (.node nid)
-          heap_push ⟨O.1.heap[j].var, l, h⟩
-          pure (.node nid)
+          heap_push O.1.root U.1.root ⟨O.1.heap[j].var, l, h⟩
         else
           if O.1.heap[j].var > U.1.heap[j'].var
           then
             let l ← apply_helper op O (U.low  U_root_def)
             let h ← apply_helper op O (U.high U_root_def)
-            let nid ← next
-            cache_put O.1.root U.1.root (.node nid)
-            heap_push ⟨U.1.heap[j'].var, l, h⟩
-            pure (.node nid)
+            heap_push O.1.root U.1.root ⟨U.1.heap[j'].var, l, h⟩
           else
             let l ← apply_helper op (O.low  O_root_def) (U.low  U_root_def)
             let h ← apply_helper op (O.high O_root_def) (U.high U_root_def)
-            let nid ← next
-            cache_put O.1.root U.1.root (.node nid)
-            heap_push ⟨U.1.heap[j'].var, l, h⟩
-            pure (.node nid)
+            heap_push O.1.root U.1.root ⟨U.1.heap[j'].var, l, h⟩
 termination_by (O, U)
 decreasing_by
   · right; exact oedge_of_low
@@ -180,9 +170,9 @@ def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n
 --       | none =>
 --         sorry
 
-theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {s : State n m m'} :
-    GoodState op O.1.heap U.1.heap s →
-    let ⟨root, s'⟩ := apply_helper op O U s
+theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {initial_state : State n m m'} :
+    GoodState op O.1.heap U.1.heap initial_state →
+    let ⟨root, s'⟩ := apply_helper op O U initial_state
     GoodState op O.1.heap U.1.heap s' ∧
     ∃ (o : Bdd.Ordered ⟨s'.heap, root⟩), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨⟨s'.heap, root⟩, o⟩ I := by
   intro sg
@@ -203,7 +193,7 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
             rw [Prod.mk.injEq] at h
             have := (mem_cache_of_cache_get_eq_some (Option.isSome_iff_exists.mpr ⟨root, (by rw [heqqq])⟩))
             rcases (sg ⟨O.1.root, U.1.root⟩ this) with ⟨h1, h2, h3, h4⟩
-            have that : s.cache[(O.1.root, U.1.root)]'this = root := by
+            have that : initial_state.cache[(O.1.root, U.1.root)]'this = root := by
               simp [cache_get] at heqqq
               rw [Prod.mk.injEq] at heqqq
               rw [Std.HashMap.getElem?_eq_some_getElem (h' := this)] at heqqq
@@ -211,7 +201,7 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
               injection hh1 with hhh1
             rw [that] at h1
             rw [← h.1, ← h.2]
-            have : s'' = (cache_get O.1.root U.1.root s).2 := by rw [heqqq]
+            have : s'' = (cache_get O.1.root U.1.root initial_state).2 := by rw [heqqq]
             rw [cache_get_preserves_state] at this
             rw [this]
             constructor
@@ -227,7 +217,7 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
             rw [Prod.mk.injEq] at h
             rw [← h.1, ← h.2]
             simp only
-            have : s'' = (cache_get O.1.root U.1.root s).2 := by rw [heqqq]
+            have : s'' = (cache_get O.1.root U.1.root initial_state).2 := by rw [heqqq]
             rw [cache_get_preserves_state] at this
             rw [this]
             rw [this] at h heqqq
@@ -250,7 +240,7 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
                 rw [OBdd.evaluate_terminal' heq, OBdd.evaluate_terminal' heqq]
                 simp
               next hh =>
-                have : key ∈ s.cache := by
+                have : key ∈ initial_state.cache := by
                   apply Std.HashMap.mem_of_mem_insert hk
                   simp_all only [beq_eq_false_iff_ne]
                 exact sg key this
@@ -271,9 +261,22 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
             rcases hhh : (apply_helper op O (U.high heqq) s') with ⟨hl, s''⟩
             rw [hh, hhh] at h
             simp only [next] at h
+            have : s = (cache_get O.1.root U.1.root initial_state).2 := by rw [heqqq]
+            rw [cache_get_preserves_state] at this
+            rw [this] at hh
+            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.low heqq) initial_state).2 := (apply_helper_spec (by rw [low_heap_eq_heap]; assumption)).1
+            rw [show (apply_helper op O (U.low heqq) initial_state).2 = s' by rw [hh]] at this
+            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.high heqq) s').2 := (apply_helper_spec (by rw [high_heap_eq_heap]; assumption)).1
+            rw [show (apply_helper op O (U.high heqq) s').2 = s'' by rw [hhh]] at this
+            constructor
+            · rw [← show (heap_push O.1.root U.1.root { var := U.1.heap[j'].var, low := ll, high := hl } s'').2 = final_state by rw [h]]
+              intro key
+              simp only [heap_push]
+              intro hk
 
-
-            sorry
+              simp only [GoodState, Bdd.Ordered.eq_1, Bdd.Ordered, Prod.forall]
+              sorry
+            · sorry
     next j heq =>
       split at h
       next => sorry
@@ -281,9 +284,14 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
         split at h
         sorry
         sorry
+termination_by (O, U)
+decreasing_by
+  · right; exact oedge_of_low
+  · right; exact oedge_of_high
+
 
 theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.succ m} {U : OBdd n.succ m'} : ∃ (o : Bdd.Ordered (apply op O U)), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨apply op O U, o⟩ I :=
-  (apply_helper_spec sorry).2
+  (apply_helper_spec (by sorry)).2
 
 end Apply
 

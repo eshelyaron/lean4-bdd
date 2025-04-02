@@ -157,7 +157,7 @@ lemma Bdd.Ordered_of_terminal' {n m} {B : Bdd n m} {b} : B.root = terminal b →
   rw [this]
   apply Ordered_of_terminal
 
-lemma Ordered_of_Proper (B : Bdd n m) : Proper B.heap → Ordered B := by
+lemma Ordered_of_Proper {B : Bdd n m} : Proper B.heap → Ordered B := by
   rintro h ⟨p, hp⟩ ⟨q, hq⟩ e
   simp_all only [GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   cases e
@@ -378,7 +378,7 @@ def RProper {n m} (v : Vec (Node n m) m) := (∀ nod ∈ v, nod.low ≠ nod.high
 instance RProper.instDecidable {v : Vec (Node n m) m} : Decidable (RProper v) := by
   exact (Vec.decidableBAll _ v)
 
-theorem NoRedundancy_of_RProper {n m} (v : Vec (Node n m) m) {p} : RProper v → ({heap := v, root := p} : Bdd n m).NoRedundancy := by
+theorem NoRedundancy_of_RProper {n m} {v : Vec (Node n m) m} {p} : RProper v → ({heap := v, root := p} : Bdd n m).NoRedundancy := by
   intro h
   intro q contra
   rcases q with ⟨q, hq⟩
@@ -582,7 +582,7 @@ lemma Bdd.eq_terminal_of_relevant {n m} {v : Vec (Node n m) m} {B : Bdd n m} (h 
   (terminal_relevant_iff (by simp [h]) S).mp rfl
 
 /-- Terminal BDDs are reduced. -/
-lemma OBdd.reduced_of_terminal {n m} (O : OBdd n m) : O.isTerminal → O.Reduced := by
+lemma OBdd.reduced_of_terminal {n m} {O : OBdd n m} : O.isTerminal → O.Reduced := by
   rintro ⟨b, h⟩
   constructor
   · intro p R
@@ -1727,15 +1727,15 @@ lemma compactify_helper_spec {n m : Nat}
     ( ∀ j j',
       ids.get j = some j' →
       ∃ (r : Reachable O.1.heap O.1.root (node j)),
-        OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper _ hp⟩
+        OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
     ) →
     let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
     ∃ (hp' : Proper new1),
       (∀ j j',
        ids1.get j = some j' →
        ∃ (r : Reachable O.1.heap O.1.root (node j)),
-         OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper _ hp'⟩
-      ) ∧ OBdd.HIsomorphic S.1 ⟨⟨new1, root⟩, Ordered_of_Proper _ hp'⟩ := by
+         OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
+      ) ∧ OBdd.HIsomorphic S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
   intro h
   unfold compactify_helper
   split
