@@ -45,6 +45,11 @@ lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p →
 
 def ROBdd n m := { O : OBdd n m // O.Reduced }
 
+structure BDD where
+  nvars : Nat
+  nheap : Nat
+  robdd : ROBdd nvars nheap
+
 namespace ROBdd
 
 def const : Bool → ROBdd 0 0 := fun b ↦
@@ -134,6 +139,28 @@ def var (n : Nat) : ROBdd n.succ 1 :=
               rw [hh, hhh]
           ⟩⟩
 
--- def not : ROBdd n m → ROBdd n m
-
 end ROBdd
+
+namespace BDD
+
+def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
+  match B.robdd.1.1.root with
+  | .terminal b => b
+  | .node j => False.elim (Nat.not_lt_zero _ (Eq.subst h B.robdd.1.1.heap[j].var.2))
+
+def const : Bool → BDD := fun b ↦ ⟨_, _, ROBdd.const b⟩
+def var   : Nat  → BDD := fun n ↦ ⟨_, _, ROBdd.var n⟩
+
+def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
+  match h : max B.nvars C.nvars with
+  | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
+  | .succ _ => ⟨_, _, ⟨Reduce.reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1), Reduce.reduce'_spec.1⟩⟩
+
+def not   : BDD → BDD       := fun B ↦ apply (¬ · ∨ ·) B (const false)
+def and   : BDD → BDD → BDD := apply Bool.and
+def or    : BDD → BDD → BDD := apply Bool.or
+
+end BDD
+
+#eval (BDD.const true).robdd.1
+#eval! (BDD.var 3).not.robdd.1

@@ -802,6 +802,17 @@ def reduce_spec {n m : Nat} {O : OBdd n.succ m.succ} : ∃ (ho : (reduce O).Orde
     simp only [StateT.run]
     exact loop_spec O_root_def
 
+def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
+  match n with
+  | .zero => O
+  | .succ _ =>
+    match m with
+    | .zero => O
+    | .succ _ => ⟨reduce O, reduce_spec.1⟩
+
+def reduce'_spec {O : OBdd n m} : OBdd.Reduced (reduce' O) ∧ O.evaluate = OBdd.evaluate (reduce' O) := sorry
+
+
 -- lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
 --     (∀ (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)), i = O.1.heap[j].var → (get_id (node j) s).1 = terminal false) →
 --     Invariant O i s →

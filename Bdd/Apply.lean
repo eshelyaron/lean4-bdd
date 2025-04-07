@@ -148,6 +148,10 @@ def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n
   let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.empty, Vec.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
   ⟨state.heap, root⟩
 
+def apply' {n n' m m' p : Nat} : max n n' = p.succ → (Bool → Bool → Bool) → OBdd n m → OBdd n' m' → OBdd (max n n') (p2t m m') := fun h op O U ↦
+  ⟨h ▸ apply op (h ▸ O.lift (n' := max n n') (Nat.le_max_left ..)) (h ▸ U.lift (n' := max n n') (Nat.le_max_right ..)), sorry⟩
+
+
 -- theorem apply_helper_spec' {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {s : State n m m'} :
 --     GoodState op O.1.heap U.1.heap s →
 --     let ⟨root, s'⟩ := apply_helper op O U s

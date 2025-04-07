@@ -84,7 +84,7 @@ lemma Pointer.toVar_node_eq {n m} (w : Vec (Node n m) m) {j} : toVar w (node j) 
 def Pointer.MayPrecede {n m} (w : Vec (Node n m) m) (p q : Pointer m) : Prop := toVar w p < toVar w q
 
 /-- Terminals must not precede other pointers. -/
-lemma Pointer.not_terminal_MayPrecede {n m} (w : Vec (Node n m) m) {q} : ¬ MayPrecede w (terminal b) q := by
+lemma Pointer.not_terminal_MayPrecede {n m} {w : Vec (Node n m) m} {q} : ¬ MayPrecede w (terminal b) q := by
   intro contra
   simp only [MayPrecede] at contra
   cases q <;> simp_all
@@ -1861,3 +1861,65 @@ end Compactify
 --   | Nat.succ k =>
 --     let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, by linarith⟩ (Vec.replicate O.numPointers ⟨(O.1.heap.get ⟨0, lt_of_le_of_lt (show 0 ≤ k by linarith) sorry⟩).var, (terminal false), (terminal false)⟩)
 --     h ▸ ⟨new, r⟩
+
+@[simp]
+def Bdd.lift_node : n ≤ n' → Node n m → Node n' m := fun h N ↦ ⟨⟨N.var.1, by exact Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩
+
+@[simp]
+def Bdd.lift_heap : n ≤ n' → Vec (Node n m) m → Vec (Node n' m) m := fun h v ↦ Vec.map (lift_node h) v
+
+@[simp]
+def Bdd.lift : n ≤ n' → Bdd n m → Bdd n' m := fun h B ↦ ⟨lift_heap h B.heap, B.root⟩
+
+lemma Bdd.lift_edge_iff {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : Edge B.heap p q ↔ Edge (B.lift h).heap p q := by
+  constructor
+  · intro e
+    cases e with
+    | low  _ => left;  simpa
+    | high _ => right; simpa
+  · intro e
+    cases e with
+    | low  _ => left;  simp_all
+    | high _ => right; simp_all
+
+lemma Bdd.lift_reachable_iff {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p : Pointer m} : Reachable B.heap B.root p ↔ Reachable (B.lift h).heap (B.lift h).root p := by
+  constructor
+  · intro r
+    induction r with
+    | refl => left
+    | tail _ e ih =>
+      right
+      · exact ih
+      · exact (lift_edge_iff.mp e)
+  · intro r
+    induction r with
+    | refl => left
+    | tail _ e ih =>
+      right
+      · exact ih
+      · exact (lift_edge_iff.mpr e)
+
+
+lemma Bdd.lift_preserves_toVar {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p : Pointer m} : toVar (B.lift h).heap p = toVar B.heap p := by
+  sorry
+
+lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : MayPrecede (B.lift h).heap p q ↔ MayPrecede B.heap p q := by
+  constructor
+  · sorry
+  · intro hm
+    cases p with
+    | terminal _ =>
+      absurd hm
+      exact not_terminal_MayPrecede
+    | node _ => sorry
+
+lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : GraphEdge (B.lift h) ⟨p, sorry⟩ ⟨q, sorry⟩ → GraphEdge B ⟨p, sorry⟩ ⟨q, sorry⟩ := sorry
+lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (B.lift h).Ordered := by
+  rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
+  simp only [GraphMayPrecede, MayPrecede, lift_preserves_toVar]
+  have := ho (lift_preserves_GraphEdge e)
+  refine (Fin.natCast_lt_natCast (by sorry) (by sorry)).mpr ?_
+  aesop
+
+
+def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
