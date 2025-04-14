@@ -3,6 +3,7 @@
 import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
+import Bdd.Compactify
 open List renaming Vector → Vec
 
 -- TODO: this is similar to `OBdd.reachable_or_eq_low_high`
@@ -141,6 +142,8 @@ def var (n : Nat) : ROBdd n.succ 1 :=
 
 end ROBdd
 
+open Compactify
+open Reduce
 namespace BDD
 
 def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
@@ -154,13 +157,16 @@ def var   : Nat  → BDD := fun n ↦ ⟨_, _, ROBdd.var n⟩
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   match h : max B.nvars C.nvars with
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
-  | .succ _ => ⟨_, _, ⟨Reduce.reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1), Reduce.reduce'_spec.1⟩⟩
+  | .succ _ => ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
 
-def not   : BDD → BDD       := fun B ↦ apply (¬ · ∨ ·) B (const false)
-def and   : BDD → BDD → BDD := apply Bool.and
-def or    : BDD → BDD → BDD := apply Bool.or
+def and : BDD → BDD → BDD := apply Bool.and
+def or  : BDD → BDD → BDD := apply Bool.or
+def imp : BDD → BDD → BDD := apply (¬ · ∨ ·)
+def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 end BDD
 
 #eval (BDD.const true).robdd.1
+#eval! (BDD.var 3).robdd.1
 #eval! (BDD.var 3).not.robdd.1
+#eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1

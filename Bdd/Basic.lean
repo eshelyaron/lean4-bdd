@@ -8,6 +8,13 @@ open List renaming Vector → Vec
 
 instance {α : Type u} [ToString α] : ToString (Vec α k) := ⟨fun v ↦ v.1.toString⟩
 
+def BooleanFunction (n : Nat) : Type := Vec Bool n → Bool
+example : BooleanFunction 0 := fun _ ↦ true
+example : BooleanFunction 1 := fun I ↦ I[0]
+example : BooleanFunction 2 := fun I ↦ I[0] ∧ I[1]
+example : BooleanFunction 3 := fun I ↦
+  if I[0] then I[1] ∨ I[2] else I[1] ∧ I[2]
+
 /-- Pointer to a BDD node or terminal -/
 inductive Pointer m where
   | terminal : Bool → Pointer _
@@ -959,7 +966,7 @@ lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i
   intro h eq
   rw [evaluate_low_eq_evaluate_set_false, h, eq ,← evaluate_low_eq_evaluate_set_false]
 
-lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
+lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
     Isomorphic (O.high h) (O.low h) → ¬ O.Reduced := by
   intro iso R
   apply R.1 O.1.toRelevantPointer
@@ -971,7 +978,8 @@ lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} {h : O.1
   exact (symm (R.2 giso))
 
 /-- Reduced OBDDs are canonical.  -/
-theorem OBdd.Canonicity {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
+theorem OBdd.Canonicity {O U : OBdd n m} :
+    O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
   intro O_reduced U_reduced h
   cases O_root_def : O.1.root with
   | terminal b =>
@@ -993,7 +1001,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluat
           rw [← h]
           simp
       absurd U_reduced
-      apply not_reduced_of_iso_high_low (h := U_root_def)
+      apply not_reduced_of_iso_high_low U_root_def
       apply Canonicity (high_reduced U_reduced) (low_reduced U_reduced) this
   | node j =>
     cases U_root_def : U.1.root with
@@ -1009,7 +1017,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} : O.Reduced → U.Reduced → O.evaluat
           rw [h]
           simp
       absurd O_reduced
-      apply not_reduced_of_iso_high_low (h := O_root_def)
+      apply not_reduced_of_iso_high_low O_root_def
       apply Canonicity (high_reduced O_reduced) (low_reduced O_reduced) this
     | node i =>
       simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
@@ -1062,31 +1070,25 @@ decreasing_by
 /-- The only reduced BDD that denotes a constant function is the terminal BDD. -/
 theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
     O.Reduced → O.evaluate = (fun _ ↦ b) → O.1.root = terminal b := by
+  intro R h
   cases O_root_def : O.1.root
   case terminal b' =>
     rcases O with ⟨⟨heap, root⟩, o⟩
-    rintro _ h
     subst O_root_def
     simp only [OBdd.evaluate, Ordered, Function.comp_apply, DecisionTree.evaluate] at h
     unfold toTree at h
-    simp [DecisionTree.evaluate] at h
+    simp only [DecisionTree.evaluate] at h
     apply eq_of_constant_eq (α := Vec Bool n) at h
     simpa
   case node j =>
-    intro R h
     exfalso
-    apply not_reduced_of_iso_high_low (h := O_root_def)
+    refine not_reduced_of_iso_high_low O_root_def ?_ R
     have : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate := by
       ext I
       trans b
-      · rw [evaluate_high_eq_evaluate_set_true]
-        rw [h]
-        simp
-      · rw [evaluate_low_eq_evaluate_set_false]
-        rw [h]
-        simp
-    apply Canonicity (high_reduced R) (low_reduced R) this
-    exact R
+      · simp [evaluate_high_eq_evaluate_set_true, h]
+      · simp [evaluate_low_eq_evaluate_set_false, h]
+    exact Canonicity (high_reduced R) (low_reduced R) this
 
 @[simp]
 lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
@@ -1661,207 +1663,6 @@ lemma Bdd.Ordered_of_low_high_ordered {n m} {j : Fin m} {v : Vec (Node n m) m} :
         sorry
       | high h => sorry
 
-namespace Compactify
--- def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) : Vec (Option (Fin O.numPointers)) m × Fin O.numPointers × Vec (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
---   match S_def : S with
---   | ⟨U, hU⟩ =>
---     match U_root_def : U.1.root with
---     | terminal b => ⟨ ids, nid, new, terminal b ⟩
---     | node j =>
---       match ids.get j with
---       | none =>
---         have U_def : U = S.1 := by rw [S_def]
---         let ⟨ ids1, nid1, new1, l ⟩ := compactify_helper O ⟨(U.low  U_root_def), sorry⟩ ids  nid  new
---         let ⟨ ids2, nid2, new2, h ⟩ := compactify_helper O ⟨(U.high U_root_def), sorry⟩ ids1 nid1 new1
---         have : NeZero O.numPointers := by apply OBdd.instNeZeroNumPointers; rw [← U_def]; assumption
---         ⟨ids2.set j (some nid2), nid2 + (Fin.ofNat' O.numPointers 1), new2.set nid2 ⟨O.1.heap[j].var, l, h⟩, node nid2⟩
---       | some j' => ⟨ ids, nid, new, node j' ⟩
--- termination_by S.1
--- decreasing_by
---   · exact oedge_of_low
---   · exact oedge_of_high
-
-def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) : Vec (Option (Fin O.numPointers)) m × Fin O.numPointers × Vec (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
-  match S_root_def : S.1.1.root with
-    | terminal b => ⟨ ids, nid, new, terminal b ⟩
-    | node j =>
-      match ids.get j with
-      | none =>
-        let ⟨ ids1, nid1, new1, l ⟩ := compactify_helper O (S.low  S_root_def) ids  nid  new
-        let ⟨ ids2, nid2, new2, h ⟩ := compactify_helper O (S.high S_root_def) ids1 nid1 new1
-        have : NeZero O.numPointers := OBdd.instNeZeroNumPointers S S_root_def
-        ⟨ ids2.set j (some nid2), nid2 + 1, new2.set nid2 ⟨O.1.heap[j].var, l, h⟩, node nid2 ⟩
-      | some j' => ⟨ ids, nid, new, node j' ⟩
-termination_by S.1
-decreasing_by
-  · exact oedge_of_low
-  · exact oedge_of_high
-
-def compactify' {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
-  match O_root_def : O.1.root with
-  | terminal b =>
-    have := isTerminal_iff_numPointer_eq_zero.mpr ⟨b, O_root_def⟩
-    ⟨this ▸ Vec.nil, terminal (Bool_of_numPointer_eq_zero O this)⟩
-  | node j =>
-    let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, OBdd.numPointers_gt_zero_of_Sub_root_eq_node (O.toSubBdd) O_root_def⟩ (Vec.replicate O.numPointers ⟨O.1.heap[j].var, (terminal false), (terminal false)⟩)
-    ⟨new, r⟩
-
--- lemma compactify_helper_ordered {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) :
---     (∀ j j', ids.get j = some j' → Bdd.Ordered ⟨new, node j'⟩) →
---     let ⟨ _, _, new1, r ⟩ := compactify_helper O S ids nid new
---     Bdd.Ordered ⟨new1, r⟩ := by
---   intro h
---   unfold compactify_helper
---   simp only
---   split
---   next b heq => apply Ordered_of_terminal
---   next j heq =>
---     split
---     next heqq =>
---       simp only
---       sorry
---     next j' heqq => e
-
-lemma compactify_helper_spec {n m : Nat}
-    (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) (hp : Proper new):
-    ( ∀ j j',
-      ids.get j = some j' →
-      ∃ (r : Reachable O.1.heap O.1.root (node j)),
-        OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
-    ) →
-    let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
-    ∃ (hp' : Proper new1),
-      (∀ j j',
-       ids1.get j = some j' →
-       ∃ (r : Reachable O.1.heap O.1.root (node j)),
-         OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
-      ) ∧ OBdd.HIsomorphic S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
-  intro h
-  unfold compactify_helper
-  split
-  next ids2 nid2 new2 root heq =>
-    split at heq
-    next b heqq =>
-      simp only [Prod.mk.injEq] at heq
-      rcases heq with ⟨heq1, heq2, heq3, heq4⟩
-      rw [← heq3, ← heq1, ← heq4]
-      use hp
-      constructor
-      · exact h
-      · exact OBdd.HIsomorphic_of_terminal heqq rfl
-    next r heqq =>
-      split at heq
-      next heqqq =>
-        split at heq
-        next ids0 nid0 new0 lh heqqqq =>
-          split at heq
-          next ids1 nid1 new1 rh heqqqqq =>
-          simp only [Prod.mk.injEq] at heq
-          rcases heq with ⟨heq1, heq2, heq3, heq4⟩
-          have hp2 : Proper new2 := by
-            apply Proper_of_all_indices_RespectsOrder
-            intro j
-            nth_rw 2 [← heq3]
-            cases decEq nid1 j with
-            | isFalse hf =>
-              rw [Vec.get_set_of_ne' hf]
-              sorry
-            | isTrue ht =>
-              rw [ht, Vec.get_set_same']
-              sorry
-          sorry
-      next j heqqq => sorry
-  --     have hp' : Proper new1 := by
-  --       sorry
-  --     sorry
-  -- next b heq =>
-  --   constructor
-  --   · constructor
-  --     · exact h
-  --     · exact OBdd.HIsomorphic_of_terminal heq rfl
-  --   · simpa
-  -- next j heq =>
-  --   constructor
-  --   case w =>
-  --     split
-  --     next heqq =>
-  --       simp only
-  --       apply Proper_of_all_indices_RespectsOrder
-  --       intro i
-  --       sorry
-  --     next j' heqq => exact hp
-  --   case h =>
-  --     constructor
-  --     · intro jj j' hjj'
-  --       sorry
-  --     · sorry
-    -- · sorry
-    -- · constructor
-    --   · sorry
-    --   · constructor
-    --     case w =>
-    --       split
-    --       next heqq =>
-    --         simp only
-    --         apply Ordered_of_low_high_ordered
-    --         · rw [Vec.get_set_same']
-    --           simp only
-    --           suffices Bdd.Ordered ⟨(compactify_helper O (S.low heq) ids nid new).2.2.1, (compactify_helper O (S.low heq) ids nid new).2.2.2⟩ by
-    --             rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
-    --             simp only [GraphEdge, Ordered] at hxy
-    --             simp only [Ordered] at hx hy
-    --             simp only [GraphMayPrecede, MayPrecede]
-    --             sorry
-    --           rcases (compactify_helper_spec O (S.low heq) ids nid new h hp).2 with ⟨hhh, _⟩
-    --           exact hhh
-    --         · sorry
-    --         · sorry
-    --         · sorry
-    --       next j' heqq =>
-    --         exact (h j j' heqq).2.1
-    --     case h => sorry
-    -- split
-    -- next heqq =>
-    --   simp only
-    --   sorry
-    -- next j' heqq => exact h j j' heqq
-
-
-lemma compactify_ordered {n m : Nat} {O : OBdd n m} : (compactify' O).Ordered := by
-  unfold compactify'
-  split
-  next b heq => apply Ordered_of_terminal
-  next j heq =>
-    simp only
-    sorry
-
---theorem compactify_spec {n m : Nat} {O : OBdd n m} : O.Isomorphic (compactify O) :=
-
-end Compactify
--- #eval (example_not_reduced_bdd).numPointers
--- #eval (example_bdd).numPointers
-
-#eval example_bdd
-#eval! Compactify.compactify' example_bdd
--- theorem compactify_induction {n m : Nat} {O : OBdd n m} {motive : Bdd n O.numPointers → Prop}
---     (one : (h : O.numPointers = 0) → motive ⟨h ▸ Vec.nil, terminal (Bool_of_numPointer_eq_zero O h)⟩)
---     (two : ∀ (k : Nat), O.numPointers = k.succ → motive (compactify O)) :
---     motive (compactify O) := by
---   cases h : O.numPointers with
---   | zero =>
---     convert one h
---     · unfold compactify
---       simp
---     rw [compactify.]
---   | succ k => sorry
-
--- def compactify {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
---   match h : O.numPointers with
---   | 0 => ⟨Vec.nil, terminal (Bool_of_numPointer_eq_zero O h)⟩
---   | Nat.succ k =>
---     let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, by linarith⟩ (Vec.replicate O.numPointers ⟨(O.1.heap.get ⟨0, lt_of_le_of_lt (show 0 ≤ k by linarith) sorry⟩).var, (terminal false), (terminal false)⟩)
---     h ▸ ⟨new, r⟩
-
 @[simp]
 def Bdd.lift_node : n ≤ n' → Node n m → Node n' m := fun h N ↦ ⟨⟨N.var.1, by exact Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩
 
@@ -1916,10 +1717,7 @@ lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} 
 lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : GraphEdge (B.lift h) ⟨p, sorry⟩ ⟨q, sorry⟩ → GraphEdge B ⟨p, sorry⟩ ⟨q, sorry⟩ := sorry
 lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (B.lift h).Ordered := by
   rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp only [GraphMayPrecede, MayPrecede, lift_preserves_toVar]
-  have := ho (lift_preserves_GraphEdge e)
-  refine (Fin.natCast_lt_natCast (by sorry) (by sorry)).mpr ?_
-  aesop
-
+  apply lift_preserves_MayPrecede.mpr
+  exact ho (lift_preserves_GraphEdge e)
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩

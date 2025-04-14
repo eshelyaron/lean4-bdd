@@ -308,19 +308,3 @@ lemma Bdd.fromVar_Ordered {n} {i : Fin n} : Bdd.Ordered (fromVar i) := by
   intro j contra
   cases contra <;> contradiction
 
-def foo := Compactify.compactify' ⟨(Reduce.reduce ⟨(Apply.apply Bool.and ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩), Reduce.reduce_spec.1⟩
-def bar := Compactify.compactify' ⟨(Reduce.reduce ⟨(Apply.apply Bool.or ⟨(Bdd.fromVar (n := 3) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 3) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩), Reduce.reduce_spec.1⟩
-def baz := Compactify.compactify' ⟨(Reduce.reduce ⟨(Apply.apply Bool.or (⟨(Apply.apply Bool.and example_bdd example_bdd), Apply.apply_spec.1⟩) example_bdd), sorry⟩), sorry⟩
-
-#eval! baz
-#eval! foo
-#eval! bar
-
-#eval (Bdd.fromVar (n := 2) 0)
-#eval Apply.apply Bool.and ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩
-#eval! Reduce.reduce ⟨(Apply.apply Bool.and ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩
-#eval! Compactify.compactify' ⟨(Reduce.reduce ⟨(Apply.apply Bool.and ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩), Reduce.reduce_spec.1⟩
-#eval! Compactify.compactify' ⟨(Reduce.reduce ⟨(Apply.apply Bool.or ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩), Reduce.reduce_spec.1⟩
-
-
-#eval! Compactify.compactify' ⟨(Apply.apply Bool.and ⟨(Bdd.fromVar (n := 2) 0), Bdd.fromVar_Ordered⟩ ⟨(Bdd.fromVar (n := 2) 1), Bdd.fromVar_Ordered⟩), Apply.apply_spec.1⟩

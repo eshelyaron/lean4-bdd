@@ -810,7 +810,8 @@ def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
     | .zero => O
     | .succ _ => ⟨reduce O, reduce_spec.1⟩
 
-def reduce'_spec {O : OBdd n m} : OBdd.Reduced (reduce' O) ∧ O.evaluate = OBdd.evaluate (reduce' O) := sorry
+lemma reduce'_spec {O : OBdd n m} :
+ OBdd.Reduced (reduce' O) ∧ O.evaluate = (reduce' O).evaluate := sorry
 
 
 -- lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
@@ -860,4 +861,3 @@ example :   OBdd.Reduced ⟨(Reduce.reduce example_not_reduced_bdd), ordered_aft
 
 --#eval Reduce.reduce example_not_reduced_bdd
 --#eval! (OBdd.numPointers (⟨Reduce.reduce example_not_reduced_bdd, Reduce.reduce_spec.1⟩))
---#eval! (Compactify.compactify (⟨Reduce.reduce example_not_reduced_bdd, Reduce.reduce_spec.1⟩))
