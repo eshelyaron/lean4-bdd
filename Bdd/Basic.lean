@@ -68,7 +68,7 @@ instance Bdd.instToString : ToString (Bdd n m) := ⟨fun B => "⟨" ++ (toString
 
 open Bdd
 
-inductive Edge {n m} (w : Vec (Node n m) m) : Pointer m → Pointer m → Prop where
+inductive Edge (w : Vec (Node n m) m) : Pointer m → Pointer m → Prop where
   | low  : w[j].low  = p → Edge w (node j) p
   | high : w[j].high = p → Edge w (node j) p
 
@@ -1700,24 +1700,57 @@ lemma Bdd.lift_reachable_iff {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p : Po
       · exact ih
       · exact (lift_edge_iff.mpr e)
 
-
-lemma Bdd.lift_preserves_toVar {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p : Pointer m} : toVar (B.lift h).heap p = toVar B.heap p := by
-  sorry
-
 lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : MayPrecede (B.lift h).heap p q ↔ MayPrecede B.heap p q := by
   constructor
-  · sorry
   · intro hm
     cases p with
     | terminal _ =>
       absurd hm
       exact not_terminal_MayPrecede
-    | node _ => sorry
+    | node j =>
+      cases q with
+      | terminal _ =>
+        apply MayPrecede_node_terminal
+      | node j' =>
+        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, List.Vector.getElem_map, lift_node] at hm
+        apply (Fin.natCast_lt_natCast (by omega) (by omega)).mp at hm
+        simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin]
+        refine (Fin.natCast_lt_natCast ?_ ?_).mpr ?_ <;> omega
+  · intro hm
+    cases p with
+    | terminal _ =>
+      absurd hm
+      exact not_terminal_MayPrecede
+    | node j =>
+      cases q with
+      | terminal _ =>
+        apply MayPrecede_node_terminal
+      | node j' =>
+        simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin] at hm
+        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, List.Vector.getElem_map, lift_node]
+        apply (Fin.natCast_lt_natCast (by omega) (by omega)).mp at hm
+        refine (Fin.natCast_lt_natCast ?_ ?_).mpr ?_ <;> omega
 
-lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : GraphEdge (B.lift h) ⟨p, sorry⟩ ⟨q, sorry⟩ → GraphEdge B ⟨p, sorry⟩ ⟨q, sorry⟩ := sorry
+lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
+    (∃ (hp : Reachable (B.lift h).heap (B.lift h).root p) (hq : Reachable (B.lift h).heap (B.lift h).root q), GraphEdge (B.lift h) ⟨p, hp⟩ ⟨q, hq⟩) ↔
+    (∃ (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q), GraphEdge B ⟨p, hp⟩ ⟨q, hq⟩) := by
+  constructor
+  · rintro ⟨hp, hq, hr⟩
+    use (lift_reachable_iff.mpr hp)
+    use (lift_reachable_iff.mpr hq)
+    cases hr with
+    | low  hl => simp at hl; left ; assumption
+    | high hh => simp at hh; right; assumption
+  · rintro ⟨hp, hq, hr⟩
+    use (lift_reachable_iff.mp hp)
+    use (lift_reachable_iff.mp hq)
+    cases hr with
+    | low  hl => simp at hl; left ; simpa
+    | high hh => simp at hh; right; simpa
+
 lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (B.lift h).Ordered := by
   rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
   apply lift_preserves_MayPrecede.mpr
-  exact ho (lift_preserves_GraphEdge e)
+  exact ho (lift_preserves_GraphEdge.mp ⟨hx, hy, e⟩).2.2
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
