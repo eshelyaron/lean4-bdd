@@ -134,7 +134,7 @@ def Bdd.toRelevantPointer {n m} (B : Bdd n m) : B.RelevantPointer :=
 
 /-- The `Edge` relation lifted to `RelevantPointer`s. -/
 @[simp]
-def Bdd.GraphEdge {n m} (B : Bdd n m) (l r : B.RelevantPointer) := Edge B.heap l.1 r.1
+def Bdd.RelevantEdge (B : Bdd n m) (p q : B.RelevantPointer) := Edge B.heap p.1 q.1
 
 /-- The `MayPrecede` relation lifted to `RelevantPointer`s. -/
 @[simp]
@@ -142,7 +142,7 @@ def Bdd.GraphMayPrecede {n m} (B : Bdd n m) (l r : B.RelevantPointer) := MayPrec
 
 /-- A BDD is `Ordered` if all edges relevant from the root respect the variable ordering. -/
 @[simp]
-def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (GraphEdge B) (GraphMayPrecede B)
+def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (RelevantEdge B) (GraphMayPrecede B)
 
 /-- Terminals induce `Ordered` BDDs. -/
 lemma Bdd.Ordered_of_terminal {n m} {v : Vec (Node n m) m} {b} : Bdd.Ordered {heap := v, root := terminal b} := by
@@ -161,7 +161,7 @@ lemma Bdd.Ordered_of_terminal' {n m} {B : Bdd n m} {b} : B.root = terminal b →
 
 lemma Ordered_of_Proper {B : Bdd n m} : Proper B.heap → Ordered B := by
   rintro h ⟨p, hp⟩ ⟨q, hq⟩ e
-  simp_all only [GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp_all only [RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   cases e
   case low j low_q =>
     cases q
@@ -253,7 +253,7 @@ theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
     rw [← h1] at h2
     let xs := x.toRelevantPointer
     let ys : x.RelevantPointer := ⟨y.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
-    have h3 : GraphEdge x xs ys := h2
+    have h3 : RelevantEdge x xs ys := h2
     apply hx at h3
     simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
     simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
@@ -270,7 +270,7 @@ theorem OEdge.flip_wellFounded {n m} : @WellFounded (OBdd n m) (flip OEdge) := b
     rw [← h1] at h2
     let ys := y.toRelevantPointer
     let xs : y.RelevantPointer := ⟨x.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
-    have h3 : GraphEdge y ys xs := h2
+    have h3 : RelevantEdge y ys xs := h2
     apply hy at h3
     simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
     simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, gt_iff_lt, xs, ys]
@@ -299,8 +299,8 @@ lemma ordered_of_relevant {n m} (O : OBdd n m) (S : O.1.RelevantPointer) :
   rcases S with ⟨q, h⟩
   simp_all only [Ordered]
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
-  have : GraphEdge O.1 ⟨x, (by exact Relation.ReflTransGen.trans h hx)⟩
+  simp_all only [Ordered, RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  have : RelevantEdge O.1 ⟨x, (by exact Relation.ReflTransGen.trans h hx)⟩
                      ⟨y, (by exact Relation.ReflTransGen.trans h hy)⟩ := e
   apply O.2 at this
   exact this
@@ -425,8 +425,8 @@ def RelevantPointer.var {n m} {B : Bdd n m} (p : B.RelevantPointer) : Nat := p.1
 @[simp]
 def RelevantPointer.gap {n m} {B : Bdd n m} (p : B.RelevantPointer) : Nat := n - (RelevantPointer.var p)
 
-theorem GraphEdge.flip_wellFounded (o : Ordered B) : WellFounded (flip (GraphEdge B)) := by
-  have : Subrelation (flip (GraphEdge B)) (InvImage Nat.lt RelevantPointer.gap) := by
+theorem RelevantEdge.flip_wellFounded (o : Ordered B) : WellFounded (flip (RelevantEdge B)) := by
+  have : Subrelation (flip (RelevantEdge B)) (InvImage Nat.lt RelevantPointer.gap) := by
     rintro ⟨x, hx⟩ ⟨y, hy⟩ e
     simp_all only [InvImage, flip, RelevantPointer.gap]
     refine Nat.sub_lt_sub_left ?_ ?_
@@ -434,9 +434,9 @@ theorem GraphEdge.flip_wellFounded (o : Ordered B) : WellFounded (flip (GraphEdg
     exact o e
   exact Subrelation.wf this (InvImage.wf _ (Nat.lt_wfRel.wf))
 
-instance GraphEdge.instWellFoundedRelation {n m} (O : OBdd n m) : WellFoundedRelation O.1.RelevantPointer where
-  rel := flip O.1.GraphEdge
-  wf  := (GraphEdge.flip_wellFounded O.2)
+instance RelevantEdge.instWellFoundedRelation {n m} (O : OBdd n m) : WellFoundedRelation O.1.RelevantPointer where
+  rel := flip O.1.RelevantEdge
+  wf  := (RelevantEdge.flip_wellFounded O.2)
 
 instance OBdd.instDecidableReflTransGen {n m} (O : OBdd n m) (p : O.1.RelevantPointer) (q) :
     Decidable (Relation.ReflTransGen (Edge O.1.heap) p.1 q) := by
@@ -492,7 +492,7 @@ instance OBdd.instDecidableReflTransGen {n m} (O : OBdd n m) (p : O.1.RelevantPo
         · apply hth
 termination_by p
 decreasing_by
-  all_goals simp_all only [Ordered, flip, GraphEdge, Fin.getElem_fin, Edge.low, Edge.high]
+  all_goals simp_all only [Ordered, flip, RelevantEdge, Fin.getElem_fin, Edge.low, Edge.high]
 
 instance Pointer.instDecidableReachable {n m} (O : OBdd n m) :
     DecidablePred (Reachable O.1.heap O.1.root) :=
@@ -755,7 +755,7 @@ lemma OBdd.Independence {O : OBdd n m} (j : Fin (O.1.root.toVar O.1.heap)) :
       · simp only [Ordered, Fin.getElem_fin, Nat.succ_eq_add_one]
         rw [aux]
         have xua : (toVar O.1.heap (node i)) < (toVar O.1.heap O.1.heap[↑i].high) := by
-          have hyp := h (show Bdd.GraphEdge { heap := O.1.heap, root := node i } ⟨(node i), Relation.ReflTransGen.refl⟩ ⟨O.1.heap[↑i].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ by exact (Edge.high rfl))
+          have hyp := h (show Bdd.RelevantEdge { heap := O.1.heap, root := node i } ⟨(node i), Relation.ReflTransGen.refl⟩ ⟨O.1.heap[↑i].high, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl))⟩ by exact (Edge.high rfl))
           assumption
         aesop
     · apply ihl ⟨j.1, _⟩
@@ -765,7 +765,7 @@ lemma OBdd.Independence {O : OBdd n m} (j : Fin (O.1.root.toVar O.1.heap)) :
       · simp only [Ordered, Fin.getElem_fin, Nat.succ_eq_add_one]
         rw [aux]
         have xua : (toVar O.1.heap (node i)) < (toVar O.1.heap O.1.heap[↑i].low) := by
-          have hyp := h (show Bdd.GraphEdge { heap := O.1.heap, root := node i } ⟨(node i), Relation.ReflTransGen.refl⟩ ⟨O.1.heap[↑i].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ by exact (Edge.low rfl))
+          have hyp := h (show Bdd.RelevantEdge { heap := O.1.heap, root := node i } ⟨(node i), Relation.ReflTransGen.refl⟩ ⟨O.1.heap[↑i].low, (Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl))⟩ by exact (Edge.low rfl))
           assumption
         aesop
 
@@ -817,12 +817,12 @@ lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} :
   intro o r_q_p
   simp_all only [Ordered]
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, GraphEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp_all only [Ordered, RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   simp at hx
   simp at hy
-  have : GraphEdge B ⟨x, (by trans p <;> aesop)⟩
+  have : RelevantEdge B ⟨x, (by trans p <;> aesop)⟩
                      ⟨y, (by trans p <;> aesop)⟩ := by
-    simp only [GraphEdge]
+    simp only [RelevantEdge]
     rw [h]
     assumption
   apply o at this
@@ -1342,7 +1342,7 @@ lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachabl
   cases contra with
   | inl h =>
     rw [← h] at e
-    have : GraphEdge O.1 O.1.toRelevantPointer O.1.toRelevantPointer := e
+    have : RelevantEdge O.1 O.1.toRelevantPointer O.1.toRelevantPointer := e
     apply O.2 at this
     simp at this
   | inr h =>
@@ -1653,7 +1653,7 @@ lemma Bdd.Ordered_of_low_high_ordered {n m} {j : Fin m} {v : Vec (Node n m) m} :
     intro hl1 hl2 hh1 hh2
     rintro ⟨p, hp⟩ ⟨q, hq⟩ hpq
     simp only at hp hq
-    simp only [GraphEdge] at hpq
+    simp only [RelevantEdge] at hpq
     simp only [GraphMayPrecede]
     apply Relation.reflTransGen_swap.mp at hp
     cases hp with
@@ -1740,9 +1740,9 @@ lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} 
         apply (Fin.natCast_lt_natCast (by omega) (by omega)).mp at hm
         refine (Fin.natCast_lt_natCast ?_ ?_).mpr ?_ <;> omega
 
-lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
-    (∃ (hp : Reachable (B.lift h).heap (B.lift h).root p) (hq : Reachable (B.lift h).heap (B.lift h).root q), GraphEdge (B.lift h) ⟨p, hp⟩ ⟨q, hq⟩) ↔
-    (∃ (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q), GraphEdge B ⟨p, hp⟩ ⟨q, hq⟩) := by
+lemma Bdd.lift_preserves_RelevantEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
+    (∃ (hp : Reachable (B.lift h).heap (B.lift h).root p) (hq : Reachable (B.lift h).heap (B.lift h).root q), RelevantEdge (B.lift h) ⟨p, hp⟩ ⟨q, hq⟩) ↔
+    (∃ (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q), RelevantEdge B ⟨p, hp⟩ ⟨q, hq⟩) := by
   constructor
   · rintro ⟨hp, hq, hr⟩
     use (lift_reachable_iff.mpr hp)
@@ -1760,6 +1760,6 @@ lemma Bdd.lift_preserves_GraphEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {
 lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (B.lift h).Ordered := by
   rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
   apply lift_preserves_MayPrecede.mpr
-  exact ho (lift_preserves_GraphEdge.mp ⟨hx, hy, e⟩).2.2
+  exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩

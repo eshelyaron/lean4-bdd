@@ -150,7 +150,7 @@ lemma compactify_helper_spec {n m : Nat}
     --           simp only
     --           suffices Bdd.Ordered ⟨(compactify_helper O (S.low heq) ids nid new).2.2.1, (compactify_helper O (S.low heq) ids nid new).2.2.2⟩ by
     --             rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
-    --             simp only [GraphEdge, Ordered] at hxy
+    --             simp only [RelevantEdge, Ordered] at hxy
     --             simp only [Ordered] at hx hy
     --             simp only [GraphMayPrecede, MayPrecede]
     --             sorry
