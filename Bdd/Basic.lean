@@ -77,29 +77,24 @@ lemma not_terminal_edge {q} : ¬ Edge w (terminal b) q := by
   intro contra
   contradiction
 
-def Pointer.toVar {n m} (w : Vec (Node n m) m) : Pointer m → Fin n.succ
-  | terminal _ => n
-  | node j => w[j].var
+def Pointer.toVar (M : Vec (Node n m) m) : Pointer m → Fin n.succ
+  | terminal _ => Fin.last n
+  | node j     => M[j].var
 
 @[simp]
-lemma Pointer.toVar_terminal_eq {n m} (w : Vec (Node n m) m) : toVar w (terminal b) = n := rfl
+lemma Pointer.toVar_terminal_eq {n m} (w : Vec (Node n m) m) : toVar w (terminal b) = n := Fin.natCast_eq_last n ▸ rfl
 
 @[simp]
 lemma Pointer.toVar_node_eq {n m} (w : Vec (Node n m) m) {j} : toVar w (node j) = w[j].var := rfl
 
 @[simp]
-def Pointer.MayPrecede {n m} (w : Vec (Node n m) m) (p q : Pointer m) : Prop := toVar w p < toVar w q
+def Pointer.MayPrecede (M : Vec (Node n m) m) (p q : Pointer m) := toVar M p < toVar M q
 
 /-- Terminals must not precede other pointers. -/
-lemma Pointer.not_terminal_MayPrecede {n m} {w : Vec (Node n m) m} {q} : ¬ MayPrecede w (terminal b) q := by
-  intro contra
-  simp only [MayPrecede] at contra
-  cases q <;> simp_all
-  case node j =>
-    rcases j with ⟨j, hj⟩
-    simp_all
-    apply Fin.ne_last_of_lt at contra
-    contradiction
+lemma Pointer.not_terminal_MayPrecede : ¬ MayPrecede M (terminal b) p := by
+  cases p with
+  | terminal _ => simp [MayPrecede]
+  | node     j => exact not_lt.mpr (Fin.le_last _)
 
 /-- Non-terminals may precede terminals. -/
 lemma Pointer.MayPrecede_node_terminal {n m} (w : Vec (Node n m) m) {j} : MayPrecede w (node j) (terminal b) := by
