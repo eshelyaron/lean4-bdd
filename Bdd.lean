@@ -87,7 +87,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
           simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hhh <;>
           apply Pointer.eq_terminal_of_reachable at hhh <;>
           simp_rw [hh, hhh] at h <;>
-          simp only [OBdd.GraphIsomorphic, OBdd.Isomorphic, InvImage] at h <;>
+          simp only [OBdd.GraphSimilar, OBdd.Similar, InvImage] at h <;>
           unfold OBdd.toTree at h <;>
           simp at h
       | inr hh =>
@@ -101,7 +101,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
           rcases hh with hh | hh <;>
           apply Pointer.eq_terminal_of_reachable at hh <;>
           simp_rw [hh, hhh] at h <;>
-          simp only [OBdd.GraphIsomorphic, OBdd.Isomorphic, InvImage] at h <;>
+          simp only [OBdd.GraphSimilar, OBdd.Similar, InvImage] at h <;>
           unfold OBdd.toTree at h <;>
           simp at h
         | inr hhh =>
@@ -121,7 +121,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
               apply Pointer.eq_terminal_of_reachable at hh
               apply Pointer.eq_terminal_of_reachable at hhh
               simp_rw [hh, hhh] at h
-              simp only [OBdd.GraphIsomorphic, OBdd.Isomorphic, InvImage] at h
+              simp only [OBdd.GraphSimilar, OBdd.Similar, InvImage] at h
               unfold OBdd.toTree at h
               simp at h
           | inr hh =>
@@ -130,7 +130,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
               apply Pointer.eq_terminal_of_reachable at hh
               apply Pointer.eq_terminal_of_reachable at hhh
               simp_rw [hh, hhh] at h
-              simp only [OBdd.GraphIsomorphic, OBdd.Isomorphic, InvImage] at h
+              simp only [OBdd.GraphSimilar, OBdd.Similar, InvImage] at h
               unfold OBdd.toTree at h
               simp at h
             | inr hhh =>

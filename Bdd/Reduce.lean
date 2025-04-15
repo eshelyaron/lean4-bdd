@@ -718,7 +718,7 @@ decreasing_by simp_all
 --         apply Invariant_of_Invariant' inv' hii'
 --   · -- simp only [bind, StateT.bind, get_out, get, getThe, MonadStateOf.get, StateT.get, pure, StateT.pure, get_id]
 --     -- simp only [Nat.succ_eq_add_one, Ordered.eq_1, Nat.zero_eq]
---     simp only [Subrelation, OBdd.GraphIsomorphic, InvImage, OBdd.Isomorphic]
+--     simp only [Subrelation, OBdd.GraphSimilar, InvImage, OBdd.Similar]
 --     sorry
 --     -- simp only loop
 --     -- simp only [bind, StateT.bind, get_out, get, getThe, MonadStateOf.get, StateT.get, pure, StateT.pure, get_id]

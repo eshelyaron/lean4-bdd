@@ -334,31 +334,31 @@ def DecisionTree.evaluate {n} : DecisionTree n → Vec Bool n → Bool
 def OBdd.evaluate {n m} : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
 @[simp]
-def OBdd.Isomorphic {n m} : OBdd n m → OBdd n m → Prop := InvImage Eq OBdd.toTree
+def OBdd.Similar {n m} : OBdd n m → OBdd n m → Prop := InvImage Eq OBdd.toTree
 
-def OBdd.HIsomorphic {n m m'} : OBdd n m → OBdd n m' → Prop := fun O U ↦ O.toTree = U.toTree
+def OBdd.HSimilar {n m m'} : OBdd n m → OBdd n m' → Prop := fun O U ↦ O.toTree = U.toTree
 
 /-- Isomorphism of `Ordered` BDDs is decidable. -/
-instance OBdd.instDecidableIsomorphic {n m} : DecidableRel (β := OBdd n m) OBdd.Isomorphic :=
+instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Similar :=
   fun O U ↦ decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [InvImage])
 
-def OBdd.GraphIsomorphic {n m} (O : OBdd n m) (l r : O.1.RelevantPointer) :=
-  Isomorphic ⟨{heap := O.1.heap, root := l.1}, ordered_of_relevant O l⟩
+def OBdd.GraphSimilar {n m} (O : OBdd n m) (l r : O.1.RelevantPointer) :=
+  Similar ⟨{heap := O.1.heap, root := l.1}, ordered_of_relevant O l⟩
              ⟨{heap := O.1.heap, root := r.1}, ordered_of_relevant O r⟩
 
-instance OBdd.instDecidableGraphIsomorphic : Decidable (OBdd.GraphIsomorphic O l r) := by
-  simp only [OBdd.GraphIsomorphic]; infer_instance
+instance OBdd.instDecidableGraphSimilar : Decidable (OBdd.GraphSimilar O l r) := by
+  simp only [OBdd.GraphSimilar]; infer_instance
 
 /-- Isomorphism of `Ordered` BDDs is an equivalence relation. -/
-def OBdd.Isomorphic.instEquivalence {n m} : Equivalence (α := OBdd n m) OBdd.Isomorphic := by
+def OBdd.Similar.instEquivalence {n m} : Equivalence (α := OBdd n m) OBdd.Similar := by
   apply InvImage.equivalence
   constructor <;> simp_all
 
-instance OBdd.Isomorphic.instReflexive : Reflexive (α := OBdd n m) OBdd.Isomorphic := instEquivalence.refl
+instance OBdd.Similar.instReflexive : Reflexive (α := OBdd n m) OBdd.Similar := instEquivalence.refl
 
-instance OBdd.Isomorphic.instSymmetric : Symmetric (α := OBdd n m) OBdd.Isomorphic := fun _ _ ↦ instEquivalence.symm
+instance OBdd.Similar.instSymmetric : Symmetric (α := OBdd n m) OBdd.Similar := fun _ _ ↦ instEquivalence.symm
 
-instance OBdd.Isomorphic.instTransitive : Transitive (α := OBdd n m) OBdd.Isomorphic := fun _ _ _ ↦ instEquivalence.trans
+instance OBdd.Similar.instTransitive : Transitive (α := OBdd n m) OBdd.Similar := fun _ _ _ ↦ instEquivalence.trans
 
 /-- A pointer is redundant if it point to node `N` with `N.low = N.high`. -/
 inductive Pointer.Redundant {n m} (w : Vec (Node n m) m) : Pointer m → Prop where
@@ -390,13 +390,13 @@ theorem NoRedundancy_of_RProper {n m} {v : Vec (Node n m) m} {p} : RProper v →
     · assumption
     · simp_all [Vec.instMembership, List.Vector.getElem_def]
 
-/-- A BDD is `Reduced` if its graph does not contain redundant nodes or distinct isomorphic subgraphs. -/
+/-- A BDD is `Reduced` if its graph does not contain redundant nodes or distinct similar subgraphs. -/
 @[simp]
 def OBdd.Reduced {n m} (O : OBdd n m) : Prop
   -- No redundant nodes.
   := NoRedundancy O.1
   -- Isomorphism implies pointer-equality.
-   ∧ Subrelation (GraphIsomorphic O) (InvImage Eq Subtype.val)
+   ∧ Subrelation (GraphSimilar O) (InvImage Eq Subtype.val)
 
 lemma transGen_iff_single_and_reflTransGen : (Relation.TransGen r a b) ↔ ∃ c, r a c ∧ Relation.ReflTransGen r c b := by
   constructor
@@ -609,10 +609,10 @@ lemma OBdd.reduced_of_relevant {n m} (O : OBdd n m) (S : O.1.RelevantPointer) {h
     constructor
     · intro p; apply R.1 ⟨p.1, Relation.transitive_reflTransGen S.2 p.2⟩
     · intro q p _
-      have : GraphIsomorphic ⟨{ heap := O.1.heap, root := node j }, o⟩
+      have : GraphSimilar ⟨{ heap := O.1.heap, root := node j }, o⟩
               ⟨q.1, Relation.transitive_reflTransGen S.2 q.2⟩
               ⟨p.1, Relation.transitive_reflTransGen S.2 p.2⟩ := by
-        simp_all only [GraphIsomorphic, Isomorphic, InvImage]
+        simp_all only [GraphSimilar, Similar, InvImage]
       apply R.2 this
 
 /-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
@@ -717,10 +717,10 @@ lemma OBdd.toTree_node' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j)
     lhs
     unfold toTree
 
-lemma OBdd.HIsomorphic_of_terminal {n m m' : Nat} {b : Bool} {O : OBdd n m} {U : OBdd n m'} :
-    O.1.root = terminal b → U.1.root = terminal b → O.HIsomorphic U := by
+lemma OBdd.HSimilar_of_terminal {n m m' : Nat} {b : Bool} {O : OBdd n m} {U : OBdd n m'} :
+    O.1.root = terminal b → U.1.root = terminal b → O.HSimilar U := by
   intro h1 h2
-  simp [HIsomorphic]
+  simp [HSimilar]
   rw [toTree_terminal' h1, toTree_terminal' h2]
 
 private lemma aux {O : OBdd n m} {i : Fin m} :
@@ -771,9 +771,9 @@ lemma OBdd.Independence {O : OBdd n m} (j : Fin (O.1.root.toVar O.1.heap)) :
 
 lemma OBdd.Independence' {O : OBdd n m} (j : Fin O.var) : independentOf (OBdd.evaluate O) ⟨j.1, (Fin.val_lt_of_le j (Fin.is_le _))⟩ := Independence j
 
-lemma OBdd.toTree_respects_Isomorphism {n m} (O U : OBdd n m) (h : OBdd.Isomorphic O U) : O.toTree = U.toTree := by simpa [OBdd.Isomorphic, InvImage]
+lemma OBdd.toTree_respects_Isomorphism {n m} (O U : OBdd n m) (h : OBdd.Similar O U) : O.toTree = U.toTree := by simpa [OBdd.Similar, InvImage]
 
-instance OBdd.instSetoid : Setoid (OBdd n m) := ⟨OBdd.Isomorphic, OBdd.Isomorphic.instEquivalence⟩
+instance OBdd.instSetoid : Setoid (OBdd n m) := ⟨OBdd.Similar, OBdd.Similar.instEquivalence⟩
 
 def AbstractBdd {n m} := @Quotient (OBdd n m) (by infer_instance)
 
@@ -962,13 +962,13 @@ lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i
   rw [evaluate_low_eq_evaluate_set_false, h, eq ,← evaluate_low_eq_evaluate_set_false]
 
 lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
-    Isomorphic (O.high h) (O.low h) → ¬ O.Reduced := by
+    Similar (O.high h) (O.low h) → ¬ O.Reduced := by
   intro iso R
   apply R.1 O.1.toRelevantPointer
   simp [toRelevantPointer]
   rw [h]
   constructor
-  have giso : GraphIsomorphic O ⟨(O.high h).1.root, reachable_of_edge (edge_of_high (h := h) O.1)⟩
+  have giso : GraphSimilar O ⟨(O.high h).1.root, reachable_of_edge (edge_of_high (h := h) O.1)⟩
                                 ⟨(O.low  h).1.root, reachable_of_edge (edge_of_low  (h := h) O.1)⟩ := iso
   exact (symm (R.2 giso))
 
@@ -980,7 +980,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
   | terminal b =>
     cases U_root_def : U.1.root with
     | terminal c =>
-      simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+      simp only [HasEquiv.Equiv, instSetoid, Similar, InvImage]
       rcases O with ⟨⟨heap, root⟩, o⟩
       rcases U with ⟨⟨ueap, uoot⟩, u⟩
       simp_all
@@ -1015,7 +1015,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
       apply not_reduced_of_iso_high_low O_root_def
       apply Canonicity (high_reduced O_reduced) (low_reduced O_reduced) this
     | node i =>
-      simp only [HasEquiv.Equiv, instSetoid, Isomorphic, InvImage]
+      simp only [HasEquiv.Equiv, instSetoid, Similar, InvImage]
       rw [toTree_node O_root_def, toTree_node U_root_def]
       simp only [Ordered, DecisionTree.branch.injEq]
       have same_var : O.1.heap[j].var = U.1.heap[i].var := by
@@ -1027,13 +1027,13 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
             rw [h] at this
             simp only [Fin.eta] at this
             simp only [independentOf] at this
-            have that : OBdd.Isomorphic (U.high U_root_def) (U.low U_root_def) :=
+            have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
               Canonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply U_reduced.1 U.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [U_root_def]
             constructor
-            have iso : GraphIsomorphic U  ⟨(U.high U_root_def).1.root, reachable_of_edge (edge_of_high (h := U_root_def) U.1)⟩
+            have iso : GraphSimilar U  ⟨(U.high U_root_def).1.root, reachable_of_edge (edge_of_high (h := U_root_def) U.1)⟩
                                           ⟨(U.low  U_root_def).1.root, reachable_of_edge (edge_of_low  (h := U_root_def) U.1)⟩ := that
             exact (symm (U_reduced.2 iso))
           · intro contra
@@ -1041,13 +1041,13 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
             rw [← h] at this
             simp only [Ordered, Fin.eta] at this
             simp only [independentOf] at this
-            have that : OBdd.Isomorphic (O.high O_root_def) (O.low O_root_def) :=
+            have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
               Canonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply O_reduced.1 O.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [O_root_def]
             constructor
-            have iso : GraphIsomorphic O  ⟨(O.high O_root_def).1.root, reachable_of_edge (edge_of_high (h := O_root_def) O.1)⟩
+            have iso : GraphSimilar O  ⟨(O.high O_root_def).1.root, reachable_of_edge (edge_of_high (h := O_root_def) O.1)⟩
                                           ⟨(O.low  O_root_def).1.root, reachable_of_edge (edge_of_low  (h := O_root_def) O.1)⟩ := that
             exact (symm (O_reduced.2 iso))
       constructor

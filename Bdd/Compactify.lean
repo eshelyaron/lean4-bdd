@@ -69,15 +69,15 @@ lemma compactify_helper_spec {n m : Nat}
     ( ∀ j j',
       ids.get j = some j' →
       ∃ (r : Reachable O.1.heap O.1.root (node j)),
-        OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
+        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
     ) →
     let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
     ∃ (hp' : Proper new1),
       (∀ j j',
        ids1.get j = some j' →
        ∃ (r : Reachable O.1.heap O.1.root (node j)),
-         OBdd.HIsomorphic ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
-      ) ∧ OBdd.HIsomorphic S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
+         OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
+      ) ∧ OBdd.HSimilar S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
   intro h
   unfold compactify_helper
   split
@@ -90,7 +90,7 @@ lemma compactify_helper_spec {n m : Nat}
       use hp
       constructor
       · exact h
-      · exact OBdd.HIsomorphic_of_terminal heqq rfl
+      · exact OBdd.HSimilar_of_terminal heqq rfl
     next r heqq =>
       split at heq
       next heqqq =>
@@ -120,7 +120,7 @@ lemma compactify_helper_spec {n m : Nat}
   --   constructor
   --   · constructor
   --     · exact h
-  --     · exact OBdd.HIsomorphic_of_terminal heq rfl
+  --     · exact OBdd.HSimilar_of_terminal heq rfl
   --   · simpa
   -- next j heq =>
   --   constructor
@@ -177,7 +177,7 @@ lemma compactify_ordered {n m : Nat} {O : OBdd n m} : (compactify' O).Ordered :=
     split
     next x ids nid new root heqq => sorry
 
---theorem compactify_spec {n m : Nat} {O : OBdd n m} : O.Isomorphic (compactify O) :=
+--theorem compactify_spec {n m : Nat} {O : OBdd n m} : O.Similar (compactify O) :=
 
 lemma compactify_preserves_reduced {n m : Nat} {O : OBdd n m} :
     OBdd.Reduced O → OBdd.Reduced ⟨(compactify' O), compactify_ordered⟩ := by
