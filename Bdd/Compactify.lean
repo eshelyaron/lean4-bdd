@@ -4,24 +4,6 @@ open List renaming Vector → Vec
 open Pointer
 
 namespace Compactify
--- def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) : Vec (Option (Fin O.numPointers)) m × Fin O.numPointers × Vec (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
---   match S_def : S with
---   | ⟨U, hU⟩ =>
---     match U_root_def : U.1.root with
---     | terminal b => ⟨ ids, nid, new, terminal b ⟩
---     | node j =>
---       match ids.get j with
---       | none =>
---         have U_def : U = S.1 := by rw [S_def]
---         let ⟨ ids1, nid1, new1, l ⟩ := compactify_helper O ⟨(U.low  U_root_def), sorry⟩ ids  nid  new
---         let ⟨ ids2, nid2, new2, h ⟩ := compactify_helper O ⟨(U.high U_root_def), sorry⟩ ids1 nid1 new1
---         have : NeZero O.numPointers := by apply OBdd.instNeZeroNumPointers; rw [← U_def]; assumption
---         ⟨ids2.set j (some nid2), nid2 + (Fin.ofNat' O.numPointers 1), new2.set nid2 ⟨O.1.heap[j].var, l, h⟩, node nid2⟩
---       | some j' => ⟨ ids, nid, new, node j' ⟩
--- termination_by S.1
--- decreasing_by
---   · exact oedge_of_low
---   · exact oedge_of_high
 
 def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) : Vec (Option (Fin O.numPointers)) m × Fin O.numPointers × Vec (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
   match S_root_def : S.1.1.root with
@@ -35,9 +17,6 @@ def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Opti
         ⟨ ids2.set j (some nid2), nid2 + 1, new2.set nid2 ⟨O.1.heap[j].var, l, h⟩, node nid2 ⟩
       | some j' => ⟨ ids, nid, new, node j' ⟩
 termination_by S.1
-decreasing_by
-  · exact oedge_of_low
-  · exact oedge_of_high
 
 def compactify' {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
   match O_root_def : O.1.root with
@@ -48,35 +27,19 @@ def compactify' {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
     let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, OBdd.numPointers_gt_zero_of_Sub_root_eq_node (O.toSubBdd) O_root_def⟩ (Vec.replicate O.numPointers ⟨O.1.heap[j].var, (terminal false), (terminal false)⟩)
     ⟨new, r⟩
 
--- lemma compactify_helper_ordered {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) :
---     (∀ j j', ids.get j = some j' → Bdd.Ordered ⟨new, node j'⟩) →
---     let ⟨ _, _, new1, r ⟩ := compactify_helper O S ids nid new
---     Bdd.Ordered ⟨new1, r⟩ := by
---   intro h
---   unfold compactify_helper
---   simp only
---   split
---   next b heq => apply Ordered_of_terminal
---   next j heq =>
---     split
---     next heqq =>
---       simp only
---       sorry
---     next j' heqq => e
-
 lemma compactify_helper_spec {n m : Nat}
     (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) (hp : Proper new):
     ( ∀ j j',
       ids.get j = some j' →
       ∃ (r : Reachable O.1.heap O.1.root (node j)),
-        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
+        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
     ) →
     let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
     ∃ (hp' : Proper new1),
       (∀ j j',
        ids1.get j = some j' →
        ∃ (r : Reachable O.1.heap O.1.root (node j)),
-         OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
+         OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
       ) ∧ OBdd.HSimilar S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
   intro h
   unfold compactify_helper
@@ -152,7 +115,7 @@ lemma compactify_helper_spec {n m : Nat}
     --             rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
     --             simp only [RelevantEdge, Ordered] at hxy
     --             simp only [Ordered] at hx hy
-    --             simp only [GraphMayPrecede, MayPrecede]
+    --             simp only [RelevantMayPrecede, MayPrecede]
     --             sorry
     --           rcases (compactify_helper_spec O (S.low heq) ids nid new h hp).2 with ⟨hhh, _⟩
     --           exact hhh

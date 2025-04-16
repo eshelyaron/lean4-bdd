@@ -136,23 +136,25 @@ def Bdd.toRelevantPointer {n m} (B : Bdd n m) : B.RelevantPointer :=
 @[simp]
 def Bdd.RelevantEdge (B : Bdd n m) (p q : B.RelevantPointer) := Edge B.heap p.1 q.1
 
+lemma Bdd.RelevantEdge_from_Edge_Reachable
+  {B : Bdd n m} (e : Edge B.heap p q)
+  (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q) :
+  RelevantEdge B ⟨p, hp⟩ ⟨q, hq⟩ := e
+
 /-- The `MayPrecede` relation lifted to `RelevantPointer`s. -/
 @[simp]
-def Bdd.GraphMayPrecede {n m} (B : Bdd n m) (l r : B.RelevantPointer) := MayPrecede B.heap l.1 r.1
+def Bdd.RelevantMayPrecede (B : Bdd n m) (p q : B.RelevantPointer) := MayPrecede B.heap p.1 q.1
 
 /-- A BDD is `Ordered` if all edges relevant from the root respect the variable ordering. -/
 @[simp]
-def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (RelevantEdge B) (GraphMayPrecede B)
+def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (RelevantEdge B) (RelevantMayPrecede B)
 
 /-- Terminals induce `Ordered` BDDs. -/
-lemma Bdd.Ordered_of_terminal {n m} {v : Vec (Node n m) m} {b} : Bdd.Ordered {heap := v, root := terminal b} := by
-  simp only [Ordered]
-  intro p q h
-  rcases p with ⟨p, hp⟩
-  rcases q with ⟨q, hq⟩
+lemma Bdd.Ordered_of_terminal : Bdd.Ordered ⟨M, terminal b⟩ := by
+  rintro ⟨p, hp⟩ ⟨q, hq⟩ h
   cases Relation.reflTransGen_swap.mp hp <;> exfalso <;> apply not_terminal_edge <;> assumption
 
-lemma Bdd.Ordered_of_terminal' {n m} {B : Bdd n m} {b} : B.root = terminal b → B.Ordered := by
+lemma Bdd.Ordered_of_terminal' {B : Bdd n m} : B.root = terminal b → B.Ordered := by
   intro h
   have : B = {heap := B.heap, root := B.root} := rfl
   have : B = {heap := B.heap, root := terminal b} := by rw [this, h]
@@ -161,7 +163,7 @@ lemma Bdd.Ordered_of_terminal' {n m} {B : Bdd n m} {b} : B.root = terminal b →
 
 lemma Ordered_of_Proper {B : Bdd n m} : Proper B.heap → Ordered B := by
   rintro h ⟨p, hp⟩ ⟨q, hq⟩ e
-  simp_all only [RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp_all only [RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   cases e
   case low j low_q =>
     cases q
@@ -234,7 +236,7 @@ def OBdd n m := { B : Bdd n m // Ordered B }
 instance OBdd.instDecidableEq {n m} : DecidableEq (OBdd n m) :=
   fun _ _ ↦ decidable_of_iff _ (symm Subtype.eq_iff)
 
-def OEdge {n m} (B C : OBdd n m) := B.1.heap = C.1.heap ∧ Edge B.1.heap B.1.root C.1.root
+def OEdge (O U : OBdd n m) := O.1.heap = U.1.heap ∧ Edge O.1.heap O.1.root U.1.root
 
 @[simp]
 def Bdd.var {n m} (B : Bdd n m) : Fin n.succ := B.root.toVar B.heap
@@ -247,20 +249,19 @@ def OBdd.rav {n m} (B : OBdd n m) : Nat := n - B.var
 
 /-- The `OEdge` relation between Ordered BDDs is well-founded. -/
 theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
-  have : Subrelation (@OEdge n m) (InvImage Nat.lt OBdd.var) := by
-    rintro ⟨x, hx⟩ ⟨y, hy⟩ ⟨h1, h2⟩
-    simp_all only [Ordered]
-    rw [← h1] at h2
-    let xs := x.toRelevantPointer
-    let ys : x.RelevantPointer := ⟨y.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
-    have h3 : RelevantEdge x xs ys := h2
-    apply hx at h3
-    simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
-    simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
-    rcases hp : x.root
-    case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]
-    case node j => rcases hq : y.root <;> simp_all
-  exact Subrelation.wf this (InvImage.wf _ (Nat.lt_wfRel.wf))
+  suffices s : Subrelation (@OEdge n m) (InvImage Nat.lt OBdd.var) from Subrelation.wf s (InvImage.wf _ (Nat.lt_wfRel.wf))
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ ⟨h1, h2⟩
+  simp_all only []
+  rw [← h1] at h2
+  let xs := x.toRelevantPointer
+  let ys : x.RelevantPointer := ⟨y.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
+  have h3 : RelevantEdge x xs ys := h2
+  apply hx at h3
+  simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
+  simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
+  rcases hp : x.root
+  case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]
+  case node j => rcases hq : y.root <;> simp_all
 
 /-- The `OEdge` relation between Ordered BDDs is converse well-founded. -/
 theorem OEdge.flip_wellFounded {n m} : @WellFounded (OBdd n m) (flip OEdge) := by
@@ -272,7 +273,7 @@ theorem OEdge.flip_wellFounded {n m} : @WellFounded (OBdd n m) (flip OEdge) := b
     let xs : y.RelevantPointer := ⟨x.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
     have h3 : RelevantEdge y ys xs := h2
     apply hy at h3
-    simp only [GraphMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
+    simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
     simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, gt_iff_lt, xs, ys]
     rcases hp : y.root
     case terminal =>
@@ -287,51 +288,111 @@ instance OEdge.instWellFoundedRelation {n m} : WellFoundedRelation (OBdd n m) wh
   rel := flip OEdge
   wf  := flip_wellFounded
 
-
 inductive DecisionTree n where
-  | leaf   : Bool → DecisionTree _
+  | leaf   : Bool  → DecisionTree _
   | branch : Fin n → DecisionTree n → DecisionTree n → DecisionTree n
 deriving DecidableEq
 
 /-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
-lemma ordered_of_relevant {n m} (O : OBdd n m) (S : O.1.RelevantPointer) :
+lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
     Ordered {heap := O.1.heap, root := S.1} := by
   rcases S with ⟨q, h⟩
   simp_all only [Ordered]
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
-  have : RelevantEdge O.1 ⟨x, (by exact Relation.ReflTransGen.trans h hx)⟩
-                     ⟨y, (by exact Relation.ReflTransGen.trans h hy)⟩ := e
-  apply O.2 at this
+  simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  exact O.2 (RelevantEdge_from_Edge_Reachable e (Relation.ReflTransGen.trans h hx) (Relation.ReflTransGen.trans h hy))
+
+def Bdd.low {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
+  fun _ ↦ {heap := B.heap, root := B.heap[j].low}
+
+lemma Bdd.edge_of_low {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.low h).root := by
+  simp only [low, h]
+  exact Edge.low rfl
+
+def Bdd.high {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
+  fun _ ↦ {heap := B.heap, root := B.heap[j].high}
+
+lemma Bdd.edge_of_high {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.high h).root := by
+  simp only [high, h]
+  exact Edge.high rfl
+
+lemma Bdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
+
+lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} :
+    B.Ordered → Reachable v q p → Bdd.Ordered {heap := v, root := p} := by
+  intro o r_q_p
+  simp_all only [Ordered]
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ e
+  simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp at hx
+  simp at hy
+  have : RelevantEdge B ⟨x, (by trans p <;> aesop)⟩
+                        ⟨y, (by trans p <;> aesop)⟩ := by
+    simp only [RelevantEdge]
+    rw [h]
+    assumption
+  apply o at this
+  rw [← h]
   exact this
 
-/-- `Ordered` BDDs map into decision trees. -/
-def OBdd.toTree {n m} (O : OBdd n m) : DecisionTree n := by
-  rcases h : O.1.root
-  case terminal b => exact .leaf b
-  case node j =>
-    let low : Bdd _ _ := {heap := O.1.heap, root := O.1.heap[j].low}
-    have hlow : Ordered low :=
-      ordered_of_relevant O ⟨O.1.heap[j].low, Relation.ReflTransGen.tail Relation.ReflTransGen.refl (by rw [h]; exact (.low rfl))⟩
-    have : flip OEdge ⟨low, hlow⟩ O := by   -- for termination checking
-      simp only [flip, Ordered, Fin.getElem_fin, low]
-      constructor <;> simp only [Ordered, low]
-      rw [h]; exact Edge.low rfl
-    let high : Bdd _ _ := {heap := O.1.heap, root := O.1.heap[j].high}
-    have hhigh : Ordered high :=
-      ordered_of_relevant O ⟨O.1.heap[j].high, Relation.ReflTransGen.tail Relation.ReflTransGen.refl (by rw [h]; exact (.high rfl))⟩
-    have : flip OEdge ⟨high, hhigh⟩ O := by -- for termination checking
-      simp only [flip, Ordered, Fin.getElem_fin, high, low]
-      constructor <;> simp only [Ordered, low, high]
-      rw [h]; exact Edge.high rfl
-    exact .branch O.1.heap[j].var (toTree ⟨low, hlow⟩ ) (toTree ⟨high, hhigh⟩ )
+lemma Bdd.ordered_of_edge {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Edge v q p → Bdd.Ordered {heap := v, root := p} := by
+  rw [← h]
+  rw [← r]
+  intro o e
+  apply ordered_of_relevant' o
+  apply reachable_of_edge e
+  rfl
+  rfl
+
+lemma Bdd.high_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.high h).Ordered := by
+  intro o
+  apply Bdd.ordered_of_edge
+  rfl
+  exact h
+  exact o
+  convert edge_of_high B
+  · symm; assumption
+  · assumption
+
+def OBdd.high {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
+  fun h ↦ ⟨O.1.high h, Bdd.high_ordered h O.2⟩
+
+lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low h).Ordered := by
+  intro o
+  apply Bdd.ordered_of_edge
+  rfl
+  exact h
+  exact o
+  convert edge_of_low B
+  · symm; assumption
+  · assumption
+
+def OBdd.low {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
+  fun h ↦ ⟨O.1.low h, Bdd.low_ordered h O.2⟩
+
+@[simp]
+lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
+
+@[simp]
+lemma high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
+
+lemma oedge_of_low  {h : O.1.root = node j} : OEdge O (O.low h)  := ⟨rfl, edge_of_low  (h := h)⟩
+lemma oedge_of_high {h : O.1.root = node j} : OEdge O (O.high h) := ⟨rfl, edge_of_high (h := h)⟩
+
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| exact oedge_of_low)
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| exact oedge_of_high)
+
+def OBdd.toTree (O : OBdd n m) : DecisionTree n :=
+  match h : O.1.root with
+  | terminal b => .leaf b
+  | node j     => .branch O.1.heap[j].var (toTree (O.low h)) (toTree (O.high h))
 termination_by O
 
-def DecisionTree.evaluate {n} : DecisionTree n → Vec Bool n → Bool
+def DecisionTree.evaluate : DecisionTree n → Vec Bool n → Bool
   | leaf b, _ => b
   | branch j l h, v => if v[j] then h.evaluate v else l.evaluate v
 
-def OBdd.evaluate {n m} : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
+def OBdd.evaluate : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
 @[simp]
 def OBdd.Similar {n m} : OBdd n m → OBdd n m → Prop := InvImage Eq OBdd.toTree
@@ -344,7 +405,7 @@ instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Si
 
 def OBdd.GraphSimilar {n m} (O : OBdd n m) (l r : O.1.RelevantPointer) :=
   Similar ⟨{heap := O.1.heap, root := l.1}, ordered_of_relevant O l⟩
-             ⟨{heap := O.1.heap, root := r.1}, ordered_of_relevant O r⟩
+          ⟨{heap := O.1.heap, root := r.1}, ordered_of_relevant O r⟩
 
 instance OBdd.instDecidableGraphSimilar : Decidable (OBdd.GraphSimilar O l r) := by
   simp only [OBdd.GraphSimilar]; infer_instance
@@ -709,14 +770,6 @@ lemma OBdd.toTree_terminal' {n m} {O : OBdd n m} : O.1.root = terminal b → O.t
   rcases O with ⟨⟨heap, root⟩, ho⟩
   simp_all [toTree]
 
-lemma OBdd.toTree_node' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.toTree = .branch O.1.heap[j].var (toTree ⟨{heap := O.1.heap, root := O.1.heap[j].low }, ordered_of_low_edge (by rw [← h]; exact O.2)⟩ ) (toTree ⟨{heap := O.1.heap, root := O.1.heap[j].high }, ordered_of_high_edge (by rw [← h]; exact O.2)⟩) := by
-  rcases O with ⟨⟨heap, root⟩, ho⟩
-  simp at h
-  simp_rw [h]
-  conv =>
-    lhs
-    unfold toTree
-
 lemma OBdd.HSimilar_of_terminal {n m m' : Nat} {b : Bool} {O : OBdd n m} {U : OBdd n m'} :
     O.1.root = terminal b → U.1.root = terminal b → O.HSimilar U := by
   intro h1 h2
@@ -797,79 +850,12 @@ lemma OBdd.size_zero_of_terminal : OBdd.isTerminal O → O.size = 0 := by
   unfold toTree
   rfl
 
-def Bdd.low {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
-  fun _ ↦ {heap := B.heap, root := B.heap[j].low}
-
-lemma Bdd.edge_of_low {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.low h).root := by
-  simp [low, h]
-  exact Edge.low rfl
-
-def Bdd.high {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
-  fun _ ↦ {heap := B.heap, root := B.heap[j].high}
-
-lemma Bdd.edge_of_high {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : Edge B.heap B.root (B.high h).root := by
-  simp [high, h]
-  exact Edge.high rfl
-
-lemma Bdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
-
-lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Reachable v q p → Bdd.Ordered {heap := v, root := p} := by
-  intro o r_q_p
-  simp_all only [Ordered]
-  rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, RelevantEdge, GraphMayPrecede, MayPrecede, Nat.succ_eq_add_one]
-  simp at hx
-  simp at hy
-  have : RelevantEdge B ⟨x, (by trans p <;> aesop)⟩
-                     ⟨y, (by trans p <;> aesop)⟩ := by
-    simp only [RelevantEdge]
-    rw [h]
-    assumption
-  apply o at this
-  rw [← h]
-  exact this
-
-lemma Bdd.ordered_of_edge {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Edge v q p → Bdd.Ordered {heap := v, root := p} := by
-  rw [← h]
-  rw [← r]
-  intro o e
-  apply ordered_of_relevant' o
-  apply reachable_of_edge e
-  rfl
-  rfl
-
-lemma Bdd.high_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.high h).Ordered := by
-  intro o
-  apply Bdd.ordered_of_edge
-  rfl
-  exact h
-  exact o
-  convert edge_of_high B
-  · symm; assumption
-  · assumption
-
-def OBdd.high {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
-  fun h ↦ ⟨O.1.high h, Bdd.high_ordered h O.2⟩
-
 lemma OBdd.high_reduced {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced → (O.high h).Reduced := by
   intro o
   apply reduced_of_relevant O ⟨O.1.heap[j].high, ?_⟩ o
   apply reachable_of_edge
   rw [h]
   exact Edge.high rfl
-
-lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low h).Ordered := by
-  intro o
-  apply Bdd.ordered_of_edge
-  rfl
-  exact h
-  exact o
-  convert edge_of_low B
-  · symm; assumption
-  · assumption
-
-def OBdd.low {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
-  fun h ↦ ⟨O.1.low h, Bdd.low_ordered h O.2⟩
 
 lemma OBdd.low_reduced {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced → (O.low h).Reduced := by
   intro o
@@ -879,18 +865,13 @@ lemma OBdd.low_reduced {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} 
   exact Edge.low rfl
 
 lemma OBdd.toTree_node {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.toTree = .branch O.1.heap[j].var (toTree (O.low h)) (toTree (O.high h)) := by
-  rcases O with ⟨⟨heap, root⟩, ho⟩
-  simp at h
-  simp_rw [h]
-  conv =>
-    lhs
-    unfold toTree
-  simp [low,high]
-  constructor <;> rfl
+  conv => lhs; unfold toTree
+  split
+  next _  heq => rw [h] at heq; contradiction
+  next j' heq => rw [h] at heq; injection heq with heq; subst heq; rfl
 
 lemma OBdd.size_node {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : O.size = 1 + (O.low h).size + (O.high h).size := by
-  simp [size]
-  rw [toTree_node h]
+  simp only [size, Function.comp_apply, toTree_node h]
   rfl
 
 lemma OBdd.evaluate_node'' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
@@ -1085,25 +1066,12 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
       · simp [evaluate_low_eq_evaluate_set_false, h]
     exact Canonicity (high_reduced R) (low_reduced R) this
 
-@[simp]
-lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
-
-@[simp]
-lemma high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
-
-
-lemma oedge_of_low {h : O.1.root = node j} : OEdge O (O.low h) := ⟨rfl, edge_of_low (h := h)⟩
-lemma oedge_of_high {h : O.1.root = node j} : OEdge O (O.high h) := ⟨rfl, edge_of_high (h := h)⟩
-
 def OBdd.collect_helper (O : OBdd n m) : Vec Bool m × List (Fin m) → Vec Bool m × List (Fin m) :=
   match h : O.1.root with
   | terminal _ => id
   | node j =>
     fun I ↦ if I.1.get j then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩)
 termination_by O
-decreasing_by
-  exact oedge_of_high
-  exact oedge_of_low
 
 /-- Return a list of all reachable node indices. -/
 def OBdd.collect : OBdd n m → List (Fin m) :=
@@ -1166,9 +1134,6 @@ theorem OBdd.collect_helper_retains_found {O : OBdd n m} {I : Vec Bool m × List
         | isTrue ht => rw [ht]; left
       exact collect_helper_retains_found this
 termination_by O
-decreasing_by
-  · exact oedge_of_low
-  · exact oedge_of_high
 
 theorem OBdd.collect_helper_retains_marked {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
     I.1.get j = true → (collect_helper O I).1.get j = true := by
@@ -1191,9 +1156,6 @@ theorem OBdd.collect_helper_retains_marked {O : OBdd n m} {I : Vec Bool m × Lis
         | isTrue ht => rw [ht]; simp
       exact collect_helper_retains_marked this
 termination_by O
-decreasing_by
-  · exact oedge_of_low
-  · exact oedge_of_high
 
 theorem OBdd.collect_helper_only_marks_reachable {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
     I.1.get j = false → (collect_helper O I).1.get j = true → Reachable O.1.heap O.1.root (node j) := by
@@ -1232,9 +1194,6 @@ theorem OBdd.collect_helper_only_marks_reachable {O : OBdd n m} {I : Vec Bool m 
           · exact reachable_of_edge (edge_of_low (h := O_root_def) O.1)
           · assumption
 termination_by O
-decreasing_by
-  exact oedge_of_high
-  exact oedge_of_low
 
 theorem OBdd.collect_helper_spec {O : OBdd n m} :
     (∀ i, (Reachable O.1.heap O.1.root (node i) → I.1.get i → i ∈ I.2)) →
@@ -1330,10 +1289,6 @@ theorem OBdd.collect_helper_spec {O : OBdd n m} :
             · apply collect_helper_only_marks_reachable hhhh ma
             · assumption
 termination_by O
-decreasing_by
-  exact oedge_of_low
-  exact oedge_of_high
-  exact oedge_of_low
 
 /-- An acyclicity lemma: an edge from `O` to `U` implies that `O` is not reachable from `U`.  -/
 lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachable O.1.heap U.1.root O.1.root := by
@@ -1488,10 +1443,6 @@ lemma OBdd.collect_spec' {O : OBdd n m} {j : Fin m} {I : Vec Bool m × List (Fin
                 exact Reachable.trans (reachable_of_edge (edge_of_low (h := O_root_def) O.1)) re1
                 exact re2
 termination_by O
-decreasing_by
-  · exact oedge_of_low
-  · exact oedge_of_high
-  · exact oedge_of_low
 
 /-- `collect` is correct. -/
 theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.root (node j) → j ∈ collect O := by
@@ -1562,10 +1513,6 @@ theorem OBdd.collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
               simp only [low_heap_eq_heap]
               exact h1 i' hi'
 termination_by O
-decreasing_by
-  exact oedge_of_low
-  exact oedge_of_high
-  exact oedge_of_low
 
 theorem OBdd.collect_spec_reverse {O : OBdd n m} {j : Fin m} : j ∈ collect O → Reachable O.1.heap O.1.root (node j) := by
   intro h
@@ -1654,7 +1601,7 @@ lemma Bdd.Ordered_of_low_high_ordered {n m} {j : Fin m} {v : Vec (Node n m) m} :
     rintro ⟨p, hp⟩ ⟨q, hq⟩ hpq
     simp only at hp hq
     simp only [RelevantEdge] at hpq
-    simp only [GraphMayPrecede]
+    simp only [RelevantMayPrecede]
     apply Relation.reflTransGen_swap.mp at hp
     cases hp with
     | refl =>
