@@ -293,14 +293,17 @@ inductive DecisionTree n where
   | branch : Fin n → DecisionTree n → DecisionTree n → DecisionTree n
 deriving DecidableEq
 
-/-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
-lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
-    Ordered {heap := O.1.heap, root := S.1} := by
-  rcases S with ⟨q, h⟩
-  simp_all only [Ordered]
+lemma Bdd.ordered_of_reachable {O : OBdd n m} :
+    Reachable O.1.heap O.1.root p →
+    Ordered {heap := O.1.heap, root := p} := by
+  intro h
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
   simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   exact O.2 (RelevantEdge_from_Edge_Reachable e (Relation.ReflTransGen.trans h hx) (Relation.ReflTransGen.trans h hy))
+
+/-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
+lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
+    Ordered {heap := O.1.heap, root := S.1} := ordered_of_reachable S.2
 
 def Bdd.low {n m} (B : Bdd n m) {j : Fin m} : B.root = node j → Bdd n m :=
   fun _ ↦ {heap := B.heap, root := B.heap[j].low}
@@ -1521,11 +1524,38 @@ theorem OBdd.collect_spec_reverse {O : OBdd n m} {j : Fin m} : j ∈ collect O �
   · simp
   · assumption
 
+theorem OBdd.collect_helper_nodup {O : OBdd n m} :
+    (∀ i ∈ I.2, I.1.get i) ∧ I.2.Nodup →
+    (∀ i ∈ (collect_helper O I).2, (collect_helper O I).1.get i) ∧ (collect_helper O I).2.Nodup := by
+  intro h
+  cases O_root_def : O.1.root with
+  | terminal b => simpa [collect_helper_terminal' O O_root_def]
+  | node     j =>
+    rw [collect_helper_node' O O_root_def]
+    split
+    next heq => assumption
+    next heq =>
+      apply collect_helper_nodup
+      apply collect_helper_nodup
+      simp only [List.mem_cons, forall_eq_or_imp, List.Vector.get_set_same, true_and, List.nodup_cons]
+      constructor
+      · intro i hi
+        cases decEq j i with
+        | isFalse hf => rw [Vec.get_set_of_ne hf]; exact h.1 i hi
+        | isTrue  ht => subst ht; simp [Vec.get_set_same]
+      · constructor
+        · contrapose heq
+          simp_all
+        · exact h.2
+termination_by O
+
 theorem OBdd.mem_collect_iff_reachable {O : OBdd n m} {j : Fin m} : j ∈ collect O ↔ Reachable O.1.heap O.1.root (node j) := ⟨collect_spec_reverse, collect_spec⟩
 
-def OBdd.numPointers {n m} : OBdd n m → Nat := List.length ∘ collect
+theorem OBdd.collect_nodup {O : OBdd n m} : (collect O).Nodup := by
+  simp only [collect]
+  exact (collect_helper_nodup (by simp)).2
 
--- lemma numPointer_le_heap_length {n m} (O : OBdd n m) : O.numPointers ≤ m := sorry
+def OBdd.numPointers : OBdd n m → Nat := List.length ∘ collect
 
 lemma isTerminal_iff_numPointer_eq_zero {n m} {O : OBdd n m} : O.numPointers = 0 ↔ O.isTerminal := by
   constructor
