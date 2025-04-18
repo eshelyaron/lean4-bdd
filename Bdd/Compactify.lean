@@ -27,6 +27,58 @@ def compactify' {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
     let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, OBdd.numPointers_gt_zero_of_Sub_root_eq_node (O.toSubBdd) O_root_def⟩ (Vec.replicate O.numPointers ⟨O.1.heap[j].var, (terminal false), (terminal false)⟩)
     ⟨new, r⟩
 
+lemma compactify_helper_spec'
+    (O : OBdd n m) (S : O.SubBdd)
+    (ids : Vec (Option (Fin O.numPointers)) m)
+    (nid : Fin O.numPointers)
+    (new : Vec (Node n O.numPointers) O.numPointers) :
+    nid = Fintype.card {j // (ids.get j).isSome} →
+    ( ∀ j j',
+      ids.get j = some j' →
+      ∃ (r : Reachable O.1.heap O.1.root (node j)) (o : Bdd.Ordered ⟨new, node j'⟩),
+        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_reachable r⟩ ⟨⟨new, node j'⟩, o⟩
+    ) →
+    let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
+    nid1 = Fintype.card {j // (ids1.get j).isSome} ∧
+    (∀ j j',
+     ids1.get j = some j' →
+     ∃ (r : Reachable O.1.heap O.1.root (node j)) (o : Bdd.Ordered ⟨new1, node j'⟩),
+        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_reachable r⟩ ⟨⟨new1, node j'⟩, o⟩
+      ) ∧ ∃ (o : Bdd.Ordered ⟨new1, root⟩), OBdd.HSimilar S.1 ⟨⟨new1, root⟩, o⟩ := by
+  intro h1 h2
+  split
+  next ids1 nid1 new1 root heq =>
+    unfold compactify_helper at heq
+    split at heq
+    next b heqq =>
+      simp_all only [Prod.mk.injEq, true_and, implies_true]
+      simp_rw [← heq.2.2.2]
+      exact ⟨Bdd.Ordered_of_terminal, OBdd.HSimilar_of_terminal heqq rfl⟩
+    next j heqq =>
+      split at heq
+      next heqqq =>
+        split at heq
+        next idsl nidl newl rootl heql =>
+          split at heq
+          next idsr nidr newr rootr heqr =>
+            simp only [Prod.mk.injEq] at heq
+            rcases heq with ⟨heq1, heq2, heq3, heq4⟩
+            constructor
+            · rw [← heq2]
+              sorry
+            · sorry
+      next j' heqqq =>
+        simp_all only [Prod.mk.injEq, true_and, implies_true]
+        simp_rw [← heq.2.2.2]
+        convert (h2 j j' heqqq).2
+        simp_rw [← heqq]
+        rcases S with ⟨U, o⟩
+        simp only at heqq
+        simp only
+        have : O.1.heap = U.1.heap := sorry --use o
+        simp_rw [this]
+        rfl
+
 lemma compactify_helper_spec {n m : Nat}
     (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) (hp : Proper new):
     ( ∀ j j',
