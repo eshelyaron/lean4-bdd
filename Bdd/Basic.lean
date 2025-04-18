@@ -1940,3 +1940,19 @@ lemma OBdd.card_reachable_node {O : OBdd n m} (h : O.1.root = node j) :
     · apply instFintypeEitherRelevantPointer (O.low h) (O.high h); simp
     · simp
   · exact Fintype.subtypeEq O.1.root
+
+lemma OBdd.numPointers_spec {O : OBdd n m} : O.numPointers = Fintype.card { j // Reachable O.1.heap O.1.root (node j) } := by
+  simp only [numPointers, Function.comp_apply]
+  simp_rw [Fintype.card, Finset.univ]
+  have : O.collect.length = (Multiset.ofList O.collect).card := by rfl
+  rw [this]
+  refine Eq.symm (Finset.card_eq_of_bijective (fun i hi ↦ ⟨O.collect.get ⟨i, hi⟩, by simp; exact collect_spec_reverse (List.getElem_mem hi)⟩) ?_ ?_ ?_)
+  · rintro ⟨j, hj⟩ h
+    simp only [Subtype.mk.injEq, Multiset.coe_card]
+    exact List.mem_iff_getElem.mp (collect_spec hj)
+  · rintro i hi
+    simp only [List.get_eq_getElem]
+    apply Fintype.complete
+  · intro i j hi hj heq
+    simp only [List.get_eq_getElem, Subtype.mk.injEq] at heq
+    exact (List.Nodup.getElem_inj_iff collect_nodup).mp heq
