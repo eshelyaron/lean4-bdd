@@ -293,13 +293,15 @@ inductive DecisionTree n where
   | branch : Fin n → DecisionTree n → DecisionTree n → DecisionTree n
 deriving DecidableEq
 
-lemma Bdd.ordered_of_reachable {O : OBdd n m} :
-    Reachable O.1.heap O.1.root p →
-    Ordered {heap := O.1.heap, root := p} := by
-  intro h
+lemma Bdd.ordered_of_reachable' {B : Bdd n m} :
+    B.Ordered → Reachable B.heap B.root p → Ordered ⟨B.heap, p⟩ := by
+  intro h1 h2
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
   simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
-  exact O.2 (RelevantEdge_from_Edge_Reachable e (Relation.ReflTransGen.trans h hx) (Relation.ReflTransGen.trans h hy))
+  exact h1 (RelevantEdge_from_Edge_Reachable e (Relation.ReflTransGen.trans h2 hx) (Relation.ReflTransGen.trans h2 hy))
+
+lemma Bdd.ordered_of_reachable {O : OBdd n m} :
+    Reachable O.1.heap O.1.root p → Ordered {heap := O.1.heap, root := p} := ordered_of_reachable' O.2
 
 /-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
 lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
@@ -319,7 +321,7 @@ lemma Bdd.edge_of_high {n m} (B : Bdd n m) {j : Fin m} {h : B.root = node j} : E
   simp only [high, h]
   exact Edge.high rfl
 
-lemma Bdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
+lemma Bdd.reachable_of_edge : Edge M p q → Reachable M p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
 
 lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} :
     B.Ordered → Reachable v q p → Bdd.Ordered {heap := v, root := p} := by
@@ -338,37 +340,25 @@ lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} :
   rw [← h]
   exact this
 
-lemma Bdd.ordered_of_edge {B : Bdd n m} {h : B.heap = v} {r : B.root = q} : B.Ordered → Edge v q p → Bdd.Ordered {heap := v, root := p} := by
-  rw [← h]
-  rw [← r]
-  intro o e
-  apply ordered_of_relevant' o
-  apply reachable_of_edge e
-  rfl
-  rfl
+lemma Bdd.ordered_of_edge {B : Bdd n m} : B.Ordered → Edge B.heap B.root p → Bdd.Ordered ⟨B.heap, p⟩ := by
+  exact fun o e ↦ ordered_of_reachable' o (reachable_of_edge e)
 
 lemma Bdd.high_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.high h).Ordered := by
   intro o
-  apply Bdd.ordered_of_edge
+  apply Bdd.ordered_of_edge o
+  rw [h]
+  right
   rfl
-  exact h
-  exact o
-  convert edge_of_high B
-  · symm; assumption
-  · assumption
-
-def OBdd.high {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
-  fun h ↦ ⟨O.1.high h, Bdd.high_ordered h O.2⟩
 
 lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low h).Ordered := by
   intro o
-  apply Bdd.ordered_of_edge
+  apply Bdd.ordered_of_edge o
+  rw [h]
+  left
   rfl
-  exact h
-  exact o
-  convert edge_of_low B
-  · symm; assumption
-  · assumption
+
+def OBdd.high {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
+  fun h ↦ ⟨O.1.high h, Bdd.high_ordered h O.2⟩
 
 def OBdd.low {n m} (O : OBdd n m) {j : Fin m} : O.1.root = node j → OBdd n m :=
   fun h ↦ ⟨O.1.low h, Bdd.low_ordered h O.2⟩
@@ -1554,7 +1544,28 @@ theorem OBdd.collect_nodup {O : OBdd n m} : (collect O).Nodup := by
   simp only [collect]
   exact (collect_helper_nodup (by simp)).2
 
+def OBdd.foo (O : OBdd n m) (l : List (Fin m)) (h : ∀ j ∈ l, Reachable O.1.heap O.1.root (node j)) : List { j // Reachable O.1.heap O.1.root (node j) } :=
+  match l_def : l with
+  | .nil => []
+  | .cons head tail => ⟨head, (by aesop)⟩ :: foo O tail (by aesop)
+
+def OBdd.bar (O : OBdd n m) : List { j // Reachable O.1.heap O.1.root (node j) } := O.foo O.collect (fun _ a ↦ mem_collect_iff_reachable.mp a)
+example {O : OBdd n m} : Finset { j // Reachable O.1.heap O.1.root (node j) } := ⟨O.bar, sorry⟩
+
+
 def OBdd.numPointers : OBdd n m → Nat := List.length ∘ collect
+
+-- def bar (O : OBdd n m) (j : Fin m) (k : { j // Reachable O.1.heap O.1.root (node j) } ) : Prop := j = k.1
+-- lemma foo (O : OBdd n m) : O.numPointers = Fintype.card { j // Reachable O.1.heap O.1.root (node j) } := by
+--   simp only [OBdd.numPointers, Function.comp_apply, Fintype.card, Finset.card]
+--   rw [← Multiset.coe_card]
+--   apply Multiset.card_eq_card_of_rel (r := bar O)
+--   induction O.collect with
+--   | nil => left
+--   | cons head tail => sorry
+--   apply?
+--   sorry
+-- -- lemma numPointer_le_heap_length {n m} (O : OBdd n m) : O.numPointers ≤ m := sorry
 
 lemma isTerminal_iff_numPointer_eq_zero {n m} {O : OBdd n m} : O.numPointers = 0 ↔ O.isTerminal := by
   constructor
