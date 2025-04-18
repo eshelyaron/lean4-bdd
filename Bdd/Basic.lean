@@ -554,6 +554,28 @@ instance Pointer.instDecidableReachable {n m} (O : OBdd n m) :
 instance OBdd.instFintypeRelevantPointer {n m} (O : OBdd n m) : Fintype (O.1.RelevantPointer) := by
   convert Subtype.fintype _ <;> infer_instance
 
+instance Pointer.instDecidableEitherReachable {n m} (O U : OBdd n m) (h : O.1.heap = U.1.heap) :
+    DecidablePred (fun q ↦ (Reachable O.1.heap O.1.root q) ∨ (Reachable O.1.heap U.1.root q)) := by
+  intro p
+  simp
+  cases instDecidableReachable O p with
+  | isFalse hf =>
+    cases instDecidableReachable U p with
+    | isFalse hhf =>
+      apply isFalse
+      simp_all only [or_self, not_false_eq_true]
+    | isTrue  hht =>
+      apply isTrue
+      simp_all only [or_true]
+  | isTrue  ht =>
+    apply isTrue
+    simp_all only [true_or]
+
+instance OBdd.instFintypeEitherRelevantPointer (O U : OBdd n m) (h : O.1.heap = U.1.heap) : Fintype {q // Reachable O.1.heap O.1.root q ∨ Reachable O.1.heap U.1.root q} := by
+  convert Subtype.fintype _
+  · exact instDecidableEitherReachable O U h
+  · infer_instance
+
 /-- The inverse image of a decidable relation is decidable. -/
 instance my_decidableRel_of_invImage2 {r : β → β → Prop} [DecidableRel r] {f : α → β} :
     DecidableRel (InvImage r f) :=
@@ -1544,28 +1566,7 @@ theorem OBdd.collect_nodup {O : OBdd n m} : (collect O).Nodup := by
   simp only [collect]
   exact (collect_helper_nodup (by simp)).2
 
-def OBdd.foo (O : OBdd n m) (l : List (Fin m)) (h : ∀ j ∈ l, Reachable O.1.heap O.1.root (node j)) : List { j // Reachable O.1.heap O.1.root (node j) } :=
-  match l_def : l with
-  | .nil => []
-  | .cons head tail => ⟨head, (by aesop)⟩ :: foo O tail (by aesop)
-
-def OBdd.bar (O : OBdd n m) : List { j // Reachable O.1.heap O.1.root (node j) } := O.foo O.collect (fun _ a ↦ mem_collect_iff_reachable.mp a)
-example {O : OBdd n m} : Finset { j // Reachable O.1.heap O.1.root (node j) } := ⟨O.bar, sorry⟩
-
-
 def OBdd.numPointers : OBdd n m → Nat := List.length ∘ collect
-
--- def bar (O : OBdd n m) (j : Fin m) (k : { j // Reachable O.1.heap O.1.root (node j) } ) : Prop := j = k.1
--- lemma foo (O : OBdd n m) : O.numPointers = Fintype.card { j // Reachable O.1.heap O.1.root (node j) } := by
---   simp only [OBdd.numPointers, Function.comp_apply, Fintype.card, Finset.card]
---   rw [← Multiset.coe_card]
---   apply Multiset.card_eq_card_of_rel (r := bar O)
---   induction O.collect with
---   | nil => left
---   | cons head tail => sorry
---   apply?
---   sorry
--- -- lemma numPointer_le_heap_length {n m} (O : OBdd n m) : O.numPointers ≤ m := sorry
 
 lemma isTerminal_iff_numPointer_eq_zero {n m} {O : OBdd n m} : O.numPointers = 0 ↔ O.isTerminal := by
   constructor
@@ -1750,3 +1751,192 @@ lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordere
   exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
+
+lemma OBdd.card_RelevantPointer_le {O : OBdd n m} : Fintype.card O.1.RelevantPointer ≤ m + 2 := by
+  conv =>
+    rhs
+    rw [← Fintype.card_fin m]
+    rw [← Fintype.card_bool]
+  rw [← Fintype.card_sum]
+  let emb : O.1.RelevantPointer → Fin m ⊕ Bool := fun
+    | ⟨terminal b, _⟩ => .inr b
+    | ⟨node j, _⟩ => .inl j
+  refine Fintype.card_le_of_embedding ⟨emb, ?_⟩
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ h
+  cases x with
+  | terminal b =>
+    cases y with
+    | node j => simp [emb] at h
+    | terminal c => simp [emb] at h; simp_rw [h]
+  | node j =>
+    cases y with
+    | node i => simp [emb] at h; simp_rw [h]
+    | terminal b => simp [emb] at h
+
+lemma OBdd.numPointers_terminal {O : OBdd n m} : O.isTerminal → Fintype.card O.1.RelevantPointer = 1 := by
+  intro h
+  refine Fintype.card_eq_one_iff.mpr ?_
+  rcases h with ⟨b, hb⟩
+  use ⟨terminal b, by rw [hb]; left⟩
+  intro y
+  apply Subtype.eq_iff.mpr
+  apply (terminal_relevant_iff hb y).mp
+  rfl
+
+lemma OBdd.reachable_node_iff {O : OBdd n m} (h : O.1.root = node j) :
+  Reachable O.1.heap O.1.root = fun q ↦
+    (Reachable O.1.heap O.1.root q ∧ ¬ Reachable O.1.heap (O.low h).1.root q ∧ ¬ Reachable O.1.heap (O.high h).1.root q) ∨
+    (Reachable O.1.heap (O.low  h).1.root q ∧ ¬ Reachable O.1.heap (O.high h).1.root q) ∨
+    (Reachable O.1.heap (O.high h).1.root q ∧ ¬ Reachable O.1.heap (O.low  h).1.root q) ∨
+    (Reachable O.1.heap (O.low  h).1.root q ∧   Reachable O.1.heap (O.high h).1.root q) := by
+  ext p
+  constructor
+  · intro r
+    cases instDecidableReachable (O.low h) p with
+    | isFalse hf =>
+      cases instDecidableReachable (O.high h) p with
+      | isFalse hhf =>
+        left
+        exact ⟨r, hf, hhf⟩
+      | isTrue hht =>
+        right
+        right
+        left
+        exact ⟨hht, hf⟩
+    | isTrue ht =>
+      cases instDecidableReachable (O.high h) p with
+      | isFalse hhf =>
+        right
+        left
+        exact ⟨ht, hhf⟩
+      | isTrue hht =>
+        right
+        right
+        right
+        exact ⟨ht, hht⟩
+  · intro r
+    cases r with
+    | inl r => exact r.1
+    | inr r =>
+      cases r with
+      | inl r =>
+        trans (O.low h).1.root
+        · exact reachable_of_edge (edge_of_low (h := h) O.1)
+        · exact r.1
+      | inr r =>
+        cases r with
+        | inl r =>
+          trans (O.high h).1.root
+          · exact reachable_of_edge (edge_of_high (h := h) O.1)
+          · exact r.1
+        | inr r =>
+          trans (O.high h).1.root
+          · exact reachable_of_edge (edge_of_high (h := h) O.1)
+          · exact r.2
+
+instance OBdd.instFintypeReachableFromNode (O : OBdd n m) (h : O.1.root = node j) : Fintype {q // (q = O.1.root ∨ (Reachable O.1.heap (O.low  h).1.root q ∨ Reachable O.1.heap (O.high h).1.root q))} := by
+  convert Subtype.fintype _
+  · intro p
+    simp only
+    cases decEq p O.1.root with
+    | isFalse hf =>
+      cases instDecidableReachable (O.low h) p with
+      | isFalse hhf =>
+        cases instDecidableReachable (O.high h) p with
+        | isFalse hhhf =>
+          apply isFalse
+          simp
+          exact ⟨hf, hhf, hhhf⟩
+        | isTrue hhht =>
+          apply isTrue
+          right
+          right
+          assumption
+      | isTrue hht =>
+        apply isTrue
+        right
+        left
+        assumption
+    | isTrue h =>
+      apply isTrue
+      left
+      assumption
+  · infer_instance
+
+lemma OBdd.reachable_from_node_iff' {O : OBdd n m} (h : O.1.root = node j) :
+    Reachable O.1.heap O.1.root p ↔ p = O.1.root ∨ (Reachable O.1.heap (O.low h).1.root p ∨ Reachable O.1.heap (O.high h).1.root p) := by
+  constructor
+  · intro r
+    cases (Relation.reflTransGen_swap.mp r) with
+    | refl => left; rfl
+    | tail t e =>
+      rename_i q
+      right
+      rw [h] at e
+      cases e with
+      | low  l =>
+        left
+        trans q
+        · simp only [low,Bdd.low, l]
+          left
+        · exact Relation.reflTransGen_swap.mp t
+      | high l =>
+        right
+        trans q
+        · simp only [high, Bdd.high, l]
+          left
+        · exact Relation.reflTransGen_swap.mp t
+  · intro r
+    cases r with
+    | inl r =>
+      rw [r]
+      left
+    | inr r =>
+      cases r with
+      | inl r =>
+        apply Relation.reflTransGen_swap.mpr
+        apply Relation.ReflTransGen.tail (Relation.reflTransGen_swap.mpr r)
+        simp [Function.swap]
+        exact edge_of_low  (h := h)
+      | inr r =>
+        apply Relation.reflTransGen_swap.mpr
+        apply Relation.ReflTransGen.tail (Relation.reflTransGen_swap.mpr r)
+        simp [Function.swap]
+        exact edge_of_high (h := h)
+
+lemma OBdd.card_reachable_node' {O : OBdd n m} (h : O.1.root = node j) :
+  Fintype.card {p // Reachable O.1.heap O.1.root p} =
+  Fintype.card {p // p = O.1.root ∨ (Reachable O.1.heap (O.low  h).1.root p ∨ Reachable O.1.heap (O.high h).1.root p)} := by
+  refine Fintype.card_congr' ?_
+  conv =>
+    lhs
+    arg 1
+    ext
+    rw [reachable_from_node_iff' h]
+
+lemma OBdd.eq_root_disjoint_reachable_low_or_high {O : OBdd n m} (h : O.1.root = node j) :
+    Disjoint
+      (· = O.1.root)
+      (fun p ↦ (Reachable O.1.heap (O.low  h).1.root p ∨ Reachable O.1.heap (O.high h).1.root p)) := by
+  intro P h1 h2 p hp
+  have this := h1 p hp
+  have that := h2 p hp
+  simp_all only
+  cases that with
+  | inl l =>
+    rw [← h] at l
+    apply OBdd.not_oedge_reachable oedge_of_low l
+  | inr l =>
+    rw [← h] at l
+    apply OBdd.not_oedge_reachable oedge_of_high l
+
+lemma OBdd.card_reachable_node {O : OBdd n m} (h : O.1.root = node j) :
+  Fintype.card { q // Reachable O.1.heap O.1.root q } =
+  1 + Fintype.card { q // Reachable (O.low h).1.heap (O.low h).1.root q ∨ Reachable (O.high h).1.heap (O.high h).1.root q } := by
+  rw [card_reachable_node' h]
+  rw [@Fintype.card_subtype_or_disjoint _ _ _ (eq_root_disjoint_reachable_low_or_high h) ..]
+  · simp only [Fintype.card_unique, low_heap_eq_heap, add_right_inj]
+    apply @Fintype.card_congr' ..
+    · apply instFintypeEitherRelevantPointer (O.low h) (O.high h); simp
+    · simp
+  · exact Fintype.subtypeEq O.1.root
