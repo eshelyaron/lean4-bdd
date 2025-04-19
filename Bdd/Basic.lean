@@ -966,6 +966,95 @@ lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1
                                 ⟨(O.low  h).1.root, reachable_of_edge (edge_of_low  (h := h) O.1)⟩ := iso
   exact (symm (R.2 giso))
 
+def OBdd.HIsomorphism (O : OBdd n m) (U : OBdd n' m') :=
+  ∃ (f : O.1.RelevantPointer → U.1.RelevantPointer),
+    (Function.Bijective f) ∧
+    (∀ (p : O.1.RelevantPointer),
+       (∀ j, (h : p.1 = node j) → ∃ i hi, f p = ⟨node i, hi⟩
+       ∧ O.1.heap[j].var.1 = U.1.heap[i].var.1
+       ∧ f ⟨O.1.heap[j].low , Reachable.trans p.2 (reachable_of_edge (h ▸ Edge.low  rfl))⟩ = ⟨U.1.heap[i].low , Reachable.trans hi (reachable_of_edge (Edge.low  rfl))⟩
+       ∧ f ⟨O.1.heap[j].high, Reachable.trans p.2 (reachable_of_edge (h ▸ Edge.high rfl))⟩ = ⟨U.1.heap[i].high, Reachable.trans hi (reachable_of_edge (Edge.high rfl))⟩)
+     ∧ (∀ b, p.1 = terminal b → ∃   hb, f p = ⟨terminal b, hb⟩))
+
+def OBdd.Isomorphism : OBdd n m → OBdd n m → Prop := HIsomorphism
+
+def OBdd.RelevantIsomorphism (O : OBdd n m) (p q : O.1.RelevantPointer) :=
+  Isomorphism ⟨{heap := O.1.heap, root := p.1}, ordered_of_reachable p.2⟩
+              ⟨{heap := O.1.heap, root := q.1}, ordered_of_reachable q.2⟩
+
+def OBdd.Reduced' (O : OBdd n m) : Prop
+  -- No redundant pointers.
+  := NoRedundancy O.1
+  -- Isomorphism implies pointer-equality.
+   ∧ Subrelation (RelevantIsomorphism O) (InvImage Eq Subtype.val)
+
+lemma OBdd.Similar_of_Isomorphism {O U : OBdd n m} : O.Isomorphism U → O.Similar U := by
+  rintro ⟨f, h1, h2⟩
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    have := ((h2 O.1.toRelevantPointer).2 b O_root_def).2
+    cases U_root_def : U.1.root with
+    | terminal c =>
+      simp only [Similar, HSimilar]
+      rw [toTree_terminal' O_root_def, toTree_terminal' U_root_def]
+      simp only [DecisionTree.leaf.injEq]
+      -- need to show that f (O.1.root) = U.1.root
+      sorry
+    | node i => sorry
+  | node j => sorry
+
+def OBdd.terminal_hiso {O : OBdd n m} {U : OBdd n' m'} : O.1.root = terminal b → U.1.root = terminal b → O.HIsomorphism U := fun ho hu ↦
+  ⟨fun _ ↦ ⟨terminal b, by rw [hu]; left⟩, by sorry⟩
+
+def OBdd.terminal_iso {O U : OBdd n m} : O.1.root = terminal b → U.1.root = terminal b → O.Isomorphism U := terminal_hiso
+
+def OBdd.node_iso {O U : OBdd n m} :
+  O.Reduced' → U.Reduced' →
+  (ho : O.1.root = node j) → (hu : U.1.root = node i) →
+  (O.low ho).Isomorphism (U.low hu) →
+  (O.high ho).Isomorphism (U.high hu) →
+  O.Isomorphism U := sorry
+
+lemma OBdd.high_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.high h).Reduced' := by
+  sorry
+
+lemma OBdd.low_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.low h).Reduced' := by
+  sorry
+
+lemma OBdd.reduced_of_relevant' {O : OBdd n m} (S : O.1.RelevantPointer):
+    O.Reduced' → OBdd.Reduced' ⟨{heap := O.1.heap, root := S.1}, ordered_of_relevant O S⟩ := by
+  sorry
+
+lemma OBdd.Isomorphism_of_Similiar {O U : OBdd n m} : O.Reduced' → U.Reduced' → O.Similar U → O.Isomorphism U := by
+  intro ho hu sim
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    have : U.1.root = terminal b := sorry
+    exact terminal_iso O_root_def this
+  | node j =>
+    have : ∃ i, U.1.root = node i := sorry
+    rcases this with ⟨i, U_root_def⟩
+    have liso := Isomorphism_of_Similiar (low_reduced'  (h := O_root_def) ho) (low_reduced'  (h := U_root_def) hu) sorry
+    have hiso := Isomorphism_of_Similiar (high_reduced' (h := O_root_def) ho) (high_reduced' (h := U_root_def) hu) sorry
+    exact node_iso ho hu O_root_def U_root_def liso hiso
+termination_by O.size + U.size
+decreasing_by all_goals simp only [size_node O_root_def, size_node U_root_def]; linarith
+
+lemma OBdd.reduced_iff_reduced' (O : OBdd n m) : O.Reduced ↔ O.Reduced' := by
+  constructor
+  · rintro ⟨h1, h2⟩
+    constructor
+    · exact h1
+    · intro p q iso
+      apply h2
+      exact Similar_of_Isomorphism iso
+  · intro h
+    constructor
+    · exact h.1
+    · intro p q sim
+      apply h.2
+      exact Isomorphism_of_Similiar (reduced_of_relevant' p h)  (reduced_of_relevant' q h) sim
+
 /-- Reduced OBDDs are canonical.  -/
 theorem OBdd.Canonicity {O U : OBdd n m} :
     O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
