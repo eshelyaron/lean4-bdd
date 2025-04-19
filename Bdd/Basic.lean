@@ -1080,6 +1080,13 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
       · simp [evaluate_low_eq_evaluate_set_false, h]
     exact Canonicity (high_reduced R) (low_reduced R) this
 
+theorem OBdd.Canonicity_reverse {O U : OBdd n m} :
+    O.Reduced → U.Reduced → O ≈ U → O.evaluate = U.evaluate := by
+  intro _ _ h
+  simp only [HasEquiv.Equiv, instSetoid, Similar, HSimilar] at h
+  simp only [evaluate, Function.comp_apply]
+  rw [h]
+
 def OBdd.collect_helper (O : OBdd n m) : Vec Bool m × List (Fin m) → Vec Bool m × List (Fin m) :=
   match h : O.1.root with
   | terminal _ => id
