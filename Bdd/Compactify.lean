@@ -194,8 +194,12 @@ lemma compactify_ordered {n m : Nat} {O : OBdd n m} : (compactify' O).Ordered :=
 
 --theorem compactify_spec {n m : Nat} {O : OBdd n m} : O.Similar (compactify O) :=
 
-lemma compactify_preserves_reduced {n m : Nat} {O : OBdd n m} :
+lemma compactify_preserves_reduced {O : OBdd n m} :
     OBdd.Reduced O → OBdd.Reduced ⟨(compactify' O), compactify_ordered⟩ := by
+  sorry
+
+lemma compactify_evaluate {O : OBdd n m} :
+    OBdd.evaluate ⟨(compactify' O), compactify_ordered⟩ = O.evaluate := by
   sorry
 
 end Compactify

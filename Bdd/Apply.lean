@@ -294,8 +294,13 @@ decreasing_by
   · right; exact oedge_of_high
 
 
-theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.succ m} {U : OBdd n.succ m'} : ∃ (o : Bdd.Ordered (apply op O U)), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨apply op O U, o⟩ I :=
+theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.succ m} {U : OBdd n.succ m'} :
+    ∃ (o : Bdd.Ordered (apply op O U)), ∀ I, (op (O.evaluate I) (U.evaluate I)) = OBdd.evaluate ⟨apply op O U, o⟩ I :=
   (apply_helper_spec (by sorry)).2
+
+theorem apply'_spec {n n' m m' p : Nat} {h : max n n' = p.succ} {op : Bool → Bool → Bool} {O : OBdd n m} {U : OBdd n' m'} :
+    ∀ I : Vec Bool (n ⊔ n'), (op ((O.lift (by simp)).evaluate I) ((U.lift (by simp)).evaluate I)) = OBdd.evaluate (apply' h op O U) I := by
+  sorry
 
 end Apply
 

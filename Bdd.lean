@@ -150,6 +150,12 @@ def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
   | .terminal b => b
   | .node j => False.elim (Nat.not_lt_zero _ (Eq.subst h B.robdd.1.1.heap[j].var.2))
 
+lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.robdd.1.1.root = .terminal (B.zero_vars_to_bool h) := by
+  simp only [zero_vars_to_bool]
+  split
+  next => assumption
+  next => contradiction
+
 def const : Bool → BDD := fun b ↦ ⟨_, _, ROBdd.const b⟩
 def var   : Nat  → BDD := fun n ↦ ⟨_, _, ROBdd.var n⟩
 
@@ -157,6 +163,16 @@ def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   match h : max B.nvars C.nvars with
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
   | .succ _ => ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
+
+lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive : BDD → Prop} :
+  (base : (h : B.nvars ⊔ C.nvars = 0) → motive (const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2)))) →
+  (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩) →
+  motive (apply op B C) := by
+  intro base step
+  simp only [apply]
+  split
+  next heq => exact base heq
+  next p heq => exact step p heq
 
 lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars := by
   simp only [apply]
@@ -166,15 +182,57 @@ lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars :=
 
 def and : BDD → BDD → BDD := apply Bool.and
 def or  : BDD → BDD → BDD := apply Bool.or
-def imp : BDD → BDD → BDD := apply (¬ · ∨ ·)
+def imp : BDD → BDD → BDD := apply (! · || ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
-def denotation (B : BDD) {m : Nat} (h : B.nvars ≤ m) : Vec Bool m → Bool := (B.robdd.1.lift h).evaluate
+def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vec Bool n → Bool := (B.robdd.1.lift h).evaluate
 
-def and_spec {B C : BDD} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
+lemma const_denotation : (const b).denotation h = Function.const _ b := by
+  simp only [denotation, const, ROBdd.const]
+  apply OBdd.evaluate_terminal'
+  rw [OBdd.lift_preserves_root]
+
+lemma apply_spec {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
+    (apply op B C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
+    (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I)) := by
+  let motive : BDD → Prop :=
+    fun D ↦
+      ∀ (h : D.nvars = B.nvars ⊔ C.nvars),
+        D.denotation (Nat.le_refl _) (h ▸ I) =
+        (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I))
+  apply apply_induction (motive := motive) (op := op) (B := B) (C := C)
+  · intro heq h
+    rw [const_denotation]
+    simp only [Function.const_apply]
+    have B_root_def := zero_vars_to_bool_spec (B := B) (by omega)
+    have C_root_def := zero_vars_to_bool_spec (B := C) (by omega)
+    simp [denotation, OBdd.lift_evaluate, OBdd.evaluate_terminal' B_root_def, OBdd.evaluate_terminal' C_root_def]
+  · intro p heq h
+    conv =>
+      lhs
+      unfold denotation
+    simp only
+    rw [OBdd.lift_trivial_eq (h := h)]
+    simp only [OBdd.evaluate_cast h]
+    rw [compactify_evaluate]
+    simp_rw [← reduce'_spec.2]
+    rw [← Apply.apply'_spec]
+    congr
+  · exact apply_nvars
+
+-- lemma apply_spec' {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
+--     (apply op B C).denotation (Nat.le_refl _) I = ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (apply_nvars ▸ I) ) := by
+--   simp only [denotation]
+--   simp only [OBdd.lift_evaluate]
+--   congr!
+--   · exact apply_nvars
+--   · exact HEq.symm (eqRec_heq apply_nvars I)
+
+lemma and_spec {B C : BDD} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
     (B.and C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
-    (B.denotation (Nat.le_max_left ..) I) ∧ (C.denotation (Nat.le_max_right ..) I) := by
-  sorry
+    ((B.denotation (Nat.le_max_left ..) I) && (C.denotation (Nat.le_max_right ..) I)) := by
+  simp [and]
+  exact apply_spec
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) =

@@ -395,6 +395,10 @@ def DecisionTree.lift : DecisionTree n → n ≤ n' → DecisionTree n'
 
 def OBdd.evaluate : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
+lemma OBdd.evaluate_cast {O : OBdd n m} (h : n = n') : (h ▸ O).evaluate I = O.evaluate (h ▸ I) := by
+  subst h
+  rfl
+
 def OBdd.HSimilar (O : OBdd n m) (U : OBdd n m') := O.toTree = U.toTree
 
 def OBdd.Similar : OBdd n m → OBdd n m → Prop := HSimilar
@@ -1779,6 +1783,10 @@ lemma Bdd.Ordered_of_low_high_ordered {n m} {j : Fin m} {v : Vec (Node n m) m} :
 @[simp]
 def Bdd.lift_node : n ≤ n' → Node n m → Node n' m := fun h N ↦ ⟨⟨N.var.1, by exact Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩
 
+lemma Bdd.lift_node_trivial_eq {n n' m : Nat} {h : n = n'} {N : Node n m} : lift_node (n' := n') (by rw [h]) N = h ▸ N := by
+  subst h
+  simp_all
+
 @[simp]
 def Bdd.lift_heap : n ≤ n' → Vec (Node n m) m → Vec (Node n' m) m := fun h v ↦ Vec.map (lift_node h) v
 
@@ -1868,6 +1876,21 @@ lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordere
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
 
+lemma OBdd.lift_trivial_eq {n n' m : Nat} {h : n = n'} {O : OBdd n m} : (O.lift (n' := n') (by rw [h])) = h ▸ O := by
+  rcases O with ⟨⟨M, r⟩, o⟩
+  simp only [lift, Bdd.lift, lift_heap]
+  congr
+  · have : (lift_node (Eq.mpr (id (congrArg (fun _a ↦ _a ≤ n') h)) (le_refl n'))) = fun (x : Node n m) ↦ h ▸ x := by
+      ext
+      exact lift_node_trivial_eq
+    rw [this]
+    subst h
+    simp only
+    rcases M with ⟨V, l⟩
+    simp only [Vec.map, List.map_id_fun', id_eq]
+  · subst h
+    simp
+
 lemma Bdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : (B.lift h).root = B.root := by simp
 lemma OBdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).1.root = O.1.root := Bdd.lift_preserves_root
 lemma OBdd.lift_low {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).low O_root_def = (O.low O_root_def).lift h := by
@@ -1920,6 +1943,13 @@ termination_by O
 lemma OBdd.lift_heap_preserves_toTree {n n' m : Nat} (h : n ≤ n') (M : Vec (Node n m) m) (p q : Pointer m) (hp : Ordered ⟨lift_heap h M, p⟩) (hq : Ordered ⟨lift_heap h M, q⟩) (hp' : Ordered ⟨M, p⟩) (hq' : Ordered ⟨M, q⟩) :
     toTree ⟨⟨lift_heap h M, p⟩, hp⟩ = toTree ⟨⟨lift_heap h M, q⟩, hq⟩ →
     toTree ⟨⟨M, p⟩, hp'⟩ = toTree ⟨⟨M, q⟩, hq'⟩ := by
+  sorry
+
+def my_vec_take (h : n ≤ n') : Vec α n' → Vec α n
+  | V => (inf_eq_left.mpr h) ▸ List.Vector.take n V
+
+lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vec Bool n'} :
+    (O.lift h).evaluate I = O.evaluate (my_vec_take h I) := by
   sorry
 
 lemma OBdd.SimilarRP_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m} {hp : Reachable (O.lift h).1.heap (O.lift h).1.root p} {hq : Reachable (O.lift h).1.heap (O.lift h).1.root q} :
