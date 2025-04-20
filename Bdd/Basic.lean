@@ -357,6 +357,10 @@ lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low
   left
   rfl
 
+lemma Bdd.low_heap_eq_heap {B : Bdd n m} {h : B.root = node j} : (B.low h).heap = B.heap := rfl
+
+lemma Bdd.high_heap_eq_heap {B : Bdd n m} {h : B.root = node j} : (B.high h).heap = B.heap := rfl
+
 def OBdd.high (O : OBdd n m) : O.1.root = node j → OBdd n m
   | h => ⟨O.1.high h, Bdd.high_ordered h O.2⟩
 
@@ -364,10 +368,10 @@ def OBdd.low (O : OBdd n m) : O.1.root = node j → OBdd n m
   | h => ⟨O.1.low h, Bdd.low_ordered h O.2⟩
 
 @[simp]
-lemma low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
+lemma OBdd.low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
 
 @[simp]
-lemma high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
+lemma OBdd.high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
 
 lemma oedge_of_low  {h : O.1.root = node j} : OEdge O (O.low h)  := ⟨rfl, edge_of_low  (h := h)⟩
 lemma oedge_of_high {h : O.1.root = node j} : OEdge O (O.high h) := ⟨rfl, edge_of_high (h := h)⟩
@@ -385,15 +389,22 @@ def DecisionTree.evaluate : DecisionTree n → Vec Bool n → Bool
   | leaf b, _ => b
   | branch j l h, v => if v[j] then h.evaluate v else l.evaluate v
 
+def DecisionTree.lift : DecisionTree n → n ≤ n' → DecisionTree n'
+  | leaf b, _ => .leaf b
+  | branch j l h, e => .branch ⟨j.1, by omega⟩ (l.lift e) (h.lift e)
+
 def OBdd.evaluate : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
 def OBdd.HSimilar (O : OBdd n m) (U : OBdd n m') := O.toTree = U.toTree
 
 def OBdd.Similar : OBdd n m → OBdd n m → Prop := HSimilar
 
-/-- Isomorphism of `Ordered` BDDs is decidable. -/
+/-- Similarity of `Ordered` BDDs is decidable. -/
 instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Similar :=
   fun O U ↦ decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
+
+instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
+  decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
 
 def OBdd.SimilarRP (O : OBdd n m) (p q : O.1.RelevantPointer) :=
   Similar ⟨{heap := O.1.heap, root := p.1}, ordered_of_reachable p.2⟩
@@ -945,15 +956,21 @@ lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {
   simp at this
   apply Independence (O := (O.low h)) ⟨O.1.heap[j].var, (by convert var_lt_low_var (O := O); simp; rw [h]; simp)⟩
 
-lemma OBdd.evaluate_high_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+lemma OBdd.evaluate_high_eq_of_evaluate_eq_and_var_eq' {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'} {j : Fin m} {i : Fin m'} {ho : O.1.root = node j} {hu : U.1.root = node i} :
     O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.high ho).evaluate = (U.high hu).evaluate := by
   intro h eq
   rw [evaluate_high_eq_evaluate_set_true, h, eq ,← evaluate_high_eq_evaluate_set_true]
 
-lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+lemma OBdd.evaluate_high_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+    O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.high ho).evaluate = (U.high hu).evaluate := evaluate_high_eq_of_evaluate_eq_and_var_eq'
+
+lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq' {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'} {j : Fin m} {i : Fin m'} {ho : O.1.root = node j} {hu : U.1.root = node i} :
   O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.low ho).evaluate = (U.low hu).evaluate := by
   intro h eq
   rw [evaluate_low_eq_evaluate_set_false, h, eq ,← evaluate_low_eq_evaluate_set_false]
+
+lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
+  O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.low ho).evaluate = (U.low hu).evaluate := evaluate_low_eq_of_evaluate_eq_and_var_eq'
 
 lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
     Similar (O.high h) (O.low h) → ¬ O.Reduced := by
@@ -1056,8 +1073,8 @@ lemma OBdd.reduced_iff_reduced' (O : OBdd n m) : O.Reduced ↔ O.Reduced' := by
       exact Isomorphism_of_Similiar (reduced_of_relevant' p h)  (reduced_of_relevant' q h) sim
 
 /-- Reduced OBDDs are canonical.  -/
-theorem OBdd.Canonicity {O U : OBdd n m} :
-    O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := by
+theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
+    O.Reduced → U.Reduced → O.evaluate = U.evaluate → O.HSimilar U := by
   intro O_reduced U_reduced h
   cases O_root_def : O.1.root with
   | terminal b =>
@@ -1080,7 +1097,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
           simp
       absurd U_reduced
       apply not_reduced_of_iso_high_low U_root_def
-      apply Canonicity (high_reduced U_reduced) (low_reduced U_reduced) this
+      apply HCanonicity (high_reduced U_reduced) (low_reduced U_reduced) this
   | node j =>
     cases U_root_def : U.1.root with
     | terminal c =>
@@ -1096,7 +1113,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
           simp
       absurd O_reduced
       apply not_reduced_of_iso_high_low O_root_def
-      apply Canonicity (high_reduced O_reduced) (low_reduced O_reduced) this
+      apply HCanonicity (high_reduced O_reduced) (low_reduced O_reduced) this
     | node i =>
       simp only [HasEquiv.Equiv, instSetoid, Similar, HSimilar, InvImage]
       rw [toTree_node O_root_def, toTree_node U_root_def]
@@ -1111,7 +1128,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
             simp only [Fin.eta] at this
             simp only [independentOf] at this
             have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
-              Canonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+              HCanonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply U_reduced.1 U.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [U_root_def]
@@ -1125,7 +1142,7 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
             simp only [Ordered, Fin.eta] at this
             simp only [independentOf] at this
             have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
-              Canonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+              HCanonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply O_reduced.1 O.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [O_root_def]
@@ -1136,14 +1153,17 @@ theorem OBdd.Canonicity {O U : OBdd n m} :
       constructor
       · assumption
       · constructor
-        · apply Canonicity (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq  h same_var)
-        · apply Canonicity (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq h same_var)
+        · apply HCanonicity (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq'  h same_var)
+        · apply HCanonicity (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
 termination_by O.size + U.size
 decreasing_by
   simp [size_node U_root_def]; linarith
   simp [size_node O_root_def]; linarith
   all_goals
     simp [size_node O_root_def, size_node U_root_def]; linarith
+
+theorem OBdd.Canonicity {O U : OBdd n m} :
+    O.Reduced → U.Reduced → O.evaluate = U.evaluate → O ≈ U := HCanonicity
 
 /-- The only reduced BDD that denotes a constant function is the terminal BDD. -/
 theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
@@ -1168,8 +1188,9 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
       · simp [evaluate_low_eq_evaluate_set_false, h]
     exact Canonicity (high_reduced R) (low_reduced R) this
 
-theorem OBdd.Canonicity_reverse {O U : OBdd n m} :
-    O.Reduced → U.Reduced → O ≈ U → O.evaluate = U.evaluate := by
+
+theorem OBdd.Canonicity_reverse {O : OBdd n m} {U : OBdd n m'}:
+    O.Reduced → U.Reduced → O.HSimilar U → O.evaluate = U.evaluate := by
   intro _ _ h
   simp only [HasEquiv.Equiv, instSetoid, Similar, HSimilar] at h
   simp only [evaluate, Function.comp_apply]
@@ -1589,7 +1610,7 @@ theorem OBdd.collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
       | isFalse hff =>
         cases List.instDecidableMemOfLawfulBEq i ((O.low h).collect_helper (I.1.set j true, j :: I.2)).2 with
         | isFalse hhf =>
-          rw [← high_heap_eq_heap (h := h)]
+          rw [← Bdd.high_heap_eq_heap (h := h)]
           refine collect_helper_spec_reverse (O.high h) r _ ?_ ?_ i h2
           · trans O.1.root
             · exact h0
@@ -1846,6 +1867,72 @@ lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordere
   exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
+
+lemma Bdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : (B.lift h).root = B.root := by simp
+lemma OBdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).1.root = O.1.root := Bdd.lift_preserves_root
+lemma OBdd.lift_low {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).low O_root_def = (O.low O_root_def).lift h := by
+  simp only [low, lift, Bdd.lift, lift_heap]
+  simp_rw [Bdd.low_heap_eq_heap]
+  simp_rw [O_root_def]
+  simp [Bdd.low]
+
+lemma OBdd.lift_high {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).high O_root_def = (O.high O_root_def).lift h := by
+  simp only [high, lift, Bdd.lift, lift_heap]
+  simp_rw [Bdd.high_heap_eq_heap]
+  simp_rw [O_root_def]
+  simp [Bdd.high]
+
+lemma OBdd.NoRedundancy_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O.1.NoRedundancy → (O.lift h).1.NoRedundancy := by
+  rintro hnr ⟨p, hp⟩ contra
+  simp only at contra
+  cases p_def : p with
+  | terminal _ =>
+    cases contra with
+    | red _ => contradiction
+  | node j =>
+    rw [p_def] at contra
+    cases contra with
+    | red red =>
+      simp only [lift, Bdd.lift, lift_heap, Fin.getElem_fin, List.Vector.getElem_map, lift_node] at red
+      apply hnr ⟨p, lift_reachable_iff.mpr hp⟩
+      simp_rw [p_def]
+      exact ⟨red⟩
+
+lemma OBdd.lift_preserves_toTree {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).toTree = O.toTree.lift h := by
+  cases O_root_def : O.1.root with
+  | terminal b =>
+    simp only [toTree_terminal' O_root_def, DecisionTree.lift, lift, Bdd.lift]
+    simp_rw [O_root_def, toTree_terminal]
+  | node j =>
+    simp only [toTree_node O_root_def, DecisionTree.lift]
+    rw [← lift_preserves_toTree (h := h) (O := (O.low  O_root_def))]
+    rw [← lift_preserves_toTree (h := h) (O := (O.high O_root_def))]
+    rw [← lift_preserves_root (h := h)] at O_root_def
+    simp only [toTree_node O_root_def]
+    simp only [DecisionTree.branch.injEq]
+    constructor
+    · simp [lift]
+    · constructor
+      · rw [lift_low]
+      · rw [lift_high]
+termination_by O
+
+lemma OBdd.lift_heap_preserves_toTree {n n' m : Nat} (h : n ≤ n') (M : Vec (Node n m) m) (p q : Pointer m) (hp : Ordered ⟨lift_heap h M, p⟩) (hq : Ordered ⟨lift_heap h M, q⟩) (hp' : Ordered ⟨M, p⟩) (hq' : Ordered ⟨M, q⟩) :
+    toTree ⟨⟨lift_heap h M, p⟩, hp⟩ = toTree ⟨⟨lift_heap h M, q⟩, hq⟩ →
+    toTree ⟨⟨M, p⟩, hp'⟩ = toTree ⟨⟨M, q⟩, hq'⟩ := by
+  sorry
+
+lemma OBdd.SimilarRP_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m} {hp : Reachable (O.lift h).1.heap (O.lift h).1.root p} {hq : Reachable (O.lift h).1.heap (O.lift h).1.root q} :
+    (O.lift h).SimilarRP ⟨p, hp⟩ ⟨q, hq⟩ → O.SimilarRP ⟨p, lift_reachable_iff.mpr hp⟩ ⟨q, lift_reachable_iff.mpr hq⟩ := by
+  intro sim
+  simp only [SimilarRP, Similar, HSimilar, lift, Bdd.lift] at sim
+  exact lift_heap_preserves_toTree h O.1.heap p q (ordered_of_reachable hp) (ordered_of_reachable hq) (ordered_of_reachable (lift_reachable_iff.mpr hp)) (ordered_of_reachable (lift_reachable_iff.mpr hq)) sim
+
+lemma OBdd.Reduced_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O.Reduced → (O.lift h).Reduced := by
+  rintro ⟨r1, r2⟩
+  constructor
+  · exact NoRedundancy_of_lift r1
+  · rintro _ _ sim; exact r2 (SimilarRP_lift sim)
 
 lemma OBdd.card_RelevantPointer_le {O : OBdd n m} : Fintype.card O.1.RelevantPointer ≤ m + 2 := by
   conv =>

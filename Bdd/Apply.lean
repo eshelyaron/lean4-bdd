@@ -268,9 +268,9 @@ theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OB
             have : s = (cache_get O.1.root U.1.root initial_state).2 := by rw [heqqq]
             rw [cache_get_preserves_state] at this
             rw [this] at hh
-            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.low heqq) initial_state).2 := (apply_helper_spec (by rw [low_heap_eq_heap]; assumption)).1
+            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.low heqq) initial_state).2 := (apply_helper_spec (by rw [OBdd.low_heap_eq_heap]; assumption)).1
             rw [show (apply_helper op O (U.low heqq) initial_state).2 = s' by rw [hh]] at this
-            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.high heqq) s').2 := (apply_helper_spec (by rw [high_heap_eq_heap]; assumption)).1
+            have : GoodState op O.1.heap U.1.heap (apply_helper op O (U.high heqq) s').2 := (apply_helper_spec (by rw [OBdd.high_heap_eq_heap]; assumption)).1
             rw [show (apply_helper op O (U.high heqq) s').2 = s'' by rw [hhh]] at this
             constructor
             · rw [← show (heap_push O.1.root U.1.root { var := U.1.heap[j'].var, low := ll, high := hl } s'').2 = final_state by rw [h]]
@@ -307,4 +307,3 @@ lemma Bdd.fromVar_Ordered {n} {i : Fin n} : Bdd.Ordered (fromVar i) := by
   simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.mem_cons, List.not_mem_nil, or_false, forall_eq]
   intro j contra
   cases contra <;> contradiction
-

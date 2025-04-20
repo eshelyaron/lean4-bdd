@@ -1,5 +1,3 @@
--- This module serves as the root of the `Bdd` library.
--- Import modules here that should be built as part of the library.
 import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
@@ -144,6 +142,7 @@ end ROBdd
 
 open Compactify
 open Reduce
+
 namespace BDD
 
 def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
@@ -159,10 +158,44 @@ def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
   | .succ _ => ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
 
+lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars := by
+  simp only [apply]
+  split
+  next heq => simp only [const]; rw [heq]
+  next n heq => simp
+
 def and : BDD → BDD → BDD := apply Bool.and
 def or  : BDD → BDD → BDD := apply Bool.or
 def imp : BDD → BDD → BDD := apply (¬ · ∨ ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
+
+def denotation (B : BDD) {m : Nat} (h : B.nvars ≤ m) : Vec Bool m → Bool := (B.robdd.1.lift h).evaluate
+
+def and_spec {B C : BDD} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
+    (B.and C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
+    (B.denotation (Nat.le_max_left ..) I) ∧ (C.denotation (Nat.le_max_right ..) I) := by
+  sorry
+
+def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
+  B.denotation (Nat.le_max_left  ..) =
+  C.denotation (Nat.le_max_right ..)
+
+def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
+  (B.robdd.1.lift (Nat.le_max_left B.nvars C.nvars)).HSimilar (C.robdd.1.lift (Nat.le_max_right B.nvars C.nvars))
+
+instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
+  | _, _ => OBdd.instDecidableHSimilar _ _
+
+theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
+    B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
+  constructor
+  · intro h
+    exact (OBdd.HCanonicity (OBdd.Reduced_of_lift B.robdd.2) (OBdd.Reduced_of_lift C.robdd.2) h)
+  · intro h
+    exact (OBdd.Canonicity_reverse (OBdd.Reduced_of_lift B.robdd.2) (OBdd.Reduced_of_lift C.robdd.2) h)
+
+instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
+  | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
 
 end BDD
 
