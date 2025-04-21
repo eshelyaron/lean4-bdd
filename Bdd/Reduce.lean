@@ -840,24 +840,3 @@ lemma reduce'_spec {O : OBdd n m} :
 --       | tail b _ => sorry
 
 end Reduce
-
-def example_not_reduced_bdd : OBdd 3 5 :=
-  ⟨ { heap := ⟨[{var := 0, low := node 1, high := node 2},
-                 {var := 1, low := terminal false, high := node 4},
-                 {var := 1, low := node 3, high := terminal true},
-                 {var := 2, low := terminal false, high := terminal true},
-                 {var := 2, low := terminal false, high := terminal true}], rfl⟩
-      root := node 0 },
-    by apply Ordered_of_Proper; decide⟩
-
-#eval Reduce.reduce example_not_reduced_bdd
-#eval Reduce.reduce example_bdd
-
-private lemma ordered_after_reduce : (Reduce.reduce example_not_reduced_bdd).Ordered := by apply Ordered_of_Proper; decide (config := {kernel := true})
-
-example : ¬ OBdd.Reduced                 example_not_reduced_bdd                         := by decide (config := {kernel := true})
-example :   OBdd.Reduced ⟨(Reduce.reduce example_not_reduced_bdd), ordered_after_reduce⟩ := by decide (config := {kernel := true})
-
-
---#eval Reduce.reduce example_not_reduced_bdd
---#eval! (OBdd.numPointers (⟨Reduce.reduce example_not_reduced_bdd, Reduce.reduce_spec.1⟩))

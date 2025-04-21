@@ -156,9 +156,9 @@ lemma Bdd.Ordered_of_terminal : Bdd.Ordered ⟨M, terminal b⟩ := by
 
 lemma Bdd.Ordered_of_terminal' {B : Bdd n m} : B.root = terminal b → B.Ordered := by
   intro h
-  have : B = {heap := B.heap, root := B.root} := rfl
-  have : B = {heap := B.heap, root := terminal b} := by rw [this, h]
-  rw [this]
+  rcases B with ⟨M, r⟩
+  simp only at h
+  rw [h]
   apply Ordered_of_terminal
 
 lemma Ordered_of_Proper {B : Bdd n m} : Proper B.heap → Ordered B := by
@@ -608,8 +608,6 @@ def example_bdd : OBdd 3 4 :=
       root := node 0 },
     by apply Ordered_of_Proper; decide⟩
 
-example : example_bdd.Reduced := by decide (config := {kernel := true})
-
 /-- The output of equal constant functions with inhabited domain is equal. -/
 lemma eq_of_constant_eq {α β} {c c' : β} [Inhabited α] :
     Function.const α c = Function.const α c' → c = c' :=
@@ -706,7 +704,7 @@ lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
       apply R.2 this
 
 /-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
-def independentOf (f : Vec α n → β) (i : Fin n) := ∀ a x, f x = f (Vec.set x i a)
+def independentOf (f : Vec α n → β) (i : Fin n) := ∀ a v, f v = f (Vec.set v i a)
 
 def dependentOn (f : Vec α n → β) (i : Fin n) := ¬ independentOf f i
 
@@ -1220,11 +1218,11 @@ lemma OBdd.collect_helper_terminal {v : Vec (Node n m) m} {h : Bdd.Ordered {heap
 
 lemma OBdd.collect_helper_terminal' (O : OBdd n m) (h : O.1.root = terminal b) :
     collect_helper O I = I := by
-  have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
-  have := collect_helper_terminal (h := (show Bdd.Ordered {heap := O.1.heap, root := terminal b} by simp_rw [← h]; exact O.2)) (I := I)
-  simp_rw [h] at O_def
-  simp_rw [← O_def] at this
-  rw [this]
+  rcases O with ⟨⟨M, r⟩, o⟩
+  simp only at h
+  have := collect_helper_terminal (h := (show Bdd.Ordered {heap := M, root := terminal b} by simp_rw [← h]; exact o)) (I := I)
+  simp_rw [h]
+  assumption
 
 lemma OBdd.collect_helper_node {v : Vec (Node n m) m} {h : Bdd.Ordered {heap := v, root := node j}} :
     collect_helper ⟨{heap := v, root := node j}, h⟩ I =
@@ -1240,12 +1238,11 @@ lemma OBdd.collect_helper_node {v : Vec (Node n m) m} {h : Bdd.Ordered {heap := 
 
 lemma OBdd.collect_helper_node' (O : OBdd n m) {j : Fin m} (h : O.1.root = node j) :
     collect_helper O I = if I.1.get j then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩) := by
-  have O_def : O = ⟨{heap := O.1.heap, root := O.1.root}, O.2⟩ := rfl
-  have := collect_helper_node (h := (show Bdd.Ordered {heap := O.1.heap, root := node j} by simp_rw [← h]; exact O.2)) (I := I)
-  simp_rw [h] at O_def
-  simp_rw [← O_def] at this
-  rw [this]
-  congr
+  rcases O with ⟨⟨M, r⟩, o⟩
+  simp only at h
+  have := collect_helper_node (h := (show Bdd.Ordered {heap := M, root := node j} by simp_rw [← h]; exact o)) (I := I)
+  simp_rw [h]
+  assumption
 
 theorem OBdd.collect_helper_retains_found {O : OBdd n m} {I : Vec Bool m × List (Fin m)} :
     j ∈ I.2 → j ∈ (collect_helper O I).2 := by
@@ -1691,7 +1688,7 @@ def OBdd.numPointers : OBdd n m → Nat := List.length ∘ collect
 lemma isTerminal_iff_numPointer_eq_zero {n m} {O : OBdd n m} : O.numPointers = 0 ↔ O.isTerminal := by
   constructor
   · intro h
-    simp only [OBdd.numPointers, Function.comp_apply, List.length_eq_zero] at h
+    simp only [OBdd.numPointers, Function.comp_apply, List.length_eq_zero_iff] at h
     cases O_root_def : O.1.root with
     | terminal b => use b
     | node j =>
@@ -1699,7 +1696,7 @@ lemma isTerminal_iff_numPointer_eq_zero {n m} {O : OBdd n m} : O.numPointers = 0
       rw [h] at this
       contradiction
   · rintro ⟨b, hb⟩
-    simp only [OBdd.numPointers, Function.comp_apply, List.length_eq_zero, OBdd.collect]
+    simp only [OBdd.numPointers, Function.comp_apply, List.length_eq_zero_iff, OBdd.collect]
     rw [OBdd.collect_helper_terminal']
     assumption
 

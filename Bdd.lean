@@ -187,14 +187,6 @@ def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vec Bool n → Bool := (B.robdd.1.lift h).evaluate
 
-private theorem take_set_of_le (a : α) {n m : Nat} (l : List α) (h : m ≤ n) :
-    (l.set n a).take m = l.take m :=
-  List.ext_getElem? fun i => by
-    rw [List.getElem?_take, List.getElem?_take]
-    split
-    · next h' => rw [List.getElem?_set_ne (by omega)]
-    · rfl
-
 lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
     independentOf (B.denotation h1) i := by
   rintro b I
@@ -204,7 +196,7 @@ lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nv
     simp only [Vec.take, Vec.set]
     apply Subtype.eq
     simp
-    exact Eq.symm (take_set_of_le b l h2)
+    exact Eq.symm (List.take_set_of_le h2)
   rw [this]
 
 lemma const_nvars : (const b).nvars = 0 := rfl

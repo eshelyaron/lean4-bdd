@@ -145,7 +145,7 @@ decreasing_by
   · left;  exact oedge_of_high
 
 def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n.succ m' → Bdd n.succ (p2t m m') := fun op O U ↦
-  let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.empty, Vec.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
+  let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.emptyWithCapacity, Vec.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
   ⟨state.heap, root⟩
 
 def apply' {n n' m m' p : Nat} : max n n' = p.succ → (Bool → Bool → Bool) → OBdd n m → OBdd n' m' → OBdd (max n n') (p2t m m') := fun h op O U ↦
