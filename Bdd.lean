@@ -192,7 +192,30 @@ lemma const_denotation : (const b).denotation h = Function.const _ b := by
   apply OBdd.evaluate_terminal'
   rw [OBdd.lift_preserves_root]
 
-lemma apply_spec {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
+private lemma toList_cast {h : n = n'} {V : Vec α n} : (h ▸ V).toList = V.toList := by
+  subst h
+  simp only
+
+private lemma my_vec_take_toList_take {h : n ≤ n'} :
+    (my_vec_take h V).toList = V.toList.take n := by
+  simp only [my_vec_take]
+  rcases V with ⟨l, h⟩
+  simp only [List.Vector.take]
+  simp only [List.Vector.toList_mk]
+  rw [toList_cast]
+  simp only [List.Vector.toList_mk]
+
+lemma var_denotation : (var i).denotation h I = I[i] := by
+  simp only [denotation, var, ROBdd.var, OBdd.lift_evaluate]
+  rw [OBdd.evaluate_node]
+  simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue, Fin.getElem_fin,
+    Fin.val_eq_zero, List.Vector.getElem_def, List.Vector.toList_singleton, List.Vector.head,
+    List.getElem_cons_zero, Fin.val_last, Bdd.Ordered.eq_1, OBdd.evaluate_terminal,
+    Function.const_apply, Bool.if_false_right, Bool.decide_eq_true, Bool.and_true]
+  simp_rw [my_vec_take_toList_take]
+  simp_all only [List.getElem_take]
+
+private lemma apply_spec' {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
     (apply op B C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
     (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I)) := by
   let motive : BDD → Prop :=
@@ -220,19 +243,43 @@ lemma apply_spec {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
     congr
   · exact apply_nvars
 
--- lemma apply_spec' {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
---     (apply op B C).denotation (Nat.le_refl _) I = ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (apply_nvars ▸ I) ) := by
---   simp only [denotation]
---   simp only [OBdd.lift_evaluate]
---   congr!
---   · exact apply_nvars
---   · exact HEq.symm (eqRec_heq apply_nvars I)
+private lemma apply_cast_nvars {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
+    (apply op B C).denotation (Nat.le_refl _) I =
+    ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (apply_nvars ▸ I) ) := by
+  simp only [denotation]
+  simp only [OBdd.lift_evaluate]
+  congr!
+  · exact apply_nvars
+  · exact HEq.symm (eqRec_heq apply_nvars I)
 
-lemma and_spec {B C : BDD} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
-    (B.and C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
-    ((B.denotation (Nat.le_max_left ..) I) && (C.denotation (Nat.le_max_right ..) I)) := by
-  simp [and]
-  exact apply_spec
+lemma apply_spec {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
+    (apply op B C).denotation (Nat.le_refl _) I =
+    (op (B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I)) (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
+  rw [apply_cast_nvars]
+  convert apply_spec'
+  · exact symm apply_nvars
+  · exact apply_nvars
+  · simp_all only [heq_eqRec_iff_heq, heq_eq_eq]
+
+lemma and_spec {B C : BDD} {I : Vec Bool (B.and C).nvars} :
+    (B.and C).denotation (Nat.le_refl _) I =
+    ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) &&
+     (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
+
+lemma or_spec {B C : BDD} {I : Vec Bool (B.or C).nvars} :
+    (B.or C).denotation (Nat.le_refl _) I =
+    ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
+     (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
+
+lemma imp_spec {B C : BDD} {I : Vec Bool (B.imp C).nvars} :
+    (B.imp C).denotation (Nat.le_refl _) I =
+    (!(B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
+      (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
+  simp only [imp, apply_spec]
+
+lemma not_spec {B : BDD} {I : Vec Bool B.not.nvars} :
+    B.not.denotation (Nat.le_refl _) I = ! B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I) := by
+  simp only [not, imp_spec, const_denotation, Function.const_apply, Bool.or_false]
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) =
@@ -261,3 +308,5 @@ end BDD
 #eval! (BDD.var 3).robdd.1
 #eval! (BDD.var 3).not.robdd.1
 #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
+#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
+#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
