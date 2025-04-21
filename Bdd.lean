@@ -46,8 +46,8 @@ def ROBdd n m := { O : OBdd n m // O.Reduced }
 
 structure BDD where
   nvars : Nat
-  nheap : Nat
-  robdd : ROBdd nvars nheap
+  private nheap : Nat
+  private robdd : ROBdd nvars nheap
 
 namespace ROBdd
 
@@ -145,12 +145,12 @@ open Reduce
 
 namespace BDD
 
-def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
+private def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
   match B.robdd.1.1.root with
   | .terminal b => b
   | .node j => False.elim (Nat.not_lt_zero _ (Eq.subst h B.robdd.1.1.heap[j].var.2))
 
-lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.robdd.1.1.root = .terminal (B.zero_vars_to_bool h) := by
+private lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.robdd.1.1.root = .terminal (B.zero_vars_to_bool h) := by
   simp only [zero_vars_to_bool]
   split
   next => assumption
@@ -164,7 +164,7 @@ def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
   | .succ _ => ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
 
-lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive : BDD → Prop} :
+private lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive : BDD → Prop} :
   (base : (h : B.nvars ⊔ C.nvars = 0) → motive (const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2)))) →
   (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩) →
   motive (apply op B C) := by
@@ -187,6 +187,28 @@ def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vec Bool n → Bool := (B.robdd.1.lift h).evaluate
 
+private theorem take_set_of_le (a : α) {n m : Nat} (l : List α) (h : m ≤ n) :
+    (l.set n a).take m = l.take m :=
+  List.ext_getElem? fun i => by
+    rw [List.getElem?_take, List.getElem?_take]
+    split
+    · next h' => rw [List.getElem?_set_ne (by omega)]
+    · rfl
+
+lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
+    independentOf (B.denotation h1) i := by
+  rintro b I
+  simp only [denotation, OBdd.lift_evaluate, my_vec_take]
+  have : List.Vector.take B.nvars I = List.Vector.take B.nvars (I.set i b) := by
+    rcases I with ⟨l, hl⟩
+    simp only [Vec.take, Vec.set]
+    apply Subtype.eq
+    simp
+    exact Eq.symm (take_set_of_le b l h2)
+  rw [this]
+
+lemma const_nvars : (const b).nvars = 0 := rfl
+
 lemma const_denotation : (const b).denotation h = Function.const _ b := by
   simp only [denotation, const, ROBdd.const]
   apply OBdd.evaluate_terminal'
@@ -204,6 +226,8 @@ private lemma my_vec_take_toList_take {h : n ≤ n'} :
   simp only [List.Vector.toList_mk]
   rw [toList_cast]
   simp only [List.Vector.toList_mk]
+
+lemma var_nvars : (var i).nvars = i + 1 := rfl
 
 lemma var_denotation : (var i).denotation h I = I[i] := by
   simp only [denotation, var, ROBdd.var, OBdd.lift_evaluate]
@@ -261,10 +285,12 @@ lemma apply_spec {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
   · exact apply_nvars
   · simp_all only [heq_eqRec_iff_heq, heq_eq_eq]
 
+lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nvars
+
 lemma and_spec {B C : BDD} {I : Vec Bool (B.and C).nvars} :
     (B.and C).denotation (Nat.le_refl _) I =
-    ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) &&
-     (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
+    ((B.denotation (Nat.le_max_left  ..) (and_nvars ▸ I)) &&
+     (C.denotation (Nat.le_max_right ..) (and_nvars ▸ I))) := apply_spec
 
 lemma or_spec {B C : BDD} {I : Vec Bool (B.or C).nvars} :
     (B.or C).denotation (Nat.le_refl _) I =
@@ -277,21 +303,25 @@ lemma imp_spec {B C : BDD} {I : Vec Bool (B.imp C).nvars} :
       (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
   simp only [imp, apply_spec]
 
+lemma not_nvars {B : BDD} : B.not.nvars = B.nvars := by
+  simp only [not, imp, apply_nvars, const_nvars, zero_le, sup_of_le_left]
+
 lemma not_spec {B : BDD} {I : Vec Bool B.not.nvars} :
-    B.not.denotation (Nat.le_refl _) I = ! B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I) := by
-  simp only [not, imp_spec, const_denotation, Function.const_apply, Bool.or_false]
+    B.not.denotation (Nat.le_refl _) I = ! B.denotation (Nat.le_refl ..) (not_nvars ▸ I) := by
+  simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
+  congr!
+  simp [zero_le, sup_of_le_left]
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
-  B.denotation (Nat.le_max_left  ..) =
-  C.denotation (Nat.le_max_right ..)
+  B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
 
-def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
+private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
   (B.robdd.1.lift (Nat.le_max_left B.nvars C.nvars)).HSimilar (C.robdd.1.lift (Nat.le_max_right B.nvars C.nvars))
 
-instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
+private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
   | _, _ => OBdd.instDecidableHSimilar _ _
 
-theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
+private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
     B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
   constructor
   · intro h

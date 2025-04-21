@@ -706,7 +706,7 @@ lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
       apply R.2 this
 
 /-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
-def independentOf (f : Vec α n → β) (i : Fin n) := ∀ a, ∀ x, f x = f (Vec.set x i a)
+def independentOf (f : Vec α n → β) (i : Fin n) := ∀ a x, f x = f (Vec.set x i a)
 
 def dependentOn (f : Vec α n → β) (i : Fin n) := ¬ independentOf f i
 
