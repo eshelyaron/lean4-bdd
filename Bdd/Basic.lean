@@ -389,9 +389,27 @@ def DecisionTree.evaluate : DecisionTree n → Vec Bool n → Bool
   | leaf b, _ => b
   | branch j l h, v => if v[j] then h.evaluate v else l.evaluate v
 
-def DecisionTree.lift : DecisionTree n → n ≤ n' → DecisionTree n'
-  | leaf b, _ => .leaf b
-  | branch j l h, e => .branch ⟨j.1, by omega⟩ (l.lift e) (h.lift e)
+def DecisionTree.lift : n ≤ n' → DecisionTree n → DecisionTree n'
+  | _, leaf b => .leaf b
+  | e, branch j l h => .branch ⟨j.1, by omega⟩ (l.lift e) (h.lift e)
+
+lemma DecisionTree.lift_injective {n n' : Nat} {h : n ≤ n'} : Function.Injective (DecisionTree.lift h) := by
+  intro x y hxy
+  cases x with
+  | leaf _ =>
+    cases y with
+    | leaf _ => simp only [lift] at hxy; simp_all
+    | branch _ _ _ => contradiction
+  | branch _ _ _ =>
+    cases y with
+    | leaf _ => contradiction
+    | branch _ _ _ =>
+      simp only [lift] at hxy
+      injection hxy with a b c
+      rw [lift_injective b, lift_injective c]
+      simp_all only [Fin.mk.injEq, branch.injEq, and_self, and_true]
+      ext
+      simp_all only
 
 def OBdd.evaluate : OBdd n m → Vec Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
@@ -1937,23 +1955,57 @@ lemma OBdd.lift_preserves_toTree {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : 
       · rw [lift_high]
 termination_by O
 
-lemma OBdd.lift_heap_preserves_toTree {n n' m : Nat} (h : n ≤ n') (M : Vec (Node n m) m) (p q : Pointer m) (hp : Ordered ⟨lift_heap h M, p⟩) (hq : Ordered ⟨lift_heap h M, q⟩) (hp' : Ordered ⟨M, p⟩) (hq' : Ordered ⟨M, q⟩) :
-    toTree ⟨⟨lift_heap h M, p⟩, hp⟩ = toTree ⟨⟨lift_heap h M, q⟩, hq⟩ →
-    toTree ⟨⟨M, p⟩, hp'⟩ = toTree ⟨⟨M, q⟩, hq'⟩ := by
-  sorry
-
 def my_vec_take (h : n ≤ n') : Vec α n' → Vec α n
   | V => (inf_eq_left.mpr h) ▸ List.Vector.take n V
 
+private lemma toList_cast {h : n = n'} {V : Vec α n} : (h ▸ V).toList = V.toList := by
+  subst h
+  simp only
+
+lemma my_vec_take_toList_take {h : n ≤ n'} :
+    (my_vec_take h V).toList = V.toList.take n := by
+  simp only [my_vec_take]
+  rcases V with ⟨l, h⟩
+  simp only [List.Vector.take]
+  simp only [List.Vector.toList_mk]
+  rw [toList_cast]
+  simp only [List.Vector.toList_mk]
+
+lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n} {I : Vec Bool n'} :
+    (DecisionTree.lift h T).evaluate I = T.evaluate (my_vec_take h I) := by
+  cases T with
+  | leaf => simp [lift, evaluate]
+  | branch _ _ _ =>
+    simp only [lift, evaluate]
+    rw [lift_evaluate]
+    rw [lift_evaluate]
+    refine ite_congr ?_ (congrFun rfl) (congrFun rfl)
+    simp only [eq_iff_iff, Bool.coe_iff_coe]
+    simp only [Fin.getElem_fin, List.Vector.getElem_def, List.Vector.toList_mk]
+    simp_rw [my_vec_take_toList_take]
+    exact Eq.symm List.getElem_take
+
 lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vec Bool n'} :
     (O.lift h).evaluate I = O.evaluate (my_vec_take h I) := by
-  sorry
+  simp only [evaluate, Function.comp_apply, lift_preserves_toTree]
+  rw [DecisionTree.lift_evaluate]
 
 lemma OBdd.SimilarRP_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m} {hp : Reachable (O.lift h).1.heap (O.lift h).1.root p} {hq : Reachable (O.lift h).1.heap (O.lift h).1.root q} :
     (O.lift h).SimilarRP ⟨p, hp⟩ ⟨q, hq⟩ → O.SimilarRP ⟨p, lift_reachable_iff.mpr hp⟩ ⟨q, lift_reachable_iff.mpr hq⟩ := by
   intro sim
-  simp only [SimilarRP, Similar, HSimilar, lift, Bdd.lift] at sim
-  exact lift_heap_preserves_toTree h O.1.heap p q (ordered_of_reachable hp) (ordered_of_reachable hq) (ordered_of_reachable (lift_reachable_iff.mpr hp)) (ordered_of_reachable (lift_reachable_iff.mpr hq)) sim
+  simp only [SimilarRP, Similar, HSimilar] at sim
+  have : OBdd.toTree ⟨{heap := (O.lift h).1.heap, root := p}, ordered_of_reachable hp⟩ = OBdd.toTree (OBdd.lift h ⟨{heap := O.1.heap, root := p}, ordered_of_reachable (lift_reachable_iff.mpr hp)⟩) := by
+    rfl
+  rw [this] at sim
+  have : OBdd.toTree ⟨{heap := (O.lift h).1.heap, root := q}, ordered_of_reachable hq⟩ = OBdd.toTree (OBdd.lift h ⟨{heap := O.1.heap, root := q}, ordered_of_reachable (lift_reachable_iff.mpr hq)⟩) := by
+    rfl
+  rw [this] at sim
+  rw [lift_preserves_toTree] at sim
+  rw [lift_preserves_toTree] at sim
+  clear this
+  clear this
+  simp only [SimilarRP, Similar, HSimilar]
+  rw [DecisionTree.lift_injective sim]
 
 lemma OBdd.Reduced_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O.Reduced → (O.lift h).Reduced := by
   rintro ⟨r1, r2⟩

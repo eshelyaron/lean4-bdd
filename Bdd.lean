@@ -206,19 +206,6 @@ lemma const_denotation : (const b).denotation h = Function.const _ b := by
   apply OBdd.evaluate_terminal'
   rw [OBdd.lift_preserves_root]
 
-private lemma toList_cast {h : n = n'} {V : Vec α n} : (h ▸ V).toList = V.toList := by
-  subst h
-  simp only
-
-private lemma my_vec_take_toList_take {h : n ≤ n'} :
-    (my_vec_take h V).toList = V.toList.take n := by
-  simp only [my_vec_take]
-  rcases V with ⟨l, h⟩
-  simp only [List.Vector.take]
-  simp only [List.Vector.toList_mk]
-  rw [toList_cast]
-  simp only [List.Vector.toList_mk]
-
 lemma var_nvars : (var i).nvars = i + 1 := rfl
 
 lemma var_denotation : (var i).denotation h I = I[i] := by
