@@ -87,6 +87,12 @@ lemma Pointer.toVar_terminal_eq {n m} (w : Vec (Node n m) m) : toVar w (terminal
 @[simp]
 lemma Pointer.toVar_node_eq {n m} (w : Vec (Node n m) m) {j} : toVar w (node j) = w[j].var := rfl
 
+lemma Vec.get_set_of_ne' {v : Vec α n} {i j : Fin n} (h : i ≠ j) (a : α) : (v.set i a)[j] = v[j] := by apply Vec.get_set_of_ne h
+
+lemma Pointer.toVar_heap_set : i ≠ j → toVar (M.set i N) (node j) = toVar M (node j) := by
+  intro neq
+  simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.coe_eq_castSucc,Fin.castSucc_inj, Vec.get_set_of_ne' neq]
+
 @[simp]
 def Pointer.MayPrecede (M : Vec (Node n m) m) (p q : Pointer m) := toVar M p < toVar M q
 
@@ -358,8 +364,10 @@ lemma Bdd.low_ordered {B : Bdd n m} (h : B.root = node j) : B.Ordered → (B.low
   rfl
 
 lemma Bdd.low_heap_eq_heap {B : Bdd n m} {h : B.root = node j} : (B.low h).heap = B.heap := rfl
+lemma Bdd.low_root_eq_low {B : Bdd n m} {h : B.root = node j} : (B.low h).root = B.heap[j].low := rfl
 
 lemma Bdd.high_heap_eq_heap {B : Bdd n m} {h : B.root = node j} : (B.high h).heap = B.heap := rfl
+lemma Bdd.high_root_eq_high {B : Bdd n m} {h : B.root = node j} : (B.high h).root = B.heap[j].high := rfl
 
 def OBdd.high (O : OBdd n m) : O.1.root = node j → OBdd n m
   | h => ⟨O.1.high h, Bdd.high_ordered h O.2⟩
@@ -369,9 +377,11 @@ def OBdd.low (O : OBdd n m) : O.1.root = node j → OBdd n m
 
 @[simp]
 lemma OBdd.low_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.heap = O.1.heap := rfl
+lemma OBdd.low_root_eq_low {O : OBdd n m} {h : O.1.root = node j} : (O.low h).1.root = O.1.heap[j].low := rfl
 
 @[simp]
 lemma OBdd.high_heap_eq_heap {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.heap = O.1.heap := rfl
+lemma OBdd.high_root_eq_high {O : OBdd n m} {h : O.1.root = node j} : (O.high h).1.root = O.1.heap[j].high := rfl
 
 lemma oedge_of_low  {h : O.1.root = node j} : OEdge O (O.low h)  := ⟨rfl, edge_of_low  (h := h)⟩
 lemma oedge_of_high {h : O.1.root = node j} : OEdge O (O.high h) := ⟨rfl, edge_of_high (h := h)⟩
@@ -878,8 +888,6 @@ def AbstractBdd {n m} := @Quotient (OBdd n m) (by infer_instance)
 lemma Vec.get_set_same' (v : Vec α n) (i : Fin n) (a : α) : (v.set i a)[i] = a := by
   cases v; cases i
   simp [Fin.getElem_fin, List.Vector.getElem_def, List.Vector.toList_set, List.getElem_set_self]
-
-lemma Vec.get_set_of_ne' {v : Vec α n} {i j : Fin n} (h : i ≠ j) (a : α) : (v.set i a)[j] = v[j] := by apply Vec.get_set_of_ne h
 
 def DecisionTree.size {n} : DecisionTree n → Nat
   | leaf _ => 0
@@ -1772,29 +1780,6 @@ instance OBdd.instNeZeroNumPointers {n m} {j} {O : OBdd n m} (S : O.SubBdd) : S.
   constructor
   linarith
 
-lemma Bdd.Ordered_of_low_high_ordered {n m} {j : Fin m} {v : Vec (Node n m) m} : Bdd.Ordered ⟨v, v[j].low⟩ → MayPrecede v (node j) v[j].low → Bdd.Ordered ⟨v, v[j].high⟩ → MayPrecede v (node j) v[j].high → Bdd.Ordered ⟨v, node j⟩ := by
-    intro hl1 hl2 hh1 hh2
-    rintro ⟨p, hp⟩ ⟨q, hq⟩ hpq
-    simp only at hp hq
-    simp only [RelevantEdge] at hpq
-    simp only [RelevantMayPrecede]
-    apply Relation.reflTransGen_swap.mp at hp
-    cases hp with
-    | refl =>
-      cases hpq with
-      | low  h => rw [← h]; assumption
-      | high h => rw [← h]; assumption
-    | tail r e =>
-      rename_i t
-      cases e with
-      | low  h =>
-        rw [← h] at r
-        apply Relation.reflTransGen_swap.mpr at r
-        rw [Function.swap_def] at r
-        eta_reduce at r
-        sorry
-      | high h => sorry
-
 @[simp]
 def Bdd.lift_node : n ≤ n' → Node n m → Node n' m := fun h N ↦ ⟨⟨N.var.1, by exact Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩
 
@@ -2217,3 +2202,122 @@ lemma OBdd.numPointers_spec {O : OBdd n m} : O.numPointers = Fintype.card { j //
   · intro i j hi hj heq
     simp only [List.get_eq_getElem, Subtype.mk.injEq] at heq
     exact (List.Nodup.getElem_inj_iff collect_nodup).mp heq
+
+lemma Bdd.ordered_of_low_high_ordered {B : Bdd n m} (h : B.root = node j):
+    (B.low h).Ordered → B.var < (B.low h).var → (B.high h).Ordered → B.var < (B.high h).var → Ordered B := by
+  rintro hl1 hl2 hh1 hh2 ⟨x, hx⟩ ⟨y, hy⟩ hxy
+  simp only [RelevantEdge] at hxy
+  simp only [RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  cases Relation.reflTransGen_swap.mp hx
+  case refl        =>
+    rw [h] at hxy
+    rw [h]
+    cases hxy with
+    | low heq =>
+      simp only [var, low_heap_eq_heap, low_root_eq_low, heq, h] at hl2
+      exact hl2
+    | high heq =>
+      simp only [var, high_heap_eq_heap, high_root_eq_high, heq, h] at hh2
+      exact hh2
+  case tail p r e =>
+    rw [h] at e
+    cases e with
+    | low heq =>
+      rw [← low_heap_eq_heap (h := h)]
+      rw [← low_heap_eq_heap (h := h)] at hxy
+      rw [← low_heap_eq_heap (h := h)] at r
+      rw [← heq] at r
+      have := @hl1 ⟨x, Relation.reflTransGen_swap.mpr r⟩ ⟨y, by trans x; exact Relation.reflTransGen_swap.mpr r; right; left; exact hxy⟩ hxy
+      exact this
+    | high heq =>
+      rw [← high_heap_eq_heap (h := h)]
+      rw [← high_heap_eq_heap (h := h)] at hxy
+      rw [← high_heap_eq_heap (h := h)] at r
+      rw [← heq] at r
+      have := @hh1 ⟨x, Relation.reflTransGen_swap.mpr r⟩ ⟨y, by trans x; exact Relation.reflTransGen_swap.mpr r; right; left; exact hxy⟩ hxy
+      exact this
+
+lemma Bdd.ordered_of_ordered_heap_not_reachable_set {O : OBdd n m} :
+    ∀ i N, ¬ Reachable O.1.heap O.1.root (node i) → Ordered ⟨O.1.heap.set i N, O.1.root⟩ := by
+  intro i N unr
+  cases O_root_def : O.1.root with
+  | terminal b => exact Ordered_of_terminal
+  | node j =>
+    have : i ≠ j := by
+      intro contra
+      rw [contra] at unr
+      rw [O_root_def] at unr
+      apply unr
+      left
+    apply ordered_of_low_high_ordered rfl
+    · simp only [low]
+      simp only [Vec.get_set_of_ne' this]
+      have that := ordered_of_ordered_heap_not_reachable_set (O := (O.low O_root_def)) i N
+      simp only [OBdd.low_heap_eq_heap] at that
+      simp only [OBdd.low_root_eq_low] at that
+      apply that
+      intro contra
+      apply unr
+      trans O.1.heap[j].low
+      · right
+        left
+        rw [O_root_def]
+        left
+        rfl
+      · exact contra
+    · simp only [Nat.succ_eq_add_one, var, low]
+      rw [Vec.get_set_of_ne' this N]
+      rw [toVar_heap_set this]
+      have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].low := by
+        exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
+                   ⟨O.1.heap[j].low, (by trans (node j); rw [O_root_def]; left; right; left; left; rfl)⟩
+                   (by left; rfl)
+      convert that using 1
+      cases low_def : O.1.heap[j].low with
+      | terminal bl => simp
+      | node jl =>
+        simp only [toVar]
+        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        rw [Vec.get_set_of_ne']
+        intro contra
+        rw [contra] at unr
+        apply unr
+        trans (node j)
+        · rw [O_root_def]; left
+        · rw [← low_def]; right; left; left; rfl
+    · simp only [high]
+      simp only [Vec.get_set_of_ne' this]
+      have that := ordered_of_ordered_heap_not_reachable_set (O := (O.high O_root_def)) i N
+      simp only [OBdd.high_heap_eq_heap] at that
+      simp only [OBdd.high_root_eq_high] at that
+      apply that
+      intro contra
+      apply unr
+      trans O.1.heap[j].high
+      · right
+        left
+        rw [O_root_def]
+        right
+        rfl
+      · exact contra
+    · simp only [Nat.succ_eq_add_one, var, high]
+      rw [Vec.get_set_of_ne' this N]
+      rw [toVar_heap_set this]
+      have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].high := by
+        exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
+                   ⟨O.1.heap[j].high, (by trans (node j); rw [O_root_def]; left; right; left; right; rfl)⟩
+                   (by right; rfl)
+      convert that using 1
+      cases high_def : O.1.heap[j].high with
+      | terminal bh => simp
+      | node bh =>
+        simp only [toVar]
+        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        rw [Vec.get_set_of_ne']
+        intro contra
+        rw [contra] at unr
+        apply unr
+        trans (node j)
+        · rw [O_root_def]; left
+        · rw [← high_def]; right; left; right; rfl
+termination_by O
