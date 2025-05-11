@@ -313,9 +313,9 @@ instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
 
 end BDD
 
-#eval (BDD.const true).robdd.1
-#eval! (BDD.var 3).robdd.1
-#eval! (BDD.var 3).not.robdd.1
-#eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
-#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
-#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
+-- #eval (BDD.const true).robdd.1
+-- #eval! (BDD.var 3).robdd.1
+-- #eval! (BDD.var 3).not.robdd.1
+-- #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
+-- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
+-- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)

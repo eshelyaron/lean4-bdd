@@ -206,8 +206,8 @@ end Compactify
 -- #eval (example_not_reduced_bdd).numPointers
 -- #eval (example_bdd).numPointers
 
-#eval example_bdd
-#eval! Compactify.compactify' example_bdd
+-- #eval example_bdd
+-- #eval! Compactify.compactify' example_bdd
 -- theorem compactify_induction {n m : Nat} {O : OBdd n m} {motive : Bdd n O.numPointers → Prop}
 --     (one : (h : O.numPointers = 0) → motive ⟨h ▸ Vec.nil, terminal (Bool_of_numPointer_eq_zero O h)⟩)
 --     (two : ∀ (k : Nat), O.numPointers = k.succ → motive (compactify O)) :
