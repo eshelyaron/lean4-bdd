@@ -1789,7 +1789,7 @@ lemma OBdd.lift_preserves_toTree {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : 
       · rw [lift_high]
 termination_by O
 
-private lemma vec_getElem_cast_eq {v : Vector α n} {h : n = m} {i : Nat} {hi : i < n} : v[i] = (h ▸ v)[i] := by
+lemma vec_getElem_cast_eq {v : Vector α n} {h : n = m} {i : Nat} {hi : i < n} : v[i] = (h ▸ v)[i] := by
   subst h
   rfl
 
@@ -2078,7 +2078,7 @@ lemma Bdd.ordered_of_low_high_ordered {B : Bdd n m} (h : B.root = node j):
       have := @hh1 ⟨x, Relation.reflTransGen_swap.mpr r⟩ ⟨y, by trans x; exact Relation.reflTransGen_swap.mpr r; right; left; exact hxy⟩ hxy
       exact this
 
-lemma Bdd.ordered_of_ordered_heap_not_reachable_set {O : OBdd n m} :
+lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
     ∀ i N, ¬ Reachable O.1.heap O.1.root (node i) → Ordered ⟨O.1.heap.set i N, O.1.root⟩ := by
   intro i N unr
   cases O_root_def : O.1.root with
@@ -2091,78 +2091,82 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set {O : OBdd n m} :
       apply unr
       left
     apply ordered_of_low_high_ordered rfl
-    · simp only [low]
-      sorry
-      -- simp only [Vector.get_set_of_ne' this]
-      -- have that := ordered_of_ordered_heap_not_reachable_set (O := (O.low O_root_def)) i N
-      -- simp only [OBdd.low_heap_eq_heap] at that
-      -- simp only [OBdd.low_root_eq_low] at that
-      -- apply that
-      -- intro contra
-      -- apply unr
-      -- trans O.1.heap[j].low
-      -- · right
-      --   left
-      --   rw [O_root_def]
-      --   left
-      --   rfl
-      -- · exact contra
+    · simp only [low, Fin.getElem_fin]
+      simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
+      have that := ordered_of_ordered_heap_not_reachable_set (O.low O_root_def) i N
+      simp only [OBdd.low_heap_eq_heap] at that
+      simp only [OBdd.low_root_eq_low] at that
+      apply that
+      intro contra
+      apply unr
+      trans O.1.heap[j].low
+      · right
+        left
+        rw [O_root_def]
+        left
+        rfl
+      · exact contra
     · simp only [Nat.succ_eq_add_one, var, low]
-      sorry
-      -- rw [Vec.get_set_of_ne' this N]
-      -- rw [toVar_heap_set this]
-      -- have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].low := by
-      --   exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
-      --              ⟨O.1.heap[j].low, (by trans (node j); rw [O_root_def]; left; right; left; left; rfl)⟩
-      --              (by left; rfl)
-      -- convert that using 1
-      -- cases low_def : O.1.heap[j].low with
-      -- | terminal bl => simp
-      -- | node jl =>
-      --   simp only [toVar]
-      --   simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
-      --   rw [Vec.get_set_of_ne']
-      --   intro contra
-      --   rw [contra] at unr
-      --   apply unr
-      --   trans (node j)
-      --   · rw [O_root_def]; left
-      --   · rw [← low_def]; right; left; left; rfl
-    · simp only [high]
-      sorry
-      -- simp only [Vec.get_set_of_ne' this]
-      -- have that := ordered_of_ordered_heap_not_reachable_set (O := (O.high O_root_def)) i N
-      -- simp only [OBdd.high_heap_eq_heap] at that
-      -- simp only [OBdd.high_root_eq_high] at that
-      -- apply that
-      -- intro contra
-      -- apply unr
-      -- trans O.1.heap[j].high
-      -- · right
-      --   left
-      --   rw [O_root_def]
-      --   right
-      --   rfl
-      -- · exact contra
+      simp only [low, Fin.getElem_fin]
+      simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
+      rw [toVar_heap_set this]
+      have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].low := by
+        exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
+                   ⟨O.1.heap[j].low, (by trans (node j); rw [O_root_def]; left; right; left; left; rfl)⟩
+                   (by left; rfl)
+      convert that using 1
+      cases low_def : O.1.heap[j].low with
+      | terminal bl => simp
+      | node jl =>
+        simp only [toVar]
+        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        simp only [Fin.getElem_fin]
+        rw [Vector.getElem_set_ne i.2 jl.2]
+        intro contra
+        rcases i with ⟨iv, ih⟩
+        simp at contra
+        simp_rw [contra] at unr
+        apply unr
+        trans (node j)
+        · rw [O_root_def]; left
+        · rw [← low_def]; right; left; left; rfl
+    · simp only [high, Fin.getElem_fin]
+      simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
+      have that := ordered_of_ordered_heap_not_reachable_set (O := (O.high O_root_def)) i N
+      simp only [OBdd.high_heap_eq_heap] at that
+      simp only [OBdd.high_root_eq_high] at that
+      apply that
+      intro contra
+      apply unr
+      trans O.1.heap[j].high
+      · right
+        left
+        rw [O_root_def]
+        right
+        rfl
+      · exact contra
     · simp only [Nat.succ_eq_add_one, var, high]
-      sorry
-      -- rw [Vec.get_set_of_ne' this N]
-      -- rw [toVar_heap_set this]
-      -- have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].high := by
-      --   exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
-      --              ⟨O.1.heap[j].high, (by trans (node j); rw [O_root_def]; left; right; left; right; rfl)⟩
-      --              (by right; rfl)
-      -- convert that using 1
-      -- cases high_def : O.1.heap[j].high with
-      -- | terminal bh => simp
-      -- | node bh =>
-      --   simp only [toVar]
-      --   simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
-      --   rw [Vec.get_set_of_ne']
-      --   intro contra
-      --   rw [contra] at unr
-      --   apply unr
-      --   trans (node j)
-      --   · rw [O_root_def]; left
-      --   · rw [← high_def]; right; left; right; rfl
+      simp only [high, Fin.getElem_fin]
+      simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
+      rw [toVar_heap_set this]
+      have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].high := by
+        exact @O.2 ⟨node j, (by rw [O_root_def]; left)⟩
+                   ⟨O.1.heap[j].high, (by trans (node j); rw [O_root_def]; left; right; left; right; rfl)⟩
+                   (by right; rfl)
+      convert that using 1
+      cases high_def : O.1.heap[j].high with
+      | terminal bh => simp
+      | node bh =>
+        simp only [toVar]
+        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        simp only [Fin.getElem_fin]
+        rw [Vector.getElem_set_ne i.2 bh.2]
+        intro contra
+        rcases i with ⟨iv, ih⟩
+        simp at contra
+        simp_rw [contra] at unr
+        apply unr
+        trans (node j)
+        · rw [O_root_def]; left
+        · rw [← high_def]; right; left; right; rfl
 termination_by O
