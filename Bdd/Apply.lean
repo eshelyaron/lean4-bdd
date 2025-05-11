@@ -2,8 +2,6 @@ import Bdd.Basic
 import Bdd.Reduce
 import Std.Data.HashMap.Lemmas
 
-open List renaming Vector → Vec
-
 namespace Apply
 inductive RawPointer where
   | terminal : Bool → RawPointer
@@ -18,10 +16,10 @@ abbrev p2t : Nat → Nat → Nat := fun l r ↦ (l + 2) * (r + 2)
 
 structure State (n) (m) (m') where
   cache : Std.HashMap (Pointer m × Pointer m') (Pointer (p2t m m'))
-  heap : Vec (Node n (p2t m m')) (p2t m m')
+  heap : Vector (Node n (p2t m m')) (p2t m m')
   next : Fin (p2t m m')
 
-def GoodState (op : Bool → Bool → Bool) (Ov : Vec (Node n m) m) (Uv : Vec (Node n m') m') : State n m m' → Prop := fun s ↦
+def GoodState (op : Bool → Bool → Bool) (Ov : Vector (Node n m) m) (Uv : Vector (Node n m') m') : State n m m' → Prop := fun s ↦
   ∀ key (hk : key ∈ s.cache),
   ∃ (o : Bdd.Ordered ⟨s.heap, s.cache[key]'hk⟩) (o1 : Bdd.Ordered ⟨Ov, key.1⟩) (o2 : Bdd.Ordered ⟨Uv, key.2⟩),
   ∀ I,
@@ -35,7 +33,7 @@ def GoodState (op : Bool → Bool → Bool) (Ov : Vec (Node n m) m) (Uv : Vec (N
 --     | .terminal b' => if (op false b') = (op true b') then some (op false b') else none
 --     | .node _ => none
 
--- def apply_helper (nid : Fin (m * m')) (heap : Vec (Node n (m * m')) (m * m')) (cache : Std.HashMap (Pointer m × Pointer m') (Pointer (m * m'))) (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n' m') :
+-- def apply_helper (nid : Fin (m * m')) (heap : Vector (Node n (m * m')) (m * m')) (cache : Std.HashMap (Pointer m × Pointer m') (Pointer (m * m'))) (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n' m') :
 --     Bdd n (m * m') :=
 --   match cache.get? ⟨O.1.root, U.1.root⟩ with
 --   | some root => ⟨heap, root⟩
@@ -145,7 +143,7 @@ decreasing_by
   · left;  exact oedge_of_high
 
 def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n.succ m' → Bdd n.succ (p2t m m') := fun op O U ↦
-  let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.emptyWithCapacity, Vec.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
+  let ⟨root, state⟩ := apply_helper op O U ⟨Std.HashMap.emptyWithCapacity, Vector.replicate _ ⟨0, .terminal false, .terminal false⟩, 0⟩
   ⟨state.heap, root⟩
 
 def apply' {n n' m m' p : Nat} : max n n' = p.succ → (Bool → Bool → Bool) → OBdd n m → OBdd n' m' → OBdd (max n n') (p2t m m') := fun h op O U ↦
@@ -299,16 +297,7 @@ theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.su
   (apply_helper_spec (by sorry)).2
 
 theorem apply'_spec {n n' m m' p : Nat} {h : max n n' = p.succ} {op : Bool → Bool → Bool} {O : OBdd n m} {U : OBdd n' m'} :
-    ∀ I : Vec Bool (n ⊔ n'), (op ((O.lift (by simp)).evaluate I) ((U.lift (by simp)).evaluate I)) = OBdd.evaluate (apply' h op O U) I := by
+    ∀ I : Vector Bool (n ⊔ n'), (op ((O.lift (by simp)).evaluate I) ((U.lift (by simp)).evaluate I)) = OBdd.evaluate (apply' h op O U) I := by
   sorry
 
 end Apply
-
-def Bdd.fromVar {n} : Fin n → Bdd n 1 := fun i ↦ ⟨⟨[⟨i, .terminal false, .terminal true⟩], rfl⟩, .node 0⟩
-
-lemma Bdd.fromVar_Ordered {n} {i : Fin n} : Bdd.Ordered (fromVar i) := by
-  apply Ordered_of_Proper
-  simp only [fromVar, Proper]
-  simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.mem_cons, List.not_mem_nil, or_false, forall_eq]
-  intro j contra
-  cases contra <;> contradiction

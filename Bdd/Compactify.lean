@@ -1,11 +1,10 @@
 import Bdd.Basic
-open List renaming Vector → Vec
 
 open Pointer
 
 namespace Compactify
 
-def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) : Vec (Option (Fin O.numPointers)) m × Fin O.numPointers × Vec (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
+def compactify_helper {n m : Nat} (O : OBdd n m) (S : O.SubBdd) (ids : Vector (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vector (Node n O.numPointers) O.numPointers) : Vector (Option (Fin O.numPointers)) m × Fin O.numPointers × Vector (Node n O.numPointers) O.numPointers × Pointer O.numPointers :=
   match S_root_def : S.1.1.root with
     | terminal b => ⟨ ids, nid, new, terminal b ⟩
     | node j =>
@@ -22,16 +21,16 @@ def compactify' {n m : Nat} (O : OBdd n m) : Bdd n O.numPointers :=
   match O_root_def : O.1.root with
   | terminal b =>
     have := isTerminal_iff_numPointer_eq_zero.mpr ⟨b, O_root_def⟩
-    ⟨this ▸ Vec.nil, terminal (Bool_of_numPointer_eq_zero O this)⟩
+    ⟨this ▸ Vector.emptyWithCapacity 0, terminal (Bool_of_numPointer_eq_zero O this)⟩
   | node j =>
-    let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vec.replicate m none) ⟨0, OBdd.numPointers_gt_zero_of_Sub_root_eq_node (O.toSubBdd) O_root_def⟩ (Vec.replicate O.numPointers ⟨O.1.heap[j].var, (terminal false), (terminal false)⟩)
+    let ⟨ ids, nid, new, r ⟩ := compactify_helper O O.toSubBdd (Vector.replicate m none) ⟨0, OBdd.numPointers_gt_zero_of_Sub_root_eq_node (O.toSubBdd) O_root_def⟩ (Vector.replicate O.numPointers ⟨O.1.heap[j].var, (terminal false), (terminal false)⟩)
     ⟨new, r⟩
 
 lemma compactify_helper_spec'
     (O : OBdd n m) (S : O.SubBdd)
-    (ids : Vec (Option (Fin O.numPointers)) m)
+    (ids : Vector (Option (Fin O.numPointers)) m)
     (nid : Fin O.numPointers)
-    (new : Vec (Node n O.numPointers) O.numPointers) :
+    (new : Vector (Node n O.numPointers) O.numPointers) :
     nid = Fintype.card {j // (ids.get j).isSome} →
     ( ∀ j j',
       ids.get j = some j' →
@@ -79,55 +78,55 @@ lemma compactify_helper_spec'
         simp_rw [this]
         rfl
 
-lemma compactify_helper_spec {n m : Nat}
-    (O : OBdd n m) (S : O.SubBdd) (ids : Vec (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vec (Node n O.numPointers) O.numPointers) (hp : Proper new):
-    ( ∀ j j',
-      ids.get j = some j' →
-      ∃ (r : Reachable O.1.heap O.1.root (node j)),
-        OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
-    ) →
-    let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
-    ∃ (hp' : Proper new1),
-      (∀ j j',
-       ids1.get j = some j' →
-       ∃ (r : Reachable O.1.heap O.1.root (node j)),
-         OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
-      ) ∧ OBdd.HSimilar S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
-  intro h
-  unfold compactify_helper
-  split
-  next ids2 nid2 new2 root heq =>
-    split at heq
-    next b heqq =>
-      simp only [Prod.mk.injEq] at heq
-      rcases heq with ⟨heq1, heq2, heq3, heq4⟩
-      rw [← heq3, ← heq1, ← heq4]
-      use hp
-      constructor
-      · exact h
-      · exact OBdd.HSimilar_of_terminal heqq rfl
-    next r heqq =>
-      split at heq
-      next heqqq =>
-        split at heq
-        next ids0 nid0 new0 lh heqqqq =>
-          split at heq
-          next ids1 nid1 new1 rh heqqqqq =>
-          simp only [Prod.mk.injEq] at heq
-          rcases heq with ⟨heq1, heq2, heq3, heq4⟩
-          have hp2 : Proper new2 := by
-            apply Proper_of_all_indices_RespectsOrder
-            intro j
-            nth_rw 2 [← heq3]
-            cases decEq nid1 j with
-            | isFalse hf =>
-              rw [Vec.get_set_of_ne' hf]
-              sorry
-            | isTrue ht =>
-              rw [ht, Vec.get_set_same']
-              sorry
-          sorry
-      next j heqqq => sorry
+-- lemma compactify_helper_spec {Proper Ordered_of_Proper} {n m : Nat}
+--     (O : OBdd n m) (S : O.SubBdd) (ids : Vector (Option (Fin O.numPointers)) m) (nid : Fin O.numPointers) (new : Vector (Node n O.numPointers) O.numPointers) (hp : Proper new):
+--     ( ∀ j j',
+--       ids.get j = some j' →
+--       ∃ (r : Reachable O.1.heap O.1.root (node j)),
+--         OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new, node j'⟩, Ordered_of_Proper hp⟩
+--     ) →
+--     let ⟨ ids1, nid1, new1, root ⟩ := compactify_helper O S ids nid new
+--     ∃ (hp' : Proper new1),
+--       (∀ j j',
+--        ids1.get j = some j' →
+--        ∃ (r : Reachable O.1.heap O.1.root (node j)),
+--          OBdd.HSimilar ⟨⟨O.1.heap, node j⟩, Bdd.ordered_of_relevant O ⟨node j, r⟩⟩ ⟨⟨new1, node j'⟩, Ordered_of_Proper hp'⟩
+--       ) ∧ OBdd.HSimilar S.1 ⟨⟨new1, root⟩, Ordered_of_Proper hp'⟩ := by
+--   intro h
+--   unfold compactify_helper
+--   split
+--   next ids2 nid2 new2 root heq =>
+--     split at heq
+--     next b heqq =>
+--       simp only [Prod.mk.injEq] at heq
+--       rcases heq with ⟨heq1, heq2, heq3, heq4⟩
+--       rw [← heq3, ← heq1, ← heq4]
+--       use hp
+--       constructor
+--       · exact h
+--       · exact OBdd.HSimilar_of_terminal heqq rfl
+--     next r heqq =>
+--       split at heq
+--       next heqqq =>
+--         split at heq
+--         next ids0 nid0 new0 lh heqqqq =>
+--           split at heq
+--           next ids1 nid1 new1 rh heqqqqq =>
+--           simp only [Prod.mk.injEq] at heq
+--           rcases heq with ⟨heq1, heq2, heq3, heq4⟩
+--           have hp2 : Proper new2 := by
+--             apply Proper_of_all_indices_RespectsOrder
+--             intro j
+--             nth_rw 2 [← heq3]
+--             cases decEq nid1 j with
+--             | isFalse hf =>
+--               rw [Vec.get_set_of_ne' hf]
+--               sorry
+--             | isTrue ht =>
+--               rw [ht, Vec.get_set_same']
+--               sorry
+--           sorry
+--       next j heqqq => sorry
   --     have hp' : Proper new1 := by
   --       sorry
   --     sorry

@@ -2,10 +2,9 @@ import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
 import Bdd.Compactify
-open List renaming Vector → Vec
 
 -- TODO: this is similar to `OBdd.reachable_or_eq_low_high`
-lemma Pointer.Reachable_iff {heap : Vec (Node n m) m } : Pointer.Reachable heap root p ↔ (p = root ∨ (∃ j, root = .node j ∧ (Pointer.Reachable heap heap[j].low p ∨ Pointer.Reachable heap heap[j].high p))) := by
+lemma Pointer.Reachable_iff {heap : Vector (Node n m) m } : Pointer.Reachable heap root p ↔ (p = root ∨ (∃ j, root = .node j ∧ (Pointer.Reachable heap heap[j].low p ∨ Pointer.Reachable heap heap[j].high p))) := by
   constructor
   · intro h
     cases Relation.reflTransGen_swap.mp h with
@@ -52,91 +51,119 @@ structure BDD where
 namespace ROBdd
 
 def const : Bool → ROBdd 0 0 := fun b ↦
-  ⟨⟨⟨⟨[], rfl⟩, .terminal b⟩, Bdd.Ordered_of_terminal⟩, OBdd.reduced_of_terminal ⟨b, rfl⟩⟩
+  ⟨⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩, OBdd.reduced_of_terminal ⟨b, rfl⟩⟩
 
 def var (n : Nat) : ROBdd n.succ 1 :=
-  ⟨⟨⟨⟨[⟨n, .terminal false, .terminal true⟩], rfl⟩, .node 0⟩,
-  (Ordered_of_Proper (fun N h ↦
-    by
-      simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.Vector.head, List.mem_cons, List.not_mem_nil, or_false] at h
-      rw [h]
-      intro j hj
-      simp only [reduceCtorEq, or_self] at hj))⟩,
-  ⟨NoRedundancy_of_RProper (fun N h ↦
-    by
-      simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.Vector.head, List.mem_cons, List.not_mem_nil, or_false] at h
-      rw [h]
-      simp),
-    by
-      rintro ⟨x, hx⟩ ⟨y, hy⟩ h
-      cases Pointer.Reachable_iff.mp hx with
-      | inl hh =>
-        simp only at hh
-        cases Pointer.Reachable_iff.mp hy with
-        | inl hhh =>
-          simp only at hhh
-          simp_rw [hh, hhh]
-          simp [InvImage]
-        | inr hhh =>
-          rcases hhh with ⟨j, hj, hhh⟩
-          simp only at hj
-          injection hj
-          rcases hhh with hhh | hhh <;>
-          simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hhh <;>
-          apply Pointer.eq_terminal_of_reachable at hhh <;>
-          simp_rw [hh, hhh] at h <;>
-          simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h <;>
-          unfold OBdd.toTree at h <;>
-          simp at h
-      | inr hh =>
-        simp only at hh
-        rcases hh with ⟨j, hj, hh⟩
-        injection hj
-        simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hh
-        cases Pointer.Reachable_iff.mp hy with
-        | inl hhh =>
-          simp only at hhh
-          rcases hh with hh | hh <;>
-          apply Pointer.eq_terminal_of_reachable at hh <;>
-          simp_rw [hh, hhh] at h <;>
-          simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h <;>
-          unfold OBdd.toTree at h <;>
-          simp at h
-        | inr hhh =>
-          simp only at hhh
-          rcases hhh with ⟨i, hi, hhh⟩
-          injection hi
-          simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hhh
-          cases hh with
-          | inl hh =>
-            cases hhh with
-            | inl hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp [InvImage]
-              rw [hh, hhh]
-            | inr hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp_rw [hh, hhh] at h
-              simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h
-              unfold OBdd.toTree at h
-              simp at h
-          | inr hh =>
-            cases hhh with
-            | inl hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp_rw [hh, hhh] at h
-              simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h
-              unfold OBdd.toTree at h
-              simp at h
-            | inr hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp [InvImage]
-              rw [hh, hhh]
-          ⟩⟩
+  ⟨⟨⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩,
+  by
+    apply Bdd.ordered_of_low_high_ordered rfl
+    · simp only [Bdd.low]
+      conv =>
+        congr
+        right
+        rw [Vector.singleton_def]
+        simp [Vector.getElem_singleton (show 0 < 1 by omega)]
+      apply Bdd.Ordered_of_terminal
+    · simp [Bdd.low, Fin.last]
+      apply Fin.lt_def.mpr
+      simp only [Fin.val_natCast]
+      refine Nat.lt_succ_of_le ?_
+      exact Nat.mod_le n (n + 1 + 1)
+    · simp only [Bdd.high]
+      conv =>
+        congr
+        right
+        rw [Vector.singleton_def]
+        simp [Vector.getElem_singleton (show 0 < 1 by omega)]
+      apply Bdd.Ordered_of_terminal
+    · simp [Bdd.high, Fin.last]
+      apply Fin.lt_def.mpr
+      simp only [Fin.val_natCast]
+      refine Nat.lt_succ_of_le ?_
+      exact Nat.mod_le n (n + 1 + 1)
+  ⟩, sorry
+  -- (Ordered_of_Proper (fun N h ↦
+  --   by
+  --     simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.Vector.head, List.mem_cons, List.not_mem_nil, or_false] at h
+  --     rw [h]
+  --     intro j hj
+  --     simp only [reduceCtorEq, or_self] at hj))⟩,
+  -- NoRedundancy_of_RProper (fun N h ↦
+  --   by
+  --     simp only [Vec.instMembership, Function.comp_apply, List.Vector.toList_singleton, List.Vector.head, List.mem_cons, List.not_mem_nil, or_false] at h
+  --     rw [h]
+  --     simp),
+  --   by
+  --     rintro ⟨x, hx⟩ ⟨y, hy⟩ h
+  --     cases Pointer.Reachable_iff.mp hx with
+  --     | inl hh =>
+  --       simp only at hh
+  --       cases Pointer.Reachable_iff.mp hy with
+  --       | inl hhh =>
+  --         simp only at hhh
+  --         simp_rw [hh, hhh]
+  --         simp [InvImage]
+  --       | inr hhh =>
+  --         rcases hhh with ⟨j, hj, hhh⟩
+  --         simp only at hj
+  --         injection hj
+  --         rcases hhh with hhh | hhh <;>
+  --         simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hhh <;>
+  --         apply Pointer.eq_terminal_of_reachable at hhh <;>
+  --         simp_rw [hh, hhh] at h <;>
+  --         simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h <;>
+  --         unfold OBdd.toTree at h <;>
+  --         simp at h
+  --     | inr hh =>
+  --       simp only at hh
+  --       rcases hh with ⟨j, hj, hh⟩
+  --       injection hj
+  --       simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hh
+  --       cases Pointer.Reachable_iff.mp hy with
+  --       | inl hhh =>
+  --         simp only at hhh
+  --         rcases hh with hh | hh <;>
+  --         apply Pointer.eq_terminal_of_reachable at hh <;>
+  --         simp_rw [hh, hhh] at h <;>
+  --         simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h <;>
+  --         unfold OBdd.toTree at h <;>
+  --         simp at h
+  --       | inr hhh =>
+  --         simp only at hhh
+  --         rcases hhh with ⟨i, hi, hhh⟩
+  --         injection hi
+  --         simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_eq_zero, Vec.getElem_def, List.Vector.toList_singleton, List.Vector.head, List.getElem_cons_zero] at hhh
+  --         cases hh with
+  --         | inl hh =>
+  --           cases hhh with
+  --           | inl hhh =>
+  --             apply Pointer.eq_terminal_of_reachable at hh
+  --             apply Pointer.eq_terminal_of_reachable at hhh
+  --             simp [InvImage]
+  --             rw [hh, hhh]
+  --           | inr hhh =>
+  --             apply Pointer.eq_terminal_of_reachable at hh
+  --             apply Pointer.eq_terminal_of_reachable at hhh
+  --             simp_rw [hh, hhh] at h
+  --             simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h
+  --             unfold OBdd.toTree at h
+  --             simp at h
+  --         | inr hh =>
+  --           cases hhh with
+  --           | inl hhh =>
+  --             apply Pointer.eq_terminal_of_reachable at hh
+  --             apply Pointer.eq_terminal_of_reachable at hhh
+  --             simp_rw [hh, hhh] at h
+  --             simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at h
+  --             unfold OBdd.toTree at h
+  --             simp at h
+  --           | inr hhh =>
+  --             apply Pointer.eq_terminal_of_reachable at hh
+  --             apply Pointer.eq_terminal_of_reachable at hhh
+  --             simp [InvImage]
+  --             rw [hh, hhh]
+  --         ⟩
+  ⟩
 
 end ROBdd
 
@@ -185,19 +212,20 @@ def or  : BDD → BDD → BDD := apply Bool.or
 def imp : BDD → BDD → BDD := apply (! · || ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
-def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vec Bool n → Bool := (B.robdd.1.lift h).evaluate
+def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vector Bool n → Bool := (B.robdd.1.lift h).evaluate
 
 lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
     independentOf (B.denotation h1) i := by
   rintro b I
-  simp only [denotation, OBdd.lift_evaluate, my_vec_take]
-  have : List.Vector.take B.nvars I = List.Vector.take B.nvars (I.set i b) := by
-    rcases I with ⟨l, hl⟩
-    simp only [Vec.take, Vec.set]
-    apply Subtype.eq
-    simp
-    exact Eq.symm (List.take_set_of_le h2)
-  rw [this]
+  sorry
+  -- simp only [denotation, OBdd.lift_evaluate, my_vec_take]
+  -- have : List.Vector.take B.nvars I = List.Vector.take B.nvars (I.set i b) := by
+  --   rcases I with ⟨l, hl⟩
+  --   simp only [Vec.take, Vec.set]
+  --   apply Subtype.eq
+  --   simp
+  --   exact Eq.symm (List.take_set_of_le h2)
+  -- rw [this]
 
 lemma const_nvars : (const b).nvars = 0 := rfl
 
@@ -215,10 +243,11 @@ lemma var_denotation : (var i).denotation h I = I[i] := by
     Fin.val_eq_zero, List.Vector.getElem_def, List.Vector.toList_singleton, List.Vector.head,
     List.getElem_cons_zero, Fin.val_last, Bdd.Ordered.eq_1, OBdd.evaluate_terminal,
     Function.const_apply, Bool.if_false_right, Bool.decide_eq_true, Bool.and_true]
-  simp_rw [my_vec_take_toList_take]
-  simp_all only [List.getElem_take]
+  sorry
+  -- simp_rw [my_vec_take_toList_take]
+  -- simp_all only [List.getElem_take]
 
-private lemma apply_spec' {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} :
+private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars)} :
     (apply op B C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
     (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I)) := by
   let motive : BDD → Prop :=
@@ -246,7 +275,7 @@ private lemma apply_spec' {B C : BDD} {op} {I : Vec Bool (B.nvars ⊔ C.nvars)} 
     congr
   · exact apply_nvars
 
-private lemma apply_cast_nvars {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
+private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation (Nat.le_refl _) I =
     ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (apply_nvars ▸ I) ) := by
   simp only [denotation]
@@ -255,7 +284,7 @@ private lemma apply_cast_nvars {B C : BDD} {op} {I : Vec Bool (apply op B C).nva
   · exact apply_nvars
   · exact HEq.symm (eqRec_heq apply_nvars I)
 
-lemma apply_spec {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
+lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation (Nat.le_refl _) I =
     (op (B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I)) (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
   rw [apply_cast_nvars]
@@ -266,17 +295,17 @@ lemma apply_spec {B C : BDD} {op} {I : Vec Bool (apply op B C).nvars} :
 
 lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 
-lemma and_spec {B C : BDD} {I : Vec Bool (B.and C).nvars} :
+lemma and_spec {B C : BDD} {I : Vector Bool (B.and C).nvars} :
     (B.and C).denotation (Nat.le_refl _) I =
     ((B.denotation (Nat.le_max_left  ..) (and_nvars ▸ I)) &&
      (C.denotation (Nat.le_max_right ..) (and_nvars ▸ I))) := apply_spec
 
-lemma or_spec {B C : BDD} {I : Vec Bool (B.or C).nvars} :
+lemma or_spec {B C : BDD} {I : Vector Bool (B.or C).nvars} :
     (B.or C).denotation (Nat.le_refl _) I =
     ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
      (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
 
-lemma imp_spec {B C : BDD} {I : Vec Bool (B.imp C).nvars} :
+lemma imp_spec {B C : BDD} {I : Vector Bool (B.imp C).nvars} :
     (B.imp C).denotation (Nat.le_refl _) I =
     (!(B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
       (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
@@ -285,7 +314,7 @@ lemma imp_spec {B C : BDD} {I : Vec Bool (B.imp C).nvars} :
 lemma not_nvars {B : BDD} : B.not.nvars = B.nvars := by
   simp only [not, imp, apply_nvars, const_nvars, zero_le, sup_of_le_left]
 
-lemma not_spec {B : BDD} {I : Vec Bool B.not.nvars} :
+lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
     B.not.denotation (Nat.le_refl _) I = ! B.denotation (Nat.le_refl ..) (not_nvars ▸ I) := by
   simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
   congr!
@@ -313,9 +342,9 @@ instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
 
 end BDD
 
--- #eval (BDD.const true).robdd.1
--- #eval! (BDD.var 3).robdd.1
--- #eval! (BDD.var 3).not.robdd.1
--- #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
--- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
--- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
+#eval (BDD.const true).robdd.1
+#eval! (BDD.var 3).robdd.1
+#eval! (BDD.var 3).not.robdd.1
+#eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
+#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
+#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
