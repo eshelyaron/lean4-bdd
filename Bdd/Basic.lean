@@ -854,72 +854,72 @@ def OBdd.Reduced' (O : OBdd n m) : Prop
   -- Isomorphism implies pointer-equality.
    ∧ Subrelation (RelevantIsomorphism O) (InvImage Eq Subtype.val)
 
-lemma OBdd.Similar_of_Isomorphism {O U : OBdd n m} : O.Isomorphism U → O.Similar U := by
-  rintro ⟨f, h1, h2⟩
-  cases O_root_def : O.1.root with
-  | terminal b =>
-    have := ((h2 O.1.toRelevantPointer).2 b O_root_def).2
-    cases U_root_def : U.1.root with
-    | terminal c =>
-      simp only [Similar, HSimilar]
-      rw [toTree_terminal' O_root_def, toTree_terminal' U_root_def]
-      simp only [DecisionTree.leaf.injEq]
-      -- need to show that f (O.1.root) = U.1.root
-      sorry
-    | node i => sorry
-  | node j => sorry
+-- lemma OBdd.Similar_of_Isomorphism {O U : OBdd n m} : O.Isomorphism U → O.Similar U := by
+--   rintro ⟨f, h1, h2⟩
+--   cases O_root_def : O.1.root with
+--   | terminal b =>
+--     have := ((h2 O.1.toRelevantPointer).2 b O_root_def).2
+--     cases U_root_def : U.1.root with
+--     | terminal c =>
+--       simp only [Similar, HSimilar]
+--       rw [toTree_terminal' O_root_def, toTree_terminal' U_root_def]
+--       simp only [DecisionTree.leaf.injEq]
+--       -- need to show that f (O.1.root) = U.1.root
+--       sorry
+--     | node i => sorry
+--   | node j => sorry
 
-def OBdd.terminal_hiso {O : OBdd n m} {U : OBdd n' m'} : O.1.root = terminal b → U.1.root = terminal b → O.HIsomorphism U := fun ho hu ↦
-  ⟨fun _ ↦ ⟨terminal b, by rw [hu]; left⟩, by sorry⟩
+-- def OBdd.terminal_hiso {O : OBdd n m} {U : OBdd n' m'} : O.1.root = terminal b → U.1.root = terminal b → O.HIsomorphism U := fun ho hu ↦
+--   ⟨fun _ ↦ ⟨terminal b, by rw [hu]; left⟩, by sorry⟩
 
-def OBdd.terminal_iso {O U : OBdd n m} : O.1.root = terminal b → U.1.root = terminal b → O.Isomorphism U := terminal_hiso
+-- def OBdd.terminal_iso {O U : OBdd n m} : O.1.root = terminal b → U.1.root = terminal b → O.Isomorphism U := terminal_hiso
 
-def OBdd.node_iso {O U : OBdd n m} :
-  O.Reduced' → U.Reduced' →
-  (ho : O.1.root = node j) → (hu : U.1.root = node i) →
-  (O.low ho).Isomorphism (U.low hu) →
-  (O.high ho).Isomorphism (U.high hu) →
-  O.Isomorphism U := sorry
+-- def OBdd.node_iso {O U : OBdd n m} :
+--   O.Reduced' → U.Reduced' →
+--   (ho : O.1.root = node j) → (hu : U.1.root = node i) →
+--   (O.low ho).Isomorphism (U.low hu) →
+--   (O.high ho).Isomorphism (U.high hu) →
+--   O.Isomorphism U := sorry
 
-lemma OBdd.high_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.high h).Reduced' := by
-  sorry
+-- lemma OBdd.high_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.high h).Reduced' := by
+--   sorry
 
-lemma OBdd.low_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.low h).Reduced' := by
-  sorry
+-- lemma OBdd.low_reduced' {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.Reduced' → (O.low h).Reduced' := by
+--   sorry
 
-lemma OBdd.reduced_of_relevant' {O : OBdd n m} (S : O.1.RelevantPointer):
-    O.Reduced' → OBdd.Reduced' ⟨{heap := O.1.heap, root := S.1}, ordered_of_relevant O S⟩ := by
-  sorry
+-- lemma OBdd.reduced_of_relevant' {O : OBdd n m} (S : O.1.RelevantPointer):
+--     O.Reduced' → OBdd.Reduced' ⟨{heap := O.1.heap, root := S.1}, ordered_of_relevant O S⟩ := by
+--   sorry
 
-lemma OBdd.Isomorphism_of_Similiar {O U : OBdd n m} : O.Reduced' → U.Reduced' → O.Similar U → O.Isomorphism U := by
-  intro ho hu sim
-  cases O_root_def : O.1.root with
-  | terminal b =>
-    have : U.1.root = terminal b := sorry
-    exact terminal_iso O_root_def this
-  | node j =>
-    have : ∃ i, U.1.root = node i := sorry
-    rcases this with ⟨i, U_root_def⟩
-    have liso := Isomorphism_of_Similiar (low_reduced'  (h := O_root_def) ho) (low_reduced'  (h := U_root_def) hu) sorry
-    have hiso := Isomorphism_of_Similiar (high_reduced' (h := O_root_def) ho) (high_reduced' (h := U_root_def) hu) sorry
-    exact node_iso ho hu O_root_def U_root_def liso hiso
-termination_by O.size + U.size
-decreasing_by all_goals simp only [size_node O_root_def, size_node U_root_def]; linarith
+-- lemma OBdd.Isomorphism_of_Similiar {O U : OBdd n m} : O.Reduced' → U.Reduced' → O.Similar U → O.Isomorphism U := by
+--   intro ho hu sim
+--   cases O_root_def : O.1.root with
+--   | terminal b =>
+--     have : U.1.root = terminal b := sorry
+--     exact terminal_iso O_root_def this
+--   | node j =>
+--     have : ∃ i, U.1.root = node i := sorry
+--     rcases this with ⟨i, U_root_def⟩
+--     have liso := Isomorphism_of_Similiar (low_reduced'  (h := O_root_def) ho) (low_reduced'  (h := U_root_def) hu) sorry
+--     have hiso := Isomorphism_of_Similiar (high_reduced' (h := O_root_def) ho) (high_reduced' (h := U_root_def) hu) sorry
+--     exact node_iso ho hu O_root_def U_root_def liso hiso
+-- termination_by O.size + U.size
+-- decreasing_by all_goals simp only [size_node O_root_def, size_node U_root_def]; linarith
 
-lemma OBdd.reduced_iff_reduced' (O : OBdd n m) : O.Reduced ↔ O.Reduced' := by
-  constructor
-  · rintro ⟨h1, h2⟩
-    constructor
-    · exact h1
-    · intro p q iso
-      apply h2
-      exact Similar_of_Isomorphism iso
-  · intro h
-    constructor
-    · exact h.1
-    · intro p q sim
-      apply h.2
-      exact Isomorphism_of_Similiar (reduced_of_relevant' p h)  (reduced_of_relevant' q h) sim
+-- lemma OBdd.reduced_iff_reduced' (O : OBdd n m) : O.Reduced ↔ O.Reduced' := by
+--   constructor
+--   · rintro ⟨h1, h2⟩
+--     constructor
+--     · exact h1
+--     · intro p q iso
+--       apply h2
+--       exact Similar_of_Isomorphism iso
+--   · intro h
+--     constructor
+--     · exact h.1
+--     · intro p q sim
+--       apply h.2
+--       exact Isomorphism_of_Similiar (reduced_of_relevant' p h)  (reduced_of_relevant' q h) sim
 
 /-- Reduced OBDDs are canonical.  -/
 theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
@@ -1789,7 +1789,8 @@ lemma OBdd.lift_preserves_toTree {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : 
       · rw [lift_high]
 termination_by O
 
-private lemma vec_getElem_cast_eq {v : Vector α n} {h : n = n} {i : Nat} {hi : i < n} : v[i] = (h ▸ v)[i] := by
+private lemma vec_getElem_cast_eq {v : Vector α n} {h : n = m} {i : Nat} {hi : i < n} : v[i] = (h ▸ v)[i] := by
+  subst h
   rfl
 
 lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n} {I : Vector Bool n'} :
@@ -1808,7 +1809,7 @@ lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n
     rw [← this]
     rcases a with ⟨a, ha⟩
     simp only
-    sorry
+    apply vec_getElem_cast_eq
 
 lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
     (O.lift h).evaluate I = O.evaluate ((show (min n n') = n by simpa) ▸ I.take n) := by
