@@ -5,9 +5,9 @@ open Bdd
 
 def OBdd.discover_helper : List (Fin m) → Vector (Node n m ) m → Vector (List (Fin m)) n → Vector (List (Fin m)) n
   | [], _, I => I
-  | head :: tail, v, I => discover_helper tail v (I.set v[head].var (head :: I.get v[head].var))
+  | head :: tail, v, I => discover_helper tail v (I.set v[head].var (head :: I[v[head].var]))
 
-lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m)) n} : j ∈ I.get i → j ∈ (discover_helper l v I).get i := by
+lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m)) n} {i : Fin n}: j ∈ I[i] → j ∈ (discover_helper l v I)[i] := by
   intro h
   cases l with
   | nil => assumption
@@ -15,8 +15,16 @@ lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m
     simp [discover_helper]
     apply discover_helper_retains_found O
     cases decEq v[head.1].var i with
-    | isFalse hf => sorry--rw [List.Vector.get_set_of_ne hf]; assumption
-    | isTrue  ht => sorry--subst ht; rw [List.Vector.get_set_same]; right; assumption
+    | isFalse hf =>
+      simp only [Fin.getElem_fin]
+      rw [Vector.getElem_set_ne _ _ (by simp_all [Fin.val_ne_of_ne hf])]
+      assumption
+    | isTrue  ht =>
+      subst ht
+      simp only [Fin.getElem_fin]
+      rw [Vector.getElem_set_self]
+      right
+      assumption
 
 lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
     j ∈ l → j ∈ (discover_helper l v I).get v[j].var := by
@@ -25,9 +33,9 @@ lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
   | head as =>
     simp [discover_helper]
     apply discover_helper_retains_found O
-    sorry
---    rw [List.Vector.get_set_same]
---    left
+    simp only [Fin.getElem_fin]
+    rw [Vector.getElem_set_self]
+    left
   | tail b ih =>
     simp [discover_helper]
     apply discover_helper_spec O ih
@@ -62,7 +70,7 @@ def get_out : StateM (State n m) (Vector (Node n m) m) := get >>= fun s ↦ pure
 
 def get_id : Pointer m → StateM (State n m) (Pointer m)
   | terminal b => pure (terminal b)
-  | node j => get >>= fun s ↦ pure (s.ids.get j)
+  | node j => get >>= fun s ↦ pure (s.ids[j])
 
 def set_id : Fin m → Pointer m → StateM (State n m) Unit :=
   fun j p ↦ get >>= fun s ↦ set (⟨s.out, s.ids.set j p, s.nid⟩ : State n m)
@@ -72,8 +80,8 @@ def set_id_to_nid : Fin m → StateM (State n m) Unit :=
 
 def set_out {n m : Nat} : Node n.succ m.succ → StateM (State n.succ m.succ) Unit :=
   fun N ↦ get >>= fun s ↦
-    have : ((s.nid).1 + 1) % m.succ < m.succ := sorry
-    set (⟨s.out.set ((s.nid + 1) % m.succ) N, s.ids, s.nid + 1⟩ : State n.succ m.succ)
+    have : (s.nid.1 + 1) % m.succ < m.succ := by simp [Nat.mod_lt]
+    set (⟨s.out.set ((s.nid.1 + 1) % m.succ) N, s.ids, s.nid + 1⟩ : State n.succ m.succ)
 
 @[simp]
 lemma set_out_preserves_ids {n m : Nat} {s : State n.succ m.succ} {p : Node n.succ m.succ} : (set_out p s).2.ids = s.ids := by
@@ -246,13 +254,13 @@ lemma set_id_to_nid_preserves_GoodNid {n m : Nat} {j : Fin m.succ} {O : OBdd n.s
     use hjo
     constructor
     · rw [← hhh1]
-      simp only [get_id, get, getThe, MonadStateOf.get, bind, StateT.bind, pure, StateT.pure, StateT.get]
-      sorry
-    --   apply Vec.get_set_of_ne
-    --   intro contra
-    --   rw [contra] at hj
-    --   rw [hj] at hhh1
-    --   contradiction
+      simp only [get_id, get, getThe, MonadStateOf.get, bind, StateT.bind, pure, StateT.pure, StateT.get, Fin.getElem_fin]
+      apply Vector.getElem_set_ne
+      intro contra
+      apply Fin.eq_of_val_eq at contra
+      rw [contra] at hj
+      rw [hj] at hhh1
+      contradiction
     · assumption
 
 lemma set_out_preserves_ordered {n m : Nat} {j : Fin m.succ} {s : State n.succ m.succ} {N : Node n.succ m.succ}:
@@ -276,7 +284,9 @@ lemma set_out_preserves_ordered {n m : Nat} {j : Fin m.succ} {s : State n.succ m
 --     else populate_queue v (⟨⟨lid, hid⟩, j⟩ :: acc) tail
 
 lemma get_id_set_id_of_ne (h : i ≠ j) : (get_id (node j) (set_id i p s).2).1 = (get_id (node j) s).1 := by
-  sorry--apply Vec.get_set_of_ne h
+  apply Vector.getElem_set_ne
+  · simp_all only [ne_eq, Fin.is_lt]
+  · simp_all only [ne_eq, Fin.is_lt, Fin.val_ne_of_ne h, not_false_eq_true]
 
 lemma populate_queue_preserves_invariant_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
     (∀ j ∈ nodes, O.1.heap[j].var = i ∧ (get_id (node j) s).1 = terminal false) →
