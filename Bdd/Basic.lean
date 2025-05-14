@@ -1455,7 +1455,7 @@ theorem OBdd.collect_spec {O : OBdd n m} {j : Fin m} : Reachable O.1.heap O.1.ro
   · assumption
   · apply collect_spec' h
     intro i re1 re2
-    exact List.Vector.get_replicate false i
+    simp only [Fin.getElem_fin, Vector.getElem_replicate]
 
 theorem OBdd.collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
     Reachable O.1.heap r O.1.root →
@@ -1534,7 +1534,7 @@ theorem OBdd.collect_helper_nodup {I : Vector Bool m × List (Fin m)} {O : OBdd 
     next heq =>
       apply collect_helper_nodup
       apply collect_helper_nodup
-      simp only [List.mem_cons, forall_eq_or_imp, List.Vector.get_set_same, true_and, List.nodup_cons]
+      simp only [List.mem_cons, forall_eq_or_imp, true_and]
       constructor
       · constructor
         · simp
@@ -1681,7 +1681,7 @@ lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} 
       | terminal _ =>
         apply MayPrecede_node_terminal
       | node j' =>
-        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, List.Vector.getElem_map, lift_node] at hm
+        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, lift_node] at hm
         apply (Fin.natCast_lt_natCast (by omega) (by omega)).mp at hm
         simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin]
         aesop
@@ -1696,7 +1696,7 @@ lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} 
         apply MayPrecede_node_terminal
       | node j' =>
         simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin] at hm
-        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, List.Vector.getElem_map, lift_node]
+        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, lift_node]
         simp_all only [Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff, Vector.getElem_map, lift_node]
         refine (Fin.natCast_lt_natCast ?_ ?_).mpr ?_ <;> omega
 
@@ -1764,7 +1764,7 @@ lemma OBdd.NoRedundancy_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O
     rw [p_def] at contra
     cases contra with
     | red red =>
-      simp only [lift, Bdd.lift, lift_heap, Fin.getElem_fin, List.Vector.getElem_map, lift_node] at red
+      simp only [lift, Bdd.lift, lift_heap, Fin.getElem_fin, lift_node] at red
       apply hnr ⟨p, lift_reachable_iff.mpr hp⟩
       simp_rw [p_def]
       constructor
@@ -1794,7 +1794,7 @@ lemma vec_getElem_cast_eq {v : Vector α n} {h : n = m} {i : Nat} {hi : i < n} :
   rfl
 
 lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n} {I : Vector Bool n'} :
-    (DecisionTree.lift h T).evaluate I = T.evaluate ((show (min n n') = n by simpa) ▸ I.take n) := by
+    (DecisionTree.lift h T).evaluate I = T.evaluate (Vector.cast (show (min n n') = n by simpa) (I.take n)) := by
   cases T with
   | leaf => simp [lift, evaluate]
   | branch _ _ _ =>
@@ -1807,12 +1807,10 @@ lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n
     have : (I.take n)[a.1] = I[a.1] := by
       apply Vector.getElem_take
     rw [← this]
-    rcases a with ⟨a, ha⟩
-    simp only
-    apply vec_getElem_cast_eq
+    rfl
 
 lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
-    (O.lift h).evaluate I = O.evaluate ((show (min n n') = n by simpa) ▸ I.take n) := by
+    (O.lift h).evaluate I = O.evaluate (Vector.cast (show (min n n') = n by simpa) (I.take n)) := by
   simp only [evaluate, Function.comp_apply, lift_preserves_toTree]
   rw [DecisionTree.lift_evaluate]
 

@@ -2,6 +2,7 @@ import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
 import Bdd.Compactify
+import Bdd.Prime
 
 -- TODO: this is similar to `OBdd.reachable_or_eq_low_high`
 lemma Pointer.Reachable_iff {heap : Vector (Node n m) m } : Pointer.Reachable heap root p ↔ (p = root ∨ (∃ j, root = .node j ∧ (Pointer.Reachable heap heap[j].low p ∨ Pointer.Reachable heap heap[j].high p))) := by
@@ -243,8 +244,7 @@ lemma var_denotation : (var i).denotation h I = I[i] := by
   have : (I.take (i + 1))[i] = I[i] := by
     apply Vector.getElem_take
   rw [← this]
-  symm
-  apply vec_getElem_cast_eq
+  rfl
 
 private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars)} :
     (apply op B C).denotation (Nat.le_refl _) (apply_nvars ▸ I) =
@@ -318,6 +318,23 @@ lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
   simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
   congr!
   simp [zero_le, sup_of_le_left]
+
+def prime : Nat → BDD → BDD
+  | p, B => ⟨B.nvars + p, B.nheap, ⟨Prime.oprime p B.robdd.1, Prime.oprime_reduced B.robdd.2⟩⟩
+
+lemma prime_nvars {B : BDD} : (B.prime p).nvars = B.nvars + p := rfl
+
+lemma prime_spec {B : BDD} {I : Vector Bool (B.prime p).nvars} :
+    (B.prime p).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (Eq.symm (Nat.eq_sub_of_add_eq rfl)) (I.drop p)) := by
+  simp [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
+
+-- def unprime {B : BDD} {p : Nat} {hp : p ≤ B.nvars} {h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩} : BDD := ⟨B.nvars - p, B.nheap, sorry⟩
+
+--lemma unprime_nvars {B : BDD} : B.unprime.nvars = B.nvars - p := rfl
+
+-- lemma unprime_spec {B : BDD} {I : Vector Bool B.unprime.nvars} {J : Vector Bool p} :
+--     B.unprime.denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (by sorry) (J.append I)) := by
+--   sorry
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
