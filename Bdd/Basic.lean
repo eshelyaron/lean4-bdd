@@ -2168,3 +2168,93 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
         · rw [O_root_def]; left
         · rw [← high_def]; right; left; right; rfl
 termination_by O
+
+lemma Pointer.mayPrecede_of_reachable {B : Bdd n m} :
+    B.Ordered → Reachable B.heap B.root p → Pointer.toVar B.heap B.root ≤ Pointer.toVar B.heap p := by
+  intro ho hp
+  induction hp with
+  | refl => simp
+  | tail r e ih =>
+    rename_i b c
+    trans toVar B.heap b
+    exact ih
+    suffices s : B.RelevantMayPrecede ⟨b, r⟩ ⟨c, by trans b; exact r; exact reachable_of_edge e⟩ by
+      simp only [RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one] at s
+      omega
+    apply ho
+    exact e
+
+inductive DecisionTree.lowerBoundedBy (p : Fin n) : DecisionTree n → Prop where
+  | leaf : lowerBoundedBy p (.leaf _)
+  | node : p ≤ q → lowerBoundedBy p l → lowerBoundedBy p h → lowerBoundedBy p (.branch q l h)
+
+lemma DecisionTree.lowerBoundedBy_low : lowerBoundedBy p (.branch q l h) → lowerBoundedBy p l := by
+  intro r
+  cases r with
+  | node _ _ _ => assumption
+
+lemma DecisionTree.lowerBoundedBy_high : lowerBoundedBy p (.branch q l h) → lowerBoundedBy p h := by
+  intro r
+  cases r with
+  | node _ _ _ => assumption
+
+lemma OBdd.toTree_lowerBoundedBy_var {O : OBdd n m} {p : Fin n} : p ≤ O.1.var → O.toTree.lowerBoundedBy p := by
+  intro h
+  cases O_root_def : O.1.root with
+  | terminal _ =>
+    simp only [toTree_terminal' O_root_def]
+    constructor
+  | node _ =>
+    simp only [toTree_node O_root_def]
+    constructor
+    · simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Bdd.var] at h
+      simp_all only [Ordered, toVar_node_eq, Nat.succ_eq_add_one, Fin.getElem_fin, Fin.coe_eq_castSucc, Fin.castSucc_le_castSucc_iff]
+    · apply toTree_lowerBoundedBy_var
+      trans O.1.var
+      · exact h
+      · exact le_of_lt var_lt_low_var
+    · apply toTree_lowerBoundedBy_var
+      trans O.1.var
+      · exact h
+      · exact le_of_lt var_lt_high_var
+termination_by O
+
+lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
+    O.Reduced → (∀ i : Fin p, independentOf (O.evaluate) ⟨i.1, by omega⟩) → p ≤ O.1.var := by
+  intro hr hp
+  cases O_root_def : O.1.root with
+  | terminal _ =>
+    simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Bdd.var, Bdd.Ordered.eq_1, O_root_def, Pointer.toVar_terminal_eq, Fin.natCast_eq_last]
+    exact Fin.le_last p.castSucc
+  | node j =>
+    by_contra c
+    simp only [not_le] at c
+    have := hp ⟨O.1.var, by aesop⟩
+    simp only [Nat.succ_eq_add_one] at this
+    suffices s : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate by
+      absurd hr
+      apply OBdd.not_reduced_of_iso_high_low O_root_def
+      apply OBdd.HCanonicity (OBdd.high_reduced hr) (OBdd.low_reduced hr) s
+    ext I
+    trans O.evaluate I
+    · simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc, Fin.eta] at this
+      have := this true I
+      rw [this]
+      rw [OBdd.evaluate_node'' O_root_def]
+      simp only [Fin.getElem_fin, Vector.getElem_set_self]
+      simp only [↓reduceIte]
+      suffices s : independentOf (O.high O_root_def).evaluate O.1.heap[j.1].var by rw [← s true I]
+      refine OBdd.Independence' (O.high O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
+      convert OBdd.var_lt_high_var
+      simp [O_root_def]
+    · symm
+      simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc, Fin.eta] at this
+      have := this false I
+      rw [this]
+      rw [OBdd.evaluate_node'' O_root_def]
+      simp only [Fin.getElem_fin, Vector.getElem_set_self]
+      simp only [Bool.false_eq_true, ↓reduceIte]
+      suffices s : independentOf (O.low O_root_def).evaluate O.1.heap[j.1].var by rw [s false I]
+      refine OBdd.Independence' (O.low O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
+      convert OBdd.var_lt_low_var
+      simp [O_root_def]

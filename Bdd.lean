@@ -328,13 +328,17 @@ lemma prime_spec {B : BDD} {I : Vector Bool (B.prime p).nvars} :
     (B.prime p).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (Eq.symm (Nat.eq_sub_of_add_eq rfl)) (I.drop p)) := by
   simp [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
 
--- def unprime {B : BDD} {p : Nat} {hp : p ≤ B.nvars} {h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩} : BDD := ⟨B.nvars - p, B.nheap, sorry⟩
+def unprime (B : BDD) (p : Fin B.nvars) (h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩) : BDD :=
+  ⟨B.nvars - p, B.nheap,
+    ⟨Prime.ounprime p B.robdd.1 (by apply OBdd.reduced_var_dependent (B.robdd.2); simp only [denotation] at h; simp_all [OBdd.lift_trivial_eq]),
+     Prime.ounprime_reduced B.robdd.2⟩⟩
 
---lemma unprime_nvars {B : BDD} : B.unprime.nvars = B.nvars - p := rfl
+lemma unprime_nvars {B : BDD} {p} {h} : (unprime B p h).nvars = B.nvars - p := rfl
 
--- lemma unprime_spec {B : BDD} {I : Vector Bool B.unprime.nvars} {J : Vector Bool p} :
---     B.unprime.denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (by sorry) (J.append I)) := by
---   sorry
+lemma unprime_spec {B : BDD} {p} {h} {I : Vector Bool (unprime B p h).nvars} {J : Vector Bool p} :
+    (unprime B p h).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (by rw [unprime_nvars]; omega) (J ++ I)) := by
+  simp only [denotation, unprime, OBdd.lift_evaluate, Vector.take_eq_extract, Vector.extract_size, Nat.sub_zero, Vector.cast_cast, Vector.cast_rfl]
+  rw [Prime.ounprime_evaluate]
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
