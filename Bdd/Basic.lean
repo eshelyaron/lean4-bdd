@@ -612,6 +612,9 @@ lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
 /-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
 def independentOf (f : Vector α n → β) (i : Fin n) := ∀ a v, f v = f (Vector.set v i a)
 
+@[simp]
+def dependsOn (f : Vector α n → β) (i : Fin n) := ¬ independentOf f i
+
 lemma OBdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
 lemma OBdd.ordered_of_edge {O : OBdd n m} {h : O.1.heap = v} {r : O.1.root = q} (p) : Edge v q p → Bdd.Ordered {heap := v, root := p} := by
   rw [← h]
@@ -2258,3 +2261,415 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       refine OBdd.Independence' (O.low O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
       convert OBdd.var_lt_low_var
       simp [O_root_def]
+
+def Bdd.usesVar (B : Bdd n m) (i : Fin n) := ∃ j, Reachable B.heap B.root (node j) ∧ B.heap[j].var = i
+
+lemma Bdd.usesVar_of_high_usesVar {B : Bdd n m} {h : B.root = node j} :
+    (B.high h).usesVar i → B.usesVar i := by
+  rintro ⟨j, h1, h2⟩
+  use j
+  constructor
+  · trans (B.high h).root
+    · apply reachable_of_edge
+      have := edge_of_high (h := h)
+      simp_all
+    · exact h1
+  · simp_all [high_heap_eq_heap]
+
+lemma Bdd.usesVar_of_low_usesVar {B : Bdd n m} {h : B.root = node j} :
+    (B.low h).usesVar i → B.usesVar i := by
+  rintro ⟨j, h1, h2⟩
+  use j
+  constructor
+  · trans (B.low h).root
+    · apply reachable_of_edge
+      have := edge_of_low (h := h)
+      simp_all
+    · exact h1
+  · simp_all [low_heap_eq_heap]
+
+lemma OBdd.usesVar_of_high_usesVar {O : OBdd n m} {h : O.1.root = node j} :
+    (O.high h).1.usesVar i → O.1.usesVar i := by
+  rintro ⟨j, h1, h2⟩
+  use j
+  constructor
+  · trans (O.high h).1.root
+    · apply reachable_of_edge
+      have := oedge_of_high (h := h)
+      simp [OEdge] at this
+      assumption
+    · exact h1
+  · simp_all
+
+lemma OBdd.usesVar_of_low_usesVar {O : OBdd n m} {h : O.1.root = node j} :
+    (O.low h).1.usesVar i → O.1.usesVar i := by
+  rintro ⟨j, h1, h2⟩
+  use j
+  constructor
+  · trans (O.low h).1.root
+    · apply reachable_of_edge
+      have := oedge_of_low (h := h)
+      simp [OEdge] at this
+      assumption
+    · exact h1
+  · simp_all
+
+lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
+    O.Reduced → Reachable O.1.heap O.1.root (node j) → O.1.heap[j].var = i → ∃ v : Vector Bool n, O.evaluate v ≠ O.evaluate (v.set i true) := by
+  intro hr hj hi
+  rcases O_def : O with ⟨⟨heap, root⟩, o⟩
+  simp_all only
+  have hr' : O.Reduced := by
+    rw [← O_def] at hr
+    exact hr
+  cases Relation.reflTransGen_swap.mp hj with
+  | refl =>
+    rw [← O_def]
+    rw [evaluate_node'' (by rw [O_def])]
+    rw [show O.1.heap = heap by rw [O_def], hi]
+    simp only [Fin.getElem_fin, Vector.getElem_set_self, Bool.false_eq_true, ↓reduceIte, ne_eq]
+    rw [← not_forall]
+    intro contra
+    apply not_reduced_of_iso_high_low (show O.1.root = node j by rw [O_def])
+    · apply HCanonicity
+      · exact high_reduced hr'
+      · exact low_reduced hr'
+      · ext x
+        have that := contra (x.set i false)
+        simp only [Vector.getElem_set_self, Bool.false_eq_true, ↓reduceIte, Vector.set_set] at that
+        calc _
+          _ = (O.high (by rw [O_def])).evaluate (x.set i true) := by
+            have hhi : i.1 < (O.high (by rw [O_def])).var := by
+              rw [← hi]
+              simp_rw [show heap = O.1.heap by rw [O_def]]
+              rw [show O.1.heap[j].var = O.var by simp [O_def]]
+              apply var_lt_high_var
+            apply Independence' (O.high (by rw [O_def])) ⟨i.1, hhi⟩
+          _ = (O.low (by rw [O_def])).evaluate (x.set i false) := by symm; assumption
+          _ = _ := by
+            symm
+            have hhi : i.1 < (O.low (by rw [O_def])).var := by
+              rw [← hi]
+              simp_rw [show heap = O.1.heap by rw [O_def]]
+              rw [show O.1.heap[j].var = O.var by simp [O_def]]
+              apply var_lt_low_var
+            apply Independence' (O.low (by rw [O_def])) ⟨i.1, hhi⟩
+    · exact hr'
+  | tail r e =>
+    rename_i p
+    apply Relation.reflTransGen_swap.mpr at r
+    cases root with
+    | terminal _ => contradiction
+    | node jr =>
+      cases e with
+      | low  he =>
+        rw [show heap = O.1.heap by rw [O_def]] at hj
+        have := OBdd.dependsOn_of_usesVar_of_reduced (low_reduced (h := by rw [O_def]) hr') (by simp_all [low_heap_eq_heap, low, Bdd.low]; exact r) (i := i) (by rw [low_heap_eq_heap, O_def]; exact hi)
+        rcases this with ⟨v, hv⟩
+        rw [← O_def]
+        use v.set heap[jr].var false
+        contrapose hv
+        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
+        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not]
+        calc _
+          _ = O.evaluate (v.set (heap[jr.1].var.1) false) := by
+            rw [evaluate_low_eq_evaluate_set_false]
+            simp [O_def]
+          _ = O.evaluate ((v.set (heap[jr.1].var.1) false).set i true) := hv
+          _ = O.evaluate ((v.set i true).set (heap[jr.1].var.1) false) := by
+            rw [Vector.set_comm]
+            apply ne_of_lt
+            have := var_lt_low_var (O := O) (h := (by rw [O_def]))
+            simp only [var, Nat.succ_eq_add_one, Bdd.var, Ordered, O_def, toVar_node_eq,
+              Fin.coe_eq_castSucc, Fin.coe_castSucc, low, Bdd.low] at this
+            rw [he] at this
+            simp only [Fin.getElem_fin] at this
+            apply lt_of_lt_of_le this
+            rw [← hi]
+            rw [show heap[j].var = (toVar heap (node j)).1 by simp [toVar]]
+            let B : Bdd n m := ⟨heap, p⟩
+            rw [show heap = B.heap by rfl]
+            rw [show p = B.root by rfl]
+            apply mayPrecede_of_reachable
+            · simp only [B]
+              rw [← he]
+              apply ordered_of_low_edge
+              exact o
+            · exact r
+          _ = (O.low (by rw [O_def])).evaluate (v.set i true) := by
+            symm
+            rw [evaluate_low_eq_evaluate_set_false]
+            simp [O_def]
+      | high he =>
+        rw [show heap = O.1.heap by rw [O_def]] at hj
+        have := OBdd.dependsOn_of_usesVar_of_reduced (high_reduced (h := by rw [O_def]) hr') (by simp_all [high_heap_eq_heap, high, Bdd.high]; exact r) (i := i) (by rw [high_heap_eq_heap, O_def]; exact hi)
+        rcases this with ⟨v, hv⟩
+        rw [← O_def]
+        use v.set heap[jr].var true
+        contrapose hv
+        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
+        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not]
+        calc _
+          _ = O.evaluate (v.set (heap[jr.1].var.1) true) := by
+            rw [evaluate_high_eq_evaluate_set_true]
+            simp [O_def]
+          _ = O.evaluate ((v.set (heap[jr.1].var.1) true).set i true) := hv
+          _ = O.evaluate ((v.set i true).set (heap[jr.1].var.1) true) := by
+            rw [Vector.set_comm]
+            apply ne_of_lt
+            have := var_lt_high_var (O := O) (h := (by rw [O_def]))
+            simp only [var, Nat.succ_eq_add_one, Bdd.var, Ordered, O_def, toVar_node_eq,
+              Fin.coe_eq_castSucc, Fin.coe_castSucc, high, Bdd.high] at this
+            rw [he] at this
+            simp only [Fin.getElem_fin] at this
+            apply lt_of_lt_of_le this
+            rw [← hi]
+            rw [show heap[j].var = (toVar heap (node j)).1 by simp [toVar]]
+            let B : Bdd n m := ⟨heap, p⟩
+            rw [show heap = B.heap by rfl]
+            rw [show p = B.root by rfl]
+            apply mayPrecede_of_reachable
+            · simp only [B]
+              rw [← he]
+              apply ordered_of_high_edge
+              exact o
+            · exact r
+          _ = (O.high (by rw [O_def])).evaluate (v.set i true) := by
+            symm
+            rw [evaluate_high_eq_evaluate_set_true]
+            simp [O_def]
+termination_by O
+
+lemma OBdd.usesVar_of_dependsOn {O : OBdd n m} {i : Fin n} :
+    O.evaluate v ≠ O.evaluate (v.set i b) → O.1.usesVar i := by
+  intro h
+  cases O_root_def : O.1.root with
+  | terminal _ =>
+    simp [evaluate_terminal' O_root_def] at h
+  | node j =>
+    cases decEq O.1.heap[j].var i with
+    | isFalse hf =>
+      cases lt_or_gt_of_ne hf with
+      | inl hl =>
+        rw [evaluate_node'' O_root_def] at h
+        simp only at h
+        split at h
+        next hh =>
+          simp only [Fin.getElem_fin] at h
+          simp only [Fin.getElem_fin] at hh
+          simp only [Fin.getElem_fin] at hf
+          simp_rw [Vector.getElem_set_ne (xs := v) (i := i.1) (j := O.1.heap[j.1].var) (by omega) (by omega) (by omega)] at h
+          rw [hh] at h
+          simp only [↓reduceIte] at h
+          exact usesVar_of_high_usesVar (usesVar_of_dependsOn h)
+        next hh =>
+          simp only [Bool.not_eq_true] at hh
+          simp only [Fin.getElem_fin] at h
+          simp only [Fin.getElem_fin] at hh
+          simp only [Fin.getElem_fin] at hf
+          simp_rw [Vector.getElem_set_ne (xs := v) (i := i.1) (j := O.1.heap[j.1].var) (by omega) (by omega) (by omega)] at h
+          rw [hh] at h
+          simp only [Bool.false_eq_true, ↓reduceIte, ne_eq] at h
+          exact usesVar_of_low_usesVar (usesVar_of_dependsOn h)
+      | inr hr =>
+        have := (Independence' O ⟨i.1, by simp [var, Bdd.var, O_root_def]; omega⟩) b v
+        contradiction
+    | isTrue ht =>
+      use j
+      constructor
+      · rw [O_root_def]; left
+      · exact ht
+termination_by O
+
+lemma OBdd.usesVar_iff_dependsOn_of_reduced {O : OBdd n m} :
+    O.Reduced → (O.1.usesVar i ↔ dependsOn O.evaluate i) := by
+  intro hr
+  constructor
+  · rintro ⟨j, hj, hi⟩
+    simp only [dependsOn, independentOf, not_forall]
+    use true
+    apply OBdd.dependsOn_of_usesVar_of_reduced hr hj hi
+  · intro nind
+    simp only [dependsOn, independentOf, not_forall] at nind
+    rcases nind with ⟨b, v, hbv⟩
+    exact usesVar_of_dependsOn hbv
+
+lemma OBdd.usesVar_iff (i : Fin n) (O : OBdd n m) : O.1.usesVar i ↔ (∃ j, ∃ (hj : O.1.root = node j), (O.1.heap[j].var = i ∨ ((O.low hj).1.usesVar i ∨ (O.high hj).1.usesVar i))) := by
+  constructor
+  · rintro ⟨j, hj, hi⟩
+    rcases O_def : O with ⟨⟨heap, root⟩, o⟩
+    simp_all
+    cases root with
+    | terminal _ =>
+      cases Relation.ReflTransGen.swap hj with
+      | tail _ e => exact False.elim (not_terminal_edge e)
+    | node j' =>
+      use j', rfl
+      cases Relation.ReflTransGen.swap hj with
+      | refl => left; assumption
+      | tail r e =>
+        cases e with
+        | low hl =>
+          right
+          left
+          use j
+          simp only [Fin.getElem_fin] at hl
+          simp only [low_heap_eq_heap, Fin.getElem_fin, low, Bdd.low, hl]
+          constructor
+          · exact Relation.ReflTransGen.swap r
+          · exact hi
+        | high hh =>
+          right
+          right
+          use j
+          simp only [Fin.getElem_fin] at hh
+          simp only [high_heap_eq_heap, Fin.getElem_fin, high, Bdd.high, hh]
+          constructor
+          · exact Relation.ReflTransGen.swap r
+          · exact hi
+  · rintro ⟨j, hj, h⟩
+    cases h with
+    | inl h =>
+      use j
+      rw [hj]
+      constructor
+      · left
+      · exact h
+    | inr h =>
+      cases h with
+      | inl h => exact usesVar_of_low_usesVar h
+      | inr h => exact usesVar_of_high_usesVar h
+
+inductive DecisionTree.usesVar (i : Fin n) : DecisionTree n → Prop where
+  | here : usesVar i (.branch i _ _)
+  | low : usesVar i l → usesVar i (.branch _ l _)
+  | high : usesVar i h → usesVar i (.branch _ _ h)
+
+lemma DecisionTree.usesVar_iff (i : Fin n) (T : DecisionTree n) : T.usesVar i ↔ (∃ i' l h, T = .branch i' l h ∧ (i = i' ∨ l.usesVar i ∨ h.usesVar i)) := by
+  constructor
+  · intro h
+    cases h with
+    | here => simp
+    | low hl => simp [hl]
+    | high hh => simp [hh]
+  · rintro ⟨i', l, h, h1, h2⟩
+    cases h2 with
+    | inl => simp_all [usesVar.here]
+    | inr h2 =>
+      cases h2 with
+      | inl => simp_all [usesVar.low]
+      | inr => simp_all [usesVar.high]
+
+lemma OBdd.toTree_usesVar {O : OBdd n m} : O.1.usesVar i ↔ O.toTree.usesVar i := by
+  constructor
+  · rw [OBdd.usesVar_iff]
+    rw [DecisionTree.usesVar_iff]
+    rintro ⟨j, hj, h⟩
+    rw [toTree_node hj]
+    use O.1.heap[j].var, (O.low hj).toTree, (O.high hj).toTree
+    cases h with
+    | inl h => simp_all
+    | inr h =>
+      simp only [Fin.getElem_fin, true_and]
+      right
+      cases h with
+      | inl h =>
+        left
+        rw [toTree_usesVar (O := (O.low hj))] at h
+        assumption
+      | inr h =>
+        right
+        rw [toTree_usesVar (O := (O.high hj))] at h
+        assumption
+  · intro h
+    cases O_root_def : O.1.root with
+    | terminal _ =>
+      rw [toTree_terminal' O_root_def] at h
+      contradiction
+    | node j =>
+      rw [DecisionTree.usesVar_iff] at h
+      rcases h with ⟨i', l, h, h1, h2⟩
+      rw [toTree_node O_root_def] at h1
+      injection h1 with ha hl hh
+      cases h2 with
+      | inl h2 =>
+        use j
+        constructor
+        · rw [O_root_def]; left
+        · simp_all
+      | inr h2 =>
+        cases h2 with
+        | inl h2 =>
+          rw [← hl, ← toTree_usesVar] at h2
+          exact usesVar_of_low_usesVar h2
+        | inr h2 =>
+          rw [← hh, ← toTree_usesVar] at h2
+          exact usesVar_of_high_usesVar h2
+termination_by O
+
+lemma eq_of_forall_dependsOn_getElem_eq {f : Vector α n → β} {I J : Vector α n} :
+    (∀ (x : Fin n), dependsOn f x → I[x] = J[x]) → f I = f J := by
+  induction n with
+  | zero =>
+    intro h
+    congr
+    ext i hi
+    contradiction
+  | succ n ih =>
+    intro h
+    let g : Vector α n → β := fun v ↦ f (Vector.push v I[n])
+    have h2 : ∀ V : Vector α (n + 1), I[n] = V[n] → f V = g V.pop := by
+      intro V hV
+      simp only [g]
+      congr
+      ext i hi
+      rw [Vector.getElem_push]
+      split
+      next hh => simp
+      next hh =>
+        have : i = n := by omega
+        simp_all
+    by_cases hf : dependsOn f n
+    · have h1 := h n hf
+      rw [h2 I rfl]
+      rw [h2 J (by convert h1; simp; simp)]
+      apply ih
+      intro x hx
+      simp only [g] at hx
+      have : dependsOn f x.castSucc := by
+        simp only [dependsOn, independentOf, not_forall, g] at hx
+        rcases hx with ⟨a, V, hav⟩
+        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp [Vector.set_push]] at hav
+        simp only [dependsOn, independentOf, not_forall, g]
+        use a, V.push I[n]
+        exact hav
+      have := h x.castSucc this
+      simp_all
+    · simp only [dependsOn, not_not, independentOf] at hf
+      rw [hf I[n] J]
+      rw [h2 I rfl]
+      rw [h2 (J.set (n : Fin (n + 1)) I[n]) (by simp)]
+      apply ih
+      intro x hx
+      simp only [g] at hx
+      have : dependsOn f x.castSucc := by
+        simp only [dependsOn, independentOf, not_forall, g] at hx
+        rcases hx with ⟨a, V, hav⟩
+        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp [Vector.set_push]] at hav
+        simp only [dependsOn, independentOf, not_forall, g]
+        use a, V.push I[n]
+        exact hav
+      have := h x.castSucc this
+      simp only [Fin.getElem_fin, Vector.getElem_pop', Fin.natCast_eq_last, Fin.val_last, g]
+      rw [Vector.getElem_set_ne _ _ (by omega)]
+      simp_all
+
+lemma OBdd.evaluate_eq_of_forall_usesVar {O : OBdd n m} {I J : Vector Bool n} :
+    (∀ i, O.1.usesVar i → I[i] = J[i]) → O.evaluate I = O.evaluate J := by
+  intro h
+  apply eq_of_forall_dependsOn_getElem_eq
+  intro i hi
+  apply h
+  simp only [dependsOn, independentOf, not_forall] at hi
+  rcases hi with ⟨b, v, hbv⟩
+  apply usesVar_of_dependsOn hbv

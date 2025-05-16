@@ -319,6 +319,26 @@ lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
   congr!
   simp [zero_le, sup_of_le_left]
 
+def relabel (B : BDD) (f : Nat → Nat)
+    (h1 : ∀ i : Fin B.nvars, f i < f B.nvars)
+    (h2 : ∀ i i' : Fin B.nvars, i < i' → dependsOn (B.denotation (le_refl ..)) i → dependsOn (B.denotation (le_refl ..)) i' → f i < f i') :
+    BDD :=
+  ⟨f B.nvars, B.nheap,
+  ⟨Prime.orelabel B.robdd.1 h1 (by
+    intro i i' hii' hi hi'
+    rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi
+    rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi'
+    simp only [denotation, OBdd.lift_trivial_eq] at h2
+    exact h2 i i' hii' hi hi'),
+   Prime.orelabel_reduced B.robdd.2⟩⟩
+
+lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
+
+lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu}  {I : Vector Bool (relabel B f hf hu).nvars} :
+    (relabel B f hf hu).denotation (le_refl ..) I = B.denotation (le_refl ..) (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
+  simp only [denotation, relabel, OBdd.lift_evaluate, Prime.orelabel_evaluate]
+  simp
+
 def prime : Nat → BDD → BDD
   | p, B => ⟨B.nvars + p, B.nheap, ⟨Prime.oprime p B.robdd.1, Prime.oprime_reduced B.robdd.2⟩⟩
 
@@ -326,7 +346,8 @@ lemma prime_nvars {B : BDD} : (B.prime p).nvars = B.nvars + p := rfl
 
 lemma prime_spec {B : BDD} {I : Vector Bool (B.prime p).nvars} :
     (B.prime p).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (Eq.symm (Nat.eq_sub_of_add_eq rfl)) (I.drop p)) := by
-  simp [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
+  simp only [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
+  simp
 
 def unprime (B : BDD) (p : Fin B.nvars) (h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩) : BDD :=
   ⟨B.nvars - p, B.nheap,
