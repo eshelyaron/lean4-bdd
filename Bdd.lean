@@ -2,7 +2,7 @@ import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
 import Bdd.Compactify
-import Bdd.Prime
+import Bdd.Relabel
 
 -- TODO: this is similar to `OBdd.reachable_or_eq_low_high`
 lemma Pointer.Reachable_iff {heap : Vector (Node n m) m } : Pointer.Reachable heap root p ↔ (p = root ∨ (∃ j, root = .node j ∧ (Pointer.Reachable heap heap[j].low p ∨ Pointer.Reachable heap heap[j].high p))) := by
@@ -324,42 +324,42 @@ def relabel (B : BDD) (f : Nat → Nat)
     (h2 : ∀ i i' : Fin B.nvars, i < i' → dependsOn (B.denotation (le_refl ..)) i → dependsOn (B.denotation (le_refl ..)) i' → f i < f i') :
     BDD :=
   ⟨f B.nvars, B.nheap,
-  ⟨Prime.orelabel B.robdd.1 h1 (by
+  ⟨Relabel.orelabel B.robdd.1 h1 (by
     intro i i' hii' hi hi'
     rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi
     rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi'
     simp only [denotation, OBdd.lift_trivial_eq] at h2
     exact h2 i i' hii' hi hi'),
-   Prime.orelabel_reduced B.robdd.2⟩⟩
+   Relabel.orelabel_reduced B.robdd.2⟩⟩
 
 lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
 
 lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu}  {I : Vector Bool (relabel B f hf hu).nvars} :
     (relabel B f hf hu).denotation (le_refl ..) I = B.denotation (le_refl ..) (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
-  simp only [denotation, relabel, OBdd.lift_evaluate, Prime.orelabel_evaluate]
+  simp only [denotation, relabel, OBdd.lift_evaluate, Relabel.orelabel_evaluate]
   simp
 
-def prime : Nat → BDD → BDD
-  | p, B => ⟨B.nvars + p, B.nheap, ⟨Prime.oprime p B.robdd.1, Prime.oprime_reduced B.robdd.2⟩⟩
+-- def prime : Nat → BDD → BDD
+--   | p, B => ⟨B.nvars + p, B.nheap, ⟨Prime.oprime p B.robdd.1, Prime.oprime_reduced B.robdd.2⟩⟩
 
-lemma prime_nvars {B : BDD} : (B.prime p).nvars = B.nvars + p := rfl
+-- lemma prime_nvars {B : BDD} : (B.prime p).nvars = B.nvars + p := rfl
 
-lemma prime_spec {B : BDD} {I : Vector Bool (B.prime p).nvars} :
-    (B.prime p).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (Eq.symm (Nat.eq_sub_of_add_eq rfl)) (I.drop p)) := by
-  simp only [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
-  simp
+-- lemma prime_spec {B : BDD} {I : Vector Bool (B.prime p).nvars} :
+--     (B.prime p).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (Eq.symm (Nat.eq_sub_of_add_eq rfl)) (I.drop p)) := by
+--   simp only [denotation, prime, OBdd.lift_evaluate, Prime.oprime_evaluate]
+--   simp
 
-def unprime (B : BDD) (p : Fin B.nvars) (h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩) : BDD :=
-  ⟨B.nvars - p, B.nheap,
-    ⟨Prime.ounprime p B.robdd.1 (by apply OBdd.reduced_var_dependent (B.robdd.2); simp only [denotation] at h; simp_all [OBdd.lift_trivial_eq]),
-     Prime.ounprime_reduced B.robdd.2⟩⟩
+-- def unprime (B : BDD) (p : Fin B.nvars) (h : ∀ i : Fin p, independentOf (B.denotation (Nat.le_refl ..)) ⟨i.1, by omega⟩) : BDD :=
+--   ⟨B.nvars - p, B.nheap,
+--     ⟨Prime.ounprime p B.robdd.1 (by apply OBdd.reduced_var_dependent (B.robdd.2); simp only [denotation] at h; simp_all [OBdd.lift_trivial_eq]),
+--      Prime.ounprime_reduced B.robdd.2⟩⟩
 
-lemma unprime_nvars {B : BDD} {p} {h} : (unprime B p h).nvars = B.nvars - p := rfl
+-- lemma unprime_nvars {B : BDD} {p} {h} : (unprime B p h).nvars = B.nvars - p := rfl
 
-lemma unprime_spec {B : BDD} {p} {h} {I : Vector Bool (unprime B p h).nvars} {J : Vector Bool p} :
-    (unprime B p h).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (by rw [unprime_nvars]; omega) (J ++ I)) := by
-  simp only [denotation, unprime, OBdd.lift_evaluate, Vector.take_eq_extract, Vector.extract_size, Nat.sub_zero, Vector.cast_cast, Vector.cast_rfl]
-  rw [Prime.ounprime_evaluate]
+-- lemma unprime_spec {B : BDD} {p} {h} {I : Vector Bool (unprime B p h).nvars} {J : Vector Bool p} :
+--     (unprime B p h).denotation (Nat.le_refl _) I = B.denotation (Nat.le_refl ..) (Vector.cast (by rw [unprime_nvars]; omega) (J ++ I)) := by
+--   simp only [denotation, unprime, OBdd.lift_evaluate, Vector.take_eq_extract, Vector.extract_size, Nat.sub_zero, Vector.cast_cast, Vector.cast_rfl]
+--   rw [Prime.ounprime_evaluate]
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
