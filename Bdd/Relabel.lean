@@ -142,6 +142,7 @@ lemma brelabel_high {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f 
       ⟨relabel hf (OBdd.high ⟨B, o⟩ h).1, relabel_preserves_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi')) (OBdd.high ⟨B, o⟩ h).2⟩ := by
   exact orelabel_high (O := ⟨B, o⟩) hf hu
 
+@[simp]
 theorem orelabel_evaluate (O : OBdd n m) {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i'} {I : Vector Bool (f n)} :
     OBdd.evaluate (orelabel O hf hu) I = O.evaluate (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
@@ -440,5 +441,16 @@ lemma orelabel_reduced {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i
   · exact relabel_preserves_noRedundancy r1
   · rintro _ _ sim
     exact r2 (orelabel_preserves_similarRP sim)
+
+@[simp]
+lemma relabel_id {B : Bdd n m} : relabel (f := id) (by simp) B = B := by
+  simp only [id_eq, relabel, relabel_heap]
+  congr
+  ext i hi
+  simp only [Vector.getElem_map, relabel_node, id_eq, Fin.eta]
+  rfl
+
+@[simp]
+lemma orelabel_id {O : OBdd n m} : orelabel O (f := id) (by simp) (fun _ _ _ _ _ ↦ by simpa) = O := by simp [orelabel]
 
 end Relabel

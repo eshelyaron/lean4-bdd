@@ -316,6 +316,9 @@ def relabel (B : BDD) (f : Nat → Nat)
    Relabel.orelabel_reduced B.robdd.2⟩⟩
 
 @[simp]
+lemma relabel_id {B : BDD} : B.relabel id (by simp) (fun _ _ _ _ _ ↦ by simpa) = B := by simp [relabel]
+
+@[simp]
 lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
 
 @[simp]
@@ -381,4 +384,4 @@ end BDD
 -- #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
 -- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
 --#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
-#eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
+-- #eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
