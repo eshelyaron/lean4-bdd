@@ -824,7 +824,34 @@ def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
     | .succ _ => ⟨reduce O, reduce_spec.1⟩
 
 lemma reduce'_spec {O : OBdd n m} :
- OBdd.Reduced (reduce' O) ∧ O.evaluate = (reduce' O).evaluate := sorry
+    OBdd.Reduced (reduce' O) ∧ O.evaluate = (reduce' O).evaluate := by
+  simp only [reduce']
+  split
+  next O =>
+    constructor
+    · apply OBdd.reduced_of_terminal
+      rcases O with ⟨⟨heap, root⟩, o⟩
+      simp at heap
+      cases root with
+      | terminal b => use b
+      | node j =>
+        rcases heap[j] with ⟨⟨_, c⟩ , _, _⟩
+        simp_all only [not_lt_zero']
+    · rfl
+  next n O =>
+    split
+    next O _ =>
+      constructor
+      · apply OBdd.reduced_of_terminal
+        rcases O with ⟨⟨heap, root⟩, o⟩
+        simp only [Nat.succ_eq_add_one, Nat.zero_eq] at heap
+        cases root with
+        | terminal b => use b
+        | node j =>
+          absurd j.2
+          simp [not_lt_zero']
+      · rfl
+    next O _ => exact (reduce_spec (O := O)).2
 
 
 -- lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
