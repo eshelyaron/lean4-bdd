@@ -164,6 +164,7 @@ private lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive 
   next heq => exact base heq
   next p heq => exact step p heq
 
+@[simp]
 lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars := by
   simp only [apply]
   split
@@ -188,15 +189,19 @@ lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nv
   rw [Vector.getElem_set_ne]
   omega
 
+@[simp]
 lemma const_nvars : (const b).nvars = 0 := rfl
 
+@[simp]
 lemma const_denotation : (const b).denotation h = Function.const _ b := by
   simp only [denotation, const, ROBdd.const]
   apply OBdd.evaluate_terminal'
   rw [OBdd.lift_preserves_root]
 
+@[simp]
 lemma var_nvars : (var i).nvars = i + 1 := rfl
 
+@[simp]
 lemma var_denotation : (var i).denotation h I = I[i] := by
   simp only [denotation, var, ROBdd.var, OBdd.lift_evaluate]
   rw [OBdd.evaluate_node]
@@ -251,6 +256,7 @@ private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).
   · exact apply_nvars
   · exact HEq.symm (eqRec_heq apply_nvars I)
 
+@[simp]
 lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation (Nat.le_refl _) I =
     (op (B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I)) (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
@@ -260,27 +266,36 @@ lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
   · exact apply_nvars
   · simp_all only [heq_eqRec_iff_heq, heq_eq_eq]
 
+@[simp]
 lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 
+@[simp]
 lemma and_spec {B C : BDD} {I : Vector Bool (B.and C).nvars} :
     (B.and C).denotation (Nat.le_refl _) I =
     ((B.denotation (Nat.le_max_left  ..) (and_nvars ▸ I)) &&
      (C.denotation (Nat.le_max_right ..) (and_nvars ▸ I))) := apply_spec
 
+@[simp]
+lemma or_nvars {B C : BDD} : (B.or C).nvars = B.nvars ⊔ C.nvars := apply_nvars
+
+@[simp]
 lemma or_spec {B C : BDD} {I : Vector Bool (B.or C).nvars} :
     (B.or C).denotation (Nat.le_refl _) I =
     ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
      (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
 
+@[simp]
 lemma imp_spec {B C : BDD} {I : Vector Bool (B.imp C).nvars} :
     (B.imp C).denotation (Nat.le_refl _) I =
     (!(B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
       (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
   simp only [imp, apply_spec]
 
+@[simp]
 lemma not_nvars {B : BDD} : B.not.nvars = B.nvars := by
   simp only [not, imp, apply_nvars, const_nvars, zero_le, sup_of_le_left]
 
+@[simp]
 lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
     B.not.denotation (Nat.le_refl _) I = ! B.denotation (Nat.le_refl ..) (not_nvars ▸ I) := by
   simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
@@ -300,12 +315,13 @@ def relabel (B : BDD) (f : Nat → Nat)
     exact h2 i i' hii' hi hi'),
    Relabel.orelabel_reduced B.robdd.2⟩⟩
 
+@[simp]
 lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
 
+@[simp]
 lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu}  {I : Vector Bool (relabel B f hf hu).nvars} :
     (relabel B f hf hu).denotation (le_refl ..) I = B.denotation (le_refl ..) (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
-  simp only [denotation, relabel, OBdd.lift_evaluate, Relabel.orelabel_evaluate]
-  simp
+  simp [denotation, relabel]
 
 -- def prime : Nat → BDD → BDD
 --   | p, B => ⟨B.nvars + p, B.nheap, ⟨Prime.oprime p B.robdd.1, Prime.oprime_reduced B.robdd.2⟩⟩
@@ -349,6 +365,14 @@ private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
 instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
 
+instance instDecidableDependsOn (B : BDD) : DecidablePred (dependsOn (B.denotation (le_refl ..))) := by
+  suffices s : dependsOn (B.denotation (le_refl ..)) = B.robdd.1.1.usesVar by rw [s]; infer_instance
+  simp [denotation]
+  ext i
+  exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2)
+
+
+
 end BDD
 
 -- #eval (BDD.const true).robdd.1
@@ -356,4 +380,5 @@ end BDD
 -- #eval! (BDD.var 3).not.robdd.1
 -- #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
 -- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
--- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
+--#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
+#eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)

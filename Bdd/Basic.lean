@@ -1737,6 +1737,7 @@ lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordere
 
 def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
 
+@[simp]
 lemma OBdd.lift_trivial_eq {n n' m : Nat} {h : n = n'} {O : OBdd n m} : (O.lift (n' := n') (by rw [h])) = h ▸ O := by
   rcases O with ⟨⟨M, r⟩, o⟩
   simp only [lift, Bdd.lift, lift_heap]
@@ -1822,6 +1823,7 @@ lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n
     rw [← this]
     rfl
 
+@[simp]
 lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
     (O.lift h).evaluate I = O.evaluate (Vector.cast (show (min n n') = n by simpa) (I.take n)) := by
   simp only [evaluate, Function.comp_apply, lift_preserves_toTree]
@@ -2683,3 +2685,8 @@ lemma OBdd.evaluate_eq_of_forall_usesVar {O : OBdd n m} {I J : Vector Bool n} :
   simp only [dependsOn, independentOf, not_forall] at hi
   rcases hi with ⟨b, v, hbv⟩
   apply usesVar_of_dependsOn hbv
+
+instance OBdd.instDecidableUsesVar {O : OBdd n m} : DecidablePred O.1.usesVar := by
+  intro i
+  simp [usesVar]
+  infer_instance
