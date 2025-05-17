@@ -4,6 +4,7 @@ import Init.Data.ToString.Basic
 import Mathlib.Tactic.DeriveFintype
 import Mathlib.Tactic.Linarith
 import Mathlib.Data.Fintype.Vector
+import Bdd.Nary
 
 instance {α : Type u} [ToString α] : ToString (Vector α k) := ⟨fun v ↦ v.toList.toString⟩
 
@@ -383,6 +384,7 @@ def OBdd.Reduced {n m} (O : OBdd n m) : Prop
   -- Similarity implies pointer-equality.
    ∧ Subrelation (SimilarRP O) (InvImage Eq Subtype.val)
 
+--- TODO: Move elsewhere or drop.
 lemma transGen_iff_single_and_reflTransGen : (Relation.TransGen r a b) ↔ ∃ c, r a c ∧ Relation.ReflTransGen r c b := by
   constructor
   case mp =>
@@ -522,8 +524,6 @@ lemma eq_of_constant_eq {α β} {c c' : β} [Inhabited α] :
     Function.const α c = Function.const α c' → c = c' :=
   fun h ↦ (show (Function.const α c) default = (Function.const α c') default by rw [h])
 
-instance Vec.instInhabited {n} [Inhabited α] : Inhabited (Vector α n) := ⟨Vector.replicate n default⟩
-
 lemma Bdd.terminal_or_node {n m} (B : Bdd n m) :
     (∃ b, (B.root = terminal b ∧ B = {heap := B.heap, root := terminal b}))
   ∨ (∃ j, (B.root = node j ∧ B = {heap := B.heap, root := node j})) := by
@@ -608,12 +608,6 @@ lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
               ⟨p.1, Relation.transitive_reflTransGen S.2 p.2⟩ := by
         simp_all only [SimilarRP, Similar, InvImage]
       apply R.2 this
-
-/-- `f.independentOf i` if the output of `f` does not depend on the value of the `i`th input. -/
-def independentOf (f : Vector α n → β) (i : Fin n) := ∀ a v, f v = f (Vector.set v i a)
-
-@[simp]
-def dependsOn (f : Vector α n → β) (i : Fin n) := ¬ independentOf f i
 
 lemma OBdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
 lemma OBdd.ordered_of_edge {O : OBdd n m} {h : O.1.heap = v} {r : O.1.root = q} (p) : Edge v q p → Bdd.Ordered {heap := v, root := p} := by
@@ -706,7 +700,7 @@ lemma OBdd.var_lt_low_var  {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node
   have e := Bdd.edge_of_low (h := h) O.1
   exact @O.2 O.1.toRelevantPointer ⟨(O.low h).1.root, reachable_of_edge e⟩ e
 
-lemma OBdd.Independence' (O : OBdd n m) (i : Fin O.var) : independentOf (OBdd.evaluate O) ⟨i.1, Fin.val_lt_of_le i (Fin.is_le _)⟩ := by
+lemma OBdd.Independence' (O : OBdd n m) (i : Fin O.var) : Nary.IndependentOf (OBdd.evaluate O) ⟨i.1, Fin.val_lt_of_le i (Fin.is_le _)⟩ := by
   cases O_root_def : O.1.root with
   | terminal _ =>
     intro b I
@@ -767,7 +761,7 @@ lemma OBdd.size_node {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) : 
   rfl
 
 lemma OBdd.evaluate_high_eq_evaluate_low_of_independentOf_root {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
-    independentOf O.evaluate O.1.heap[j].var → (O.high h).evaluate = (O.low h).evaluate := by
+    Nary.IndependentOf O.evaluate O.1.heap[j].var → (O.high h).evaluate = (O.low h).evaluate := by
   intro i
   ext I
   trans O.evaluate I
@@ -978,7 +972,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
             have := Independence' O ⟨U.1.heap[i].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [O_root_def]; simpa⟩
             rw [h] at this
             simp only [Fin.eta] at this
-            simp only [independentOf] at this
+            simp only [Nary.IndependentOf] at this
             have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
               HCanonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply U_reduced.1 U.1.toRelevantPointer
@@ -992,7 +986,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
             have := Independence' U ⟨O.1.heap[j].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [U_root_def]; simpa⟩
             rw [← h] at this
             simp only [Ordered, Fin.eta] at this
-            simp only [independentOf] at this
+            simp only [Nary.IndependentOf] at this
             have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
               HCanonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply O_reduced.1 O.1.toRelevantPointer
@@ -2235,7 +2229,7 @@ lemma OBdd.toTree_lowerBoundedBy_var {O : OBdd n m} {p : Fin n} : p ≤ O.1.var 
 termination_by O
 
 lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
-    O.Reduced → (∀ i : Fin p, independentOf (O.evaluate) ⟨i.1, by omega⟩) → p ≤ O.1.var := by
+    O.Reduced → (∀ i : Fin p, Nary.IndependentOf (O.evaluate) ⟨i.1, by omega⟩) → p ≤ O.1.var := by
   intro hr hp
   cases O_root_def : O.1.root with
   | terminal _ =>
@@ -2258,7 +2252,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       rw [OBdd.evaluate_node'' O_root_def]
       simp only [Fin.getElem_fin, Vector.getElem_set_self]
       simp only [↓reduceIte]
-      suffices s : independentOf (O.high O_root_def).evaluate O.1.heap[j.1].var by rw [← s true I]
+      suffices s : Nary.IndependentOf (O.high O_root_def).evaluate O.1.heap[j.1].var by rw [← s true I]
       refine OBdd.Independence' (O.high O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
       convert OBdd.var_lt_high_var
       simp [O_root_def]
@@ -2269,7 +2263,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       rw [OBdd.evaluate_node'' O_root_def]
       simp only [Fin.getElem_fin, Vector.getElem_set_self]
       simp only [Bool.false_eq_true, ↓reduceIte]
-      suffices s : independentOf (O.low O_root_def).evaluate O.1.heap[j.1].var by rw [s false I]
+      suffices s : Nary.IndependentOf (O.low O_root_def).evaluate O.1.heap[j.1].var by rw [s false I]
       refine OBdd.Independence' (O.low O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
       convert OBdd.var_lt_low_var
       simp [O_root_def]
@@ -2494,15 +2488,15 @@ lemma OBdd.usesVar_of_dependsOn {O : OBdd n m} {i : Fin n} :
 termination_by O
 
 lemma OBdd.usesVar_iff_dependsOn_of_reduced {O : OBdd n m} :
-    O.Reduced → (O.1.usesVar i ↔ dependsOn O.evaluate i) := by
+    O.Reduced → (O.1.usesVar i ↔ Nary.DependsOn O.evaluate i) := by
   intro hr
   constructor
   · rintro ⟨j, hj, hi⟩
-    simp only [dependsOn, independentOf, not_forall]
+    simp only [Nary.DependsOn, Nary.IndependentOf, not_forall]
     use true
     apply OBdd.dependsOn_of_usesVar_of_reduced hr hj hi
   · intro nind
-    simp only [dependsOn, independentOf, not_forall] at nind
+    simp only [Nary.DependsOn, Nary.IndependentOf, not_forall] at nind
     rcases nind with ⟨b, v, hbv⟩
     exact usesVar_of_dependsOn hbv
 
@@ -2619,70 +2613,13 @@ lemma OBdd.toTree_usesVar {O : OBdd n m} : O.1.usesVar i ↔ O.toTree.usesVar i 
           exact usesVar_of_high_usesVar h2
 termination_by O
 
-lemma eq_of_forall_dependsOn_getElem_eq {f : Vector α n → β} {I J : Vector α n} :
-    (∀ (x : Fin n), dependsOn f x → I[x] = J[x]) → f I = f J := by
-  induction n with
-  | zero =>
-    intro h
-    congr
-    ext i hi
-    contradiction
-  | succ n ih =>
-    intro h
-    let g : Vector α n → β := fun v ↦ f (Vector.push v I[n])
-    have h2 : ∀ V : Vector α (n + 1), I[n] = V[n] → f V = g V.pop := by
-      intro V hV
-      simp only [g]
-      congr
-      ext i hi
-      rw [Vector.getElem_push]
-      split
-      next hh => simp
-      next hh =>
-        have : i = n := by omega
-        simp_all
-    by_cases hf : dependsOn f n
-    · have h1 := h n hf
-      rw [h2 I rfl]
-      rw [h2 J (by convert h1; simp; simp)]
-      apply ih
-      intro x hx
-      simp only [g] at hx
-      have : dependsOn f x.castSucc := by
-        simp only [dependsOn, independentOf, not_forall, g] at hx
-        rcases hx with ⟨a, V, hav⟩
-        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp [Vector.set_push]] at hav
-        simp only [dependsOn, independentOf, not_forall, g]
-        use a, V.push I[n]
-        exact hav
-      have := h x.castSucc this
-      simp_all
-    · simp only [dependsOn, not_not, independentOf] at hf
-      rw [hf I[n] J]
-      rw [h2 I rfl]
-      rw [h2 (J.set (n : Fin (n + 1)) I[n]) (by simp)]
-      apply ih
-      intro x hx
-      simp only [g] at hx
-      have : dependsOn f x.castSucc := by
-        simp only [dependsOn, independentOf, not_forall, g] at hx
-        rcases hx with ⟨a, V, hav⟩
-        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp [Vector.set_push]] at hav
-        simp only [dependsOn, independentOf, not_forall, g]
-        use a, V.push I[n]
-        exact hav
-      have := h x.castSucc this
-      simp only [Fin.getElem_fin, Vector.getElem_pop', Fin.natCast_eq_last, Fin.val_last, g]
-      rw [Vector.getElem_set_ne _ _ (by omega)]
-      simp_all
-
 lemma OBdd.evaluate_eq_of_forall_usesVar {O : OBdd n m} {I J : Vector Bool n} :
     (∀ i, O.1.usesVar i → I[i] = J[i]) → O.evaluate I = O.evaluate J := by
   intro h
-  apply eq_of_forall_dependsOn_getElem_eq
-  intro i hi
+  apply Nary.eq_of_forall_dependency_getElem_eq
+  rintro ⟨i, hi⟩
   apply h
-  simp only [dependsOn, independentOf, not_forall] at hi
+  simp only [Nary.DependsOn, Nary.IndependentOf, not_forall] at hi
   rcases hi with ⟨b, v, hbv⟩
   apply usesVar_of_dependsOn hbv
 
