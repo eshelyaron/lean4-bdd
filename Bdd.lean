@@ -4,38 +4,6 @@ import Bdd.Apply
 import Bdd.Compactify
 import Bdd.Relabel
 
--- TODO: this is similar to `OBdd.reachable_or_eq_low_high`
-lemma Pointer.Reachable_iff {heap : Vector (Node n m) m } : Pointer.Reachable heap root p ↔ (p = root ∨ (∃ j, root = .node j ∧ (Pointer.Reachable heap heap[j].low p ∨ Pointer.Reachable heap heap[j].high p))) := by
-  constructor
-  · intro h
-    cases Relation.reflTransGen_swap.mp h with
-    | refl =>
-      left
-      rfl
-    | tail r e =>
-      rename_i q
-      right
-      cases e with
-      | low  hh => rename_i j; exact ⟨j, rfl, .inl (by trans q; rw [hh]; left; exact (Relation.reflTransGen_swap.mpr r))⟩
-      | high hh => rename_i j; exact ⟨j, rfl, .inr (by trans q; rw [hh]; left; exact (Relation.reflTransGen_swap.mpr r))⟩
-  · intro h
-    cases h with
-    | inl h => rw [h]; left
-    | inr h =>
-      rcases h with ⟨j, hj, h⟩
-      rw [hj]
-      cases h with
-      | inl h =>
-        apply Relation.reflTransGen_swap.mp
-        right
-        · apply Relation.reflTransGen_swap.mpr; exact h
-        · left; rfl
-      | inr h =>
-        apply Relation.reflTransGen_swap.mp
-        right
-        · apply Relation.reflTransGen_swap.mpr; exact h
-        · right; rfl
-
 lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p → p = (.terminal b) := by
   intro h
   cases Relation.reflTransGen_swap.mp h with
@@ -99,7 +67,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
         cases Pointer.Reachable_iff.mp hy with
         | inl hhh =>
           simp only at hhh
-          simp_rw [hh, hhh]
+          simp_rw [← hh, hhh]
         | inr hhh =>
           rcases hhh with ⟨j, hj, hhh⟩
           simp only at hj
@@ -109,7 +77,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
           simp at hhh
           rcases hhh with hhh | hhh <;>
           apply Pointer.eq_terminal_of_reachable at hhh <;>
-          simp_rw [hh, hhh] at hxy <;>
+          simp_rw [← hh, hhh] at hxy <;>
           simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
           unfold OBdd.toTree at hxy <;>
           simp at hxy
@@ -124,7 +92,7 @@ def var (n : Nat) : ROBdd n.succ 1 :=
           simp only at hhh
           rcases hh with hh | hh <;>
           apply Pointer.eq_terminal_of_reachable at hh <;>
-          simp_rw [hh, hhh] at hxy <;>
+          simp_rw [hh, ← hhh] at hxy <;>
           simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
           unfold OBdd.toTree at hxy <;>
           simp at hxy

@@ -1309,41 +1309,51 @@ lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachabl
     rw [← same_heap]; exact reachable_of_edge e
 termination_by O
 
+lemma Pointer.Reachable_iff {M : Vector (Node n m) m } :
+  Pointer.Reachable M r p ↔ (r = p ∨ (∃ j, r = .node j ∧ (Pointer.Reachable M M[j].low p ∨ Pointer.Reachable M M[j].high p))) := by
+  constructor
+  · intro h
+    cases Relation.reflTransGen_swap.mp h with
+    | refl =>
+      left
+      rfl
+    | tail r e =>
+      rename_i q
+      right
+      cases e with
+      | low  hh => rename_i j; exact ⟨j, rfl, .inl (by trans q; rw [hh]; left; exact (Relation.reflTransGen_swap.mpr r))⟩
+      | high hh => rename_i j; exact ⟨j, rfl, .inr (by trans q; rw [hh]; left; exact (Relation.reflTransGen_swap.mpr r))⟩
+  · intro h
+    cases h with
+    | inl h => rw [h]; left
+    | inr h =>
+      rcases h with ⟨j, hj, h⟩
+      rw [hj]
+      cases h with
+      | inl h =>
+        apply Relation.reflTransGen_swap.mp
+        right
+        · apply Relation.reflTransGen_swap.mpr; exact h
+        · left; rfl
+      | inr h =>
+        apply Relation.reflTransGen_swap.mp
+        right
+        · apply Relation.reflTransGen_swap.mpr; exact h
+        · right; rfl
+
+
 lemma OBdd.reachable_or_eq_low_high {O : OBdd n m} :
     Reachable O.1.heap O.1.root p → (O.1.root = p ∨ (∃ j, ∃ (h : O.1.root = node j), (Reachable O.1.heap (O.low h).1.root p ∨ Reachable O.1.heap (O.high h).1.root p))) := by
-  intro r
-  cases (Relation.reflTransGen_swap.mp r) with
-  | refl => left; rfl
-  | tail t e =>
-    rcases O_def: O with ⟨⟨heap, root⟩, o⟩
-    simp only
-    have O_root_def : O.1.root = root := by rw [O_def]
-    cases root with
-    | terminal b =>
-      rw [O_root_def] at e
-      contradiction
-    | node j =>
-      right
-      use j
-      use rfl
-      rw [O_root_def] at e
-      cases e with
-      | low h =>
-        left
-        apply (Relation.reflTransGen_swap.mp) at t
-        rw [← h] at t
-        simp_rw [← O_def]
-        have O_heap_def : O.1.heap = heap := by rw [O_def]
-        nth_rw 1 [O_heap_def] at t
-        exact t
-      | high h =>
-        right
-        apply (Relation.reflTransGen_swap.mp) at t
-        rw [← h] at t
-        simp_rw [← O_def]
-        have O_heap_def : O.1.heap = heap := by rw [O_def]
-        nth_rw 1 [O_heap_def] at t
-        exact t
+  intro hr
+  cases Reachable_iff.mp hr with
+  | inl => left; assumption
+  | inr h =>
+    right
+    rcases h with ⟨j, O_root_def, hj⟩
+    use j, O_root_def
+    cases hj with
+    | inl hl => left;  simpa [low, Bdd.low]
+    | inr hh => right; simpa [high, Bdd.high]
 
 lemma OBdd.collect_spec' {O : OBdd n m} {j : Fin m} {I : Vector Bool m × List (Fin m)} :
     Reachable O.1.heap O.1.root (node j) →
