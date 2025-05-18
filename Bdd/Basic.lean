@@ -2723,3 +2723,30 @@ lemma OBdd.numPointers_le {O : OBdd n m} : O.numPointers ≤ 2 ^ n - 1 := by
   · simp only [Nat.succ_eq_add_one, tsub_le_iff_right]
     rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
     apply Nat.pow_le_pow_right <;> omega
+
+def OBdd.evaluate' (O : OBdd n m) : Vector Bool n → Bool := fun I ↦
+  match h : O.1.root with
+  | terminal b => b
+  | node j => if I[O.1.heap[j].var] then (O.high h).evaluate' I else (O.low h).evaluate' I
+termination_by O
+
+lemma OBdd.evaluate_evaluate' {O : OBdd n m }: evaluate O = evaluate' O := by
+  ext I
+  unfold evaluate'
+  split
+  next b hb => simp [evaluate_terminal' hb]
+  next j hj =>
+    have := evaluate_evaluate' (O := O.low hj)
+    have := evaluate_evaluate' (O := O.high hj)
+    simp [evaluate_node'' hj, *]
+termination_by O
+
+lemma OBdd.evaluate'_terminal {O : OBdd n m} : O.1.root = terminal b → O.evaluate' = Function.const _ b := by
+  rw [← evaluate_evaluate']
+  exact evaluate_terminal'
+
+lemma OBdd.evaluate'_node {O : OBdd n m} (h : O.1.root = node j) :
+    O.evaluate' = fun I ↦ if I[O.1.heap[j].var] then (O.high h).evaluate' I else (O.low h).evaluate' I := by
+  rw [← evaluate_evaluate']
+  rw [evaluate_node'' h]
+  simp [evaluate_evaluate']
