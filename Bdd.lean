@@ -4,6 +4,7 @@ import Bdd.Apply
 import Bdd.Compactify
 import Bdd.Relabel
 import Bdd.Nary
+import Bdd.Choice
 
 lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p → p = (.terminal b) := by
   intro h
@@ -347,6 +348,49 @@ private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
 instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
 
+def choice {B : BDD} (s : ∃ I, B.denotation (le_refl ..) I) : Vector Bool B.nvars := Choice.choice B.robdd.1 (by simp_all [denotation])
+
+@[simp]
+lemma choice_spec {B : BDD} {s : ∃ I, B.denotation (le_refl ..) I} : B.denotation (le_refl ..) (B.choice s) = true := by
+  simp [choice, denotation, Choice.choice_spec B.robdd.2 (by simp_all [denotation])]
+
+private lemma find_aux {B : BDD} :
+    ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool (max B.nvars 0)), B.denotation (by simp) I := by
+  intro h
+  contrapose h
+  simp_all only [not_exists, Bool.not_eq_true, SemanticEquiv, const_nvars, const_denotation, not_not]
+  ext x
+  simp only [Function.const_apply]
+  apply h
+
+private lemma find_aux' {B : BDD} :
+    ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool B.nvars), B.denotation (by simp) I := by
+  intro h
+  rcases find_aux h with ⟨I, hI⟩
+  use ((show (max B.nvars 0) = B.nvars by simp) ▸ I)
+  rw [← hI]
+  clear hI
+  congr! <;> simp
+
+def find {B : BDD} : Option (Vector Bool B.nvars) :=
+  match instDecidableSemacticEquiv B (const false) with
+  | isTrue _ => none
+  | isFalse hf => some (choice (find_aux' hf))
+
+def find_none {B : BDD} : B.find.isNone → B.SemanticEquiv (const false) := by
+  intro h
+  simp only [find] at h
+  split at h
+  next ht _ => exact ht
+  next hf _ => contradiction
+
+def find_some {B : BDD} {I : Vector Bool B.nvars} : B.find = some I → B.denotation (le_refl ..) I = true := by
+  intro h
+  simp only [find] at h
+  split at h
+  next ht _ => contradiction
+  next hf _ => injection h with heq; simp [← heq]
+
 instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn (B.denotation (le_refl ..))) := by
   suffices s : Nary.DependsOn (B.denotation (le_refl ..)) = B.robdd.1.1.usesVar by rw [s]; infer_instance
   simp [denotation]
@@ -358,7 +402,7 @@ end BDD
 -- #eval (BDD.const true).robdd.1
 -- #eval! (BDD.var 3).robdd.1
 -- #eval! (BDD.var 3).not.robdd.1
--- #eval! (BDD.and (BDD.var 3) (BDD.var 4).not).robdd.1
+-- #eval! (BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).find
 -- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
 --#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
 -- #eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
