@@ -1,4 +1,5 @@
 import Bdd.Basic
+import Bdd.Collect
 
 open Pointer
 open Bdd
@@ -43,12 +44,12 @@ lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
 /-- Return a vector whose `v`th entry is a list of node indices with variable index `v`.
 
 This is a subroutine of `reduce`.  -/
-def OBdd.discover (O : OBdd n m) : Vector (List (Fin m)) n := discover_helper (collect O) O.1.heap (Vector.replicate n [])
+def OBdd.discover (O : OBdd n m) : Vector (List (Fin m)) n := discover_helper (Collect.collect O) O.1.heap (Vector.replicate n [])
 
 /-- `discover` is correct. -/
 theorem OBdd.discover_spec {O : OBdd n m} {j : Fin m} :
     (Reachable O.1.heap O.1.root (node j)) → j ∈ (discover O).get O.1.heap[j].var :=
-  (discover_helper_spec O) ∘ collect_spec
+  (discover_helper_spec O) ∘ Collect.collect_spec
 
 /-- `discover` is correct. -/
 theorem OBdd.discover_spec_reverse {O : OBdd n m} {j : Fin m} :
