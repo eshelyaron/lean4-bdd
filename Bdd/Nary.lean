@@ -8,7 +8,7 @@ abbrev Func n α β := Vector α n → β
 @[simp]
 def IndependentOf (f : Func n α β) (i : Fin n) := ∀ a v, f v = f (Vector.set v i a)
 
-/-- `DependsOn i` if the output of `f` depends on the value of the `i`th input. -/
+/-- `DependsOn f i` if the output of `f` depends on the value of the `i`th input. -/
 @[simp]
 def DependsOn (f : Func n α β) (i : Fin n) := ¬ IndependentOf f i
 
@@ -75,5 +75,13 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
       simp_all only [DependsOn, IndependentOf, not_forall, Fin.getElem_fin, forall_exists_index,
         Fin.natCast_eq_last, Fin.val_last, Vector.getElem_push_eq, Vector.pop_push,
         Fin.coe_castSucc]
+
+@[simp]
+def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦ f (I.set i a)
+
+@[simp]
+lemma restrict_const : restrict (Function.const _ b) c i = (Function.const _ b) := by ext; simp
+
+lemma restrict_independetOf : IndependentOf (restrict f c i) i := by simp
 
 end Nary
