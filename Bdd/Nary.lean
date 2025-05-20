@@ -82,6 +82,6 @@ def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦
 @[simp]
 lemma restrict_const : restrict (Function.const _ b) c i = (Function.const _ b) := by ext; simp
 
-lemma restrict_independetOf : IndependentOf (restrict f c i) i := by simp
+lemma restrict_independentOf : IndependentOf (restrict f c i) i := by simp
 
 end Nary

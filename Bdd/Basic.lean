@@ -1253,6 +1253,8 @@ lemma OBdd.lift_trivial_eq {n n' m : Nat} {h : n = n'} {O : OBdd n m} : (O.lift 
     simp
 
 lemma Bdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : (B.lift h).root = B.root := by simp
+
+@[simp]
 lemma OBdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).1.root = O.1.root := Bdd.lift_preserves_root
 lemma OBdd.lift_low {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).low O_root_def = (O.low O_root_def).lift h := by
   simp only [low, lift, Bdd.lift, lift_heap]
