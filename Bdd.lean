@@ -219,12 +219,12 @@ lemma var_denotation : (var i).denotation h I = I[i] := by
 abbrev denotation' O := denotation O (le_refl _)
 
 private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars)} :
-    (apply op B C).denotation' (apply_nvars ▸ I) =
+    (apply op B C).denotation' (Vector.cast (Eq.symm apply_nvars) I) =
     (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I)) := by
   let motive : BDD → Prop :=
     fun D ↦
       ∀ (h : D.nvars = B.nvars ⊔ C.nvars),
-        D.denotation' (h ▸ I) =
+        D.denotation' (Vector.cast (Eq.symm h) I) =
         (op (B.denotation (Nat.le_max_left ..) I) (C.denotation (Nat.le_max_right ..) I))
   apply apply_induction (motive := motive) (op := op) (B := B) (C := C)
   · intro heq h
@@ -251,22 +251,29 @@ private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars
 
 private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation' I =
-    ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (apply_nvars ▸ I) ) := by
+    ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (Vector.cast apply_nvars I) ) := by
   simp only [denotation]
   simp only [← OBdd.evaluate_evaluate', OBdd.lift_evaluate]
   congr!
   · exact apply_nvars
-  · exact HEq.symm (eqRec_heq apply_nvars I)
+  · refine heq_of_eqRec_eq (congrArg (Vector Bool) ?_) ?_
+    simp
+    simp [Vector.cast]
+    congr <;> simp
 
 @[simp]
 lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation' I =
-    (op (B.denotation (Nat.le_max_left ..) (apply_nvars ▸ I)) (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
+    (op (B.denotation (Nat.le_max_left ..) (Vector.cast apply_nvars I)) (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := by
   rw [apply_cast_nvars]
   convert apply_spec'
   · exact symm apply_nvars
   · exact apply_nvars
-  · simp_all only [heq_eqRec_iff_heq, heq_eq_eq]
+  · refine heq_of_eqRec_eq (congrArg (Vector Bool) ?_) ?_
+    simp
+    simp [Vector.cast]
+    congr
+    simp
 
 @[simp]
 lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nvars
@@ -274,8 +281,8 @@ lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nva
 @[simp]
 lemma and_spec {B C : BDD} {I : Vector Bool (B.and C).nvars} :
     (B.and C).denotation' I =
-    ((B.denotation (Nat.le_max_left  ..) (and_nvars ▸ I)) &&
-     (C.denotation (Nat.le_max_right ..) (and_nvars ▸ I))) := apply_spec
+    ((B.denotation (Nat.le_max_left  ..) (Vector.cast and_nvars I)) &&
+     (C.denotation (Nat.le_max_right ..) (Vector.cast and_nvars I))) := apply_spec
 
 @[simp]
 lemma or_nvars {B C : BDD} : (B.or C).nvars = B.nvars ⊔ C.nvars := apply_nvars
@@ -283,14 +290,14 @@ lemma or_nvars {B C : BDD} : (B.or C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 @[simp]
 lemma or_spec {B C : BDD} {I : Vector Bool (B.or C).nvars} :
     (B.or C).denotation' I =
-    ((B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
-     (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := apply_spec
+    ((B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ||
+     (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := apply_spec
 
 @[simp]
 lemma imp_spec {B C : BDD} {I : Vector Bool (B.imp C).nvars} :
     (B.imp C).denotation' I =
-    (!(B.denotation (Nat.le_max_left  ..) (apply_nvars ▸ I)) ||
-      (C.denotation (Nat.le_max_right ..) (apply_nvars ▸ I))) := by
+    (!(B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ||
+      (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := by
   simp only [imp, apply_spec]
 
 @[simp]
@@ -299,7 +306,7 @@ lemma not_nvars {B : BDD} : B.not.nvars = B.nvars := by
 
 @[simp]
 lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
-    B.not.denotation' I = ! B.denotation' (not_nvars ▸ I) := by
+    B.not.denotation' I = ! B.denotation' (Vector.cast not_nvars I) := by
   simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
   congr!
   simp [zero_le, sup_of_le_left]
