@@ -170,6 +170,7 @@ lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars :=
 
 def and : BDD → BDD → BDD := apply Bool.and
 def or  : BDD → BDD → BDD := apply Bool.or
+def xor : BDD → BDD → BDD := apply Bool.xor
 def imp : BDD → BDD → BDD := apply (! · || ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
@@ -191,9 +192,7 @@ lemma const_nvars : (const b).nvars = 0 := rfl
 
 @[simp]
 lemma const_denotation : (const b).denotation h = Function.const _ b := by
-  simp only [denotation, const, ROBdd.const]
-  apply OBdd.evaluate'_terminal
-  rw [OBdd.lift_preserves_root]
+  simp [denotation, const, ROBdd.const, OBdd.evaluate'_terminal _]
 
 @[simp]
 lemma var_nvars : (var i).nvars = i + 1 := rfl
@@ -264,7 +263,8 @@ private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).
 @[simp]
 lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     (apply op B C).denotation' I =
-    (op (B.denotation (Nat.le_max_left ..) (Vector.cast apply_nvars I)) (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := by
+    (op (B.denotation (le_max_left ..)  (Vector.cast apply_nvars I))
+        (C.denotation (le_max_right ..) (Vector.cast apply_nvars I))) := by
   rw [apply_cast_nvars]
   convert apply_spec'
   · exact symm apply_nvars
@@ -291,6 +291,15 @@ lemma or_nvars {B C : BDD} : (B.or C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 lemma or_spec {B C : BDD} {I : Vector Bool (B.or C).nvars} :
     (B.or C).denotation' I =
     ((B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ||
+     (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := apply_spec
+
+@[simp]
+lemma xor_nvars {B C : BDD} : (B.xor C).nvars = B.nvars ⊔ C.nvars := apply_nvars
+
+@[simp]
+lemma xor_spec {B C : BDD} {I : Vector Bool (B.xor C).nvars} :
+    (B.xor C).denotation' I =
+    ((B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ^^
      (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := apply_spec
 
 @[simp]
@@ -331,7 +340,7 @@ lemma relabel_id {B : BDD} : B.relabel id (by simp) (fun _ _ _ _ _ ↦ by simpa)
 lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
 
 @[simp]
-lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu}  {I : Vector Bool (relabel B f hf hu).nvars} :
+lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu} {I} :
     (relabel B f hf hu).denotation' I = B.denotation' (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
   simp [denotation, ← OBdd.evaluate_evaluate', relabel]
 
