@@ -2143,3 +2143,9 @@ lemma OBdd.evaluate'_node {O : OBdd n m} (h : O.1.root = node j) :
   rw [← evaluate_evaluate']
   rw [evaluate_node'' h]
   simp [evaluate_evaluate']
+
+lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p → p = (.terminal b) := by
+  intro h
+  cases Relation.reflTransGen_swap.mp h with
+  | refl => rfl
+  | tail => contradiction
