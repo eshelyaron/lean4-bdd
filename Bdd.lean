@@ -418,12 +418,57 @@ instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.deno
   ext i
   exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2)
 
+lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) : B.denotation hn I = B.denotation hm (Vector.cast h I) := by
+  subst h
+  simp
+
+def bforall (B : BDD) (i : Fin B.nvars) : BDD := (and (B.restrict false i) (B.restrict true i))
+
+@[simp]
+lemma bforall_nvars {B : BDD} {i} : (B.bforall i).nvars = B.nvars := by simp [bforall]
+
+@[simp]
+lemma bforall_spec {B : BDD} {i} {I} : (B.bforall i).denotation' I = (∀ b, B.denotation' (Vector.cast bforall_nvars (I.set i b))) := by
+  simp only [denotation', bforall, and_spec, Bool.and_eq_true, Bool.forall_bool, eq_iff_iff]
+  have := restrict_spec (B := B) (i := i) (b := false)
+  simp only [denotation'] at this
+  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict false i).nvars := by simp
+  rw [denotation_cast (hn := by simp) (hm := by simp) that]
+  rw [this]
+  have := restrict_spec (B := B) (i := i) (b := true)
+  simp only [denotation'] at this
+  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict true i).nvars := by simp
+  rw [denotation_cast (hn := by simp) (hm := by simp) that]
+  rw [this]
+  rfl
+
+def bexists (B : BDD) (i : Fin B.nvars) : BDD := (or (B.restrict false i) (B.restrict true i))
+
+@[simp]
+lemma bexists_nvars {B : BDD} {i} : (B.bexists i).nvars = B.nvars := by simp [bexists]
+
+@[simp]
+lemma bexists_spec {B : BDD} {i} {I} : (B.bexists i).denotation' I = (∃ b, B.denotation' (Vector.cast bexists_nvars (I.set i b))) := by
+  simp only [denotation', bexists, or_spec, Bool.or_eq_true, Bool.exists_bool, eq_iff_iff]
+  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict false i).nvars := by simp
+  rw [denotation_cast (hn := by simp) (hm := by simp) that]
+  have := restrict_spec (B := B) (i := i) (b := false)
+  simp only [denotation'] at this
+  rw [this]
+  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict true i).nvars := by simp
+  rw [denotation_cast (hn := by simp) (hm := by simp) that]
+  have := restrict_spec (B := B) (i := i) (b := true)
+  simp only [denotation'] at this
+  rw [this]
+  rfl
+
 end BDD
 
 -- #eval (BDD.const true).robdd.1
 -- #eval! (BDD.var 3).robdd.1
 -- #eval! (BDD.var 3).not.robdd.1
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict false ⟨0, by simp⟩).robdd.1
+--#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).robdd.1
+--#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bexists ⟨1, by simp⟩).robdd.1
 --#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict true ⟨0, by simp⟩).robdd.1
 -- #eval! (BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).robdd.1
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict true ⟨1, by simp⟩).robdd.1
