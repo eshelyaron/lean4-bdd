@@ -176,6 +176,11 @@ def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 def denotation (B : BDD) {n : Nat} (h : B.nvars ≤ n) : Vector Bool n → Bool := (B.robdd.1.lift h).evaluate'
 
+@[simp]
+lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) : B.denotation hm (Vector.cast h I) = B.denotation hn I := by
+  subst h
+  simp
+
 lemma nvars_spec {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
     Nary.IndependentOf (B.denotation h1) i := by
   rintro b I
@@ -248,23 +253,23 @@ private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars
     congr <;> rw [OBdd.evaluate_evaluate'] <;> rfl
   · exact apply_nvars
 
+@[simp]
+private lemma Vector.heq_cast : HEq I (Vector.cast h I) := by
+  refine heq_of_eqRec_eq (congrArg _ ?_) ?_ <;> simp_all [Vector.cast]
+  congr <;> simp_all
+
 private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
-    (apply op B C).denotation' I =
+    (apply op B C).denotation (le_refl _) I =
     ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (Vector.cast apply_nvars I) ) := by
   simp only [denotation]
   simp only [← OBdd.evaluate_evaluate', OBdd.lift_evaluate]
-  congr!
-  · exact apply_nvars
-  · refine heq_of_eqRec_eq (congrArg (Vector Bool) ?_) ?_
-    simp
-    simp [Vector.cast]
-    congr <;> simp
+  congr <;> simp
 
-@[simp]
-lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
-    (apply op B C).denotation' I =
-    (op (B.denotation (le_max_left ..)  (Vector.cast apply_nvars I))
-        (C.denotation (le_max_right ..) (Vector.cast apply_nvars I))) := by
+private lemma apply_spec'' {B C : BDD} {op} {I : Vector Bool n} {h : n = (apply op B C).nvars} :
+    (apply op B C).denotation (by omega) I =
+    (op (B.denotation (le_max_left B.nvars C.nvars) (Vector.cast (by simp_all) I))
+        (C.denotation (le_max_right B.nvars C.nvars) (Vector.cast (by simp_all) I))) := by
+  subst h
   rw [apply_cast_nvars]
   convert apply_spec'
   · exact symm apply_nvars
@@ -275,50 +280,83 @@ lemma apply_spec {B C : BDD} {op} {I : Vector Bool (apply op B C).nvars} :
     congr
     simp
 
+private lemma denotation_take {B : BDD} {hn : B.nvars ≤ n} {hm1 : B.nvars ≤ m} {hm2 : m ≤ n}:
+    B.denotation hn I = B.denotation (by simp_all) (I.take m) := by
+  simp [denotation']
+  simp [denotation, ← OBdd.evaluate_evaluate']
+  congr!
+  omega
+
+private lemma denotation_take' {B : BDD} {hn : B.nvars ≤ n} :
+    B.denotation hn I = B.denotation (le_refl _) (Vector.cast (by simp_all) (I.take B.nvars)) := by
+  simp [denotation', denotation, ← OBdd.evaluate_evaluate']
+
+@[simp]
+lemma apply_denotation {B C : BDD} {op} {I : Vector Bool n} {h} :
+    (apply op B C).denotation h I =
+    (op (B.denotation (by simp_all) I) (C.denotation (by simp_all) I)) := by
+  rw [denotation_take (m := max B.nvars C.nvars) (hm1 := by simp_all) (hm2 := by simp_all)]
+  rw [apply_spec'']
+  swap; simp_all
+  congr 1
+  · rw [denotation_cast (m := max B.nvars C.nvars)]
+    swap; simp_all
+    simp only [denotation, ← OBdd.evaluate_evaluate']
+    simp only [OBdd.Reduced.eq_1, Bdd.Ordered.eq_1, Vector.take_eq_extract, OBdd.lift_evaluate,
+      Vector.extract_extract, Nat.add_zero, Nat.sub_zero, Vector.cast_cast]
+    congr 1
+    have : (min (0 + B.nvars) (max B.nvars C.nvars)) = B.nvars := by omega
+    simp only [Vector.cast_eq_cast]
+    ext i
+    simp_all
+    congr! <;> simp_all
+  · rw [denotation_cast (m := max B.nvars C.nvars)]
+    swap; simp_all
+    simp only [denotation, ← OBdd.evaluate_evaluate']
+    simp only [OBdd.Reduced.eq_1, Bdd.Ordered.eq_1, Vector.take_eq_extract, OBdd.lift_evaluate,
+      Vector.extract_extract, Nat.add_zero, Nat.sub_zero, Vector.cast_cast]
+    congr 1
+    have : (min (0 + B.nvars) (max B.nvars C.nvars)) = B.nvars := by omega
+    simp only [Vector.cast_eq_cast]
+    ext i
+    simp_all
+    congr! <;> simp_all
+
 @[simp]
 lemma and_nvars {B C : BDD} : (B.and C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 
 @[simp]
-lemma and_spec {B C : BDD} {I : Vector Bool (B.and C).nvars} :
-    (B.and C).denotation' I =
-    ((B.denotation (Nat.le_max_left  ..) (Vector.cast and_nvars I)) &&
-     (C.denotation (Nat.le_max_right ..) (Vector.cast and_nvars I))) := apply_spec
+lemma and_denotation {B C : BDD} {I : Vector Bool n} {h} :
+    (B.and C).denotation h I = ((B.denotation (by simp_all) I) && (C.denotation (by simp_all) I)) := apply_denotation
 
 @[simp]
 lemma or_nvars {B C : BDD} : (B.or C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 
 @[simp]
-lemma or_spec {B C : BDD} {I : Vector Bool (B.or C).nvars} :
-    (B.or C).denotation' I =
-    ((B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ||
-     (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := apply_spec
+lemma or_denotation {B C : BDD} {I : Vector Bool n} {h} :
+    (B.or C).denotation h I = ((B.denotation (by simp_all) I) || (C.denotation (by simp_all) I)) := apply_denotation
 
 @[simp]
 lemma xor_nvars {B C : BDD} : (B.xor C).nvars = B.nvars ⊔ C.nvars := apply_nvars
 
 @[simp]
-lemma xor_spec {B C : BDD} {I : Vector Bool (B.xor C).nvars} :
-    (B.xor C).denotation' I =
-    ((B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ^^
-     (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := apply_spec
+lemma xor_denotation {B C : BDD} {I : Vector Bool n} {h} :
+    (B.xor C).denotation h I = ((B.denotation (by simp_all) I) ^^ (C.denotation (by simp_all) I)) := apply_denotation
 
 @[simp]
-lemma imp_spec {B C : BDD} {I : Vector Bool (B.imp C).nvars} :
-    (B.imp C).denotation' I =
-    (!(B.denotation (Nat.le_max_left  ..) (Vector.cast apply_nvars I)) ||
-      (C.denotation (Nat.le_max_right ..) (Vector.cast apply_nvars I))) := by
-  simp only [imp, apply_spec]
+lemma imp_nvars {B C : BDD} : (B.imp C).nvars = B.nvars ⊔ C.nvars := apply_nvars
+
+@[simp]
+lemma imp_denotation {B C : BDD} {I : Vector Bool n} {h} :
+    (B.imp C).denotation h I = (!(B.denotation (by simp_all) I) || (C.denotation (by simp_all) I)) := apply_denotation
 
 @[simp]
 lemma not_nvars {B : BDD} : B.not.nvars = B.nvars := by
   simp only [not, imp, apply_nvars, const_nvars, zero_le, sup_of_le_left]
 
 @[simp]
-lemma not_spec {B : BDD} {I : Vector Bool B.not.nvars} :
-    B.not.denotation' I = ! B.denotation' (Vector.cast not_nvars I) := by
-  simp only [not, imp_spec, const_nvars, const_denotation, Function.const_apply, Bool.or_false]
-  congr!
-  simp [zero_le, sup_of_le_left]
+lemma not_denotation {B : BDD} {I : Vector Bool n} {h} :
+    B.not.denotation h I = ! B.denotation (by simp_all) I := by simp [not]
 
 def relabel (B : BDD) (f : Nat → Nat)
     (h1 : ∀ i : Fin B.nvars, f i < f B.nvars)
@@ -339,10 +377,21 @@ lemma relabel_id {B : BDD} : B.relabel id (by simp) (fun _ _ _ _ _ ↦ by simpa)
 @[simp]
 lemma relabel_nvars {B : BDD} {f : Nat → Nat} {hf} {hu} : (relabel B f hf hu).nvars = f B.nvars := rfl
 
-@[simp]
-lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu} {I} :
-    (relabel B f hf hu).denotation' I = B.denotation' (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
+private lemma relabel_spec {B : BDD} {f : Nat → Nat} {hf} {hu} {I} :
+    (relabel B f hf hu).denotation (le_refl _) I = B.denotation' (Vector.ofFn (fun i ↦ I[f i]'(hf i))) := by
   simp [denotation, ← OBdd.evaluate_evaluate', relabel]
+
+@[simp]
+lemma relabel_denotation {B : BDD} {f : Nat → Nat} {hf} {hu} {I : Vector Bool n} {h} :
+    (relabel B f hf hu).denotation h I =
+    B.denotation (by simp_all) (Vector.ofFn (fun i : Fin B.nvars ↦ I[f i]'(by have := hf i; rw [relabel_nvars] at h; omega))) := by
+  rw [denotation_take']
+  rw [relabel_spec]
+  simp only [denotation']
+  congr
+  ext i
+  simp only [relabel_nvars, Vector.getElem_cast]
+  apply Vector.getElem_take
 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
@@ -416,10 +465,31 @@ def restrict (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
 lemma restrict_nvars {B : BDD} {i} : (B.restrict b i).nvars = B.nvars := by simp only [restrict]
 
 @[simp]
-lemma restrict_spec {B : BDD} {i} : (B.restrict b i).denotation' = Nary.restrict B.denotation' b i := by
+private lemma restrict_spec {B : BDD} {i} {h1 : _ ≤ m} {h2 : m = B.nvars} :
+    (B.restrict b i).denotation h1 = Nary.restrict (B.denotation h1) b ⟨i.1, by omega⟩ := by
+  subst h2
   simp only [restrict, denotation, OBdd.lift_trivial_eq, ← OBdd.evaluate_evaluate', compactify_evaluate]
   simp_rw [← reduce'_spec.2]
   simp [Restrict.orestrict_evaluate]
+
+@[simp]
+private lemma Vector.cast_set {v : Vector α n} {i : Fin m} :
+  (Vector.cast h v).set i a = Vector.cast h (v.set i a) := by rfl
+
+@[simp]
+lemma restrict_denotation {B : BDD} {i} {I : Vector Bool n} {h} :
+    (B.restrict b i).denotation h I = (Nary.restrict (B.denotation (by simp_all)) b ⟨i.1, by simp_all; omega⟩) I := by
+  rw [denotation_take']
+  simp only [restrict_nvars, restrict_spec, Nary.restrict, Vector.cast_set]
+  rw [denotation_cast]
+  swap; simp_all
+  nth_rw 2 [denotation_take (m := (B.restrict b i).nvars)] <;> simp_all
+  congr
+  rw [Vector.extract_set]
+  simp
+  split
+  next => simp_all
+  next c => absurd c; simp_all; omega
 
 instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := by
   suffices s : Nary.DependsOn B.denotation' = B.robdd.1.1.usesVar by rw [s]; infer_instance
@@ -427,49 +497,138 @@ instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.deno
   ext i
   exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2)
 
-lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) : B.denotation hn I = B.denotation hm (Vector.cast h I) := by
-  subst h
-  simp
-
 def bforall (B : BDD) (i : Fin B.nvars) : BDD := (and (B.restrict false i) (B.restrict true i))
 
 @[simp]
 lemma bforall_nvars {B : BDD} {i} : (B.bforall i).nvars = B.nvars := by simp [bforall]
 
+lemma bforall_spec {B : BDD} {i} {I} : (B.bforall i).denotation' I = ((∀ b, B.denotation (by simp) (I.set i b)) : Bool) := by simp [bforall]
+
 @[simp]
-lemma bforall_spec {B : BDD} {i} {I} : (B.bforall i).denotation' I = (∀ b, B.denotation' (Vector.cast bforall_nvars (I.set i b))) := by
-  simp only [denotation', bforall, and_spec, Bool.and_eq_true, Bool.forall_bool, eq_iff_iff]
-  have := restrict_spec (B := B) (i := i) (b := false)
-  simp only [denotation'] at this
-  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict false i).nvars := by simp
-  rw [denotation_cast (hn := by simp) (hm := by simp) that]
-  rw [this]
-  have := restrict_spec (B := B) (i := i) (b := true)
-  simp only [denotation'] at this
-  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict true i).nvars := by simp
-  rw [denotation_cast (hn := by simp) (hm := by simp) that]
-  rw [this]
-  rfl
+lemma bforall_denotation {B : BDD} {i} {I : Vector Bool n} {h} :
+    (B.bforall i).denotation h I = ((∀ b, B.denotation (by simp_all) (I.set i b (by simp_all; omega))) : Bool) := by
+  simp only [Bool.forall_bool, Bool.decide_and, Bool.decide_eq_true]
+  nth_rw 1 [denotation_take']
+  simp only [bforall_spec, Bool.forall_bool, Bool.decide_and, Bool.decide_eq_true]
+  congr 1
+  · rw [show ((Vector.cast _ (I.take (B.bforall i).nvars)).set i.1 false _) = (Vector.cast _ ((I.take (B.bforall i).nvars).set i.1 false (by simp_all))) by rfl]
+    rw [denotation_cast]
+    nth_rw 2 [denotation_take (m := ((B.bforall i).nvars))] <;> simp_all
+    congr
+    rw [Vector.extract_set]
+    simp
+    split
+    next => simp_all
+    next c => absurd c; simp_all; omega
+    simp_all
+    simp_all
+  · rw [show ((Vector.cast _ (I.take (B.bforall i).nvars)).set i.1 true _) = (Vector.cast _ ((I.take (B.bforall i).nvars).set i.1 true (by simp_all))) by rfl]
+    rw [denotation_cast]
+    nth_rw 2 [denotation_take (m := ((B.bforall i).nvars))] <;> simp_all
+    congr
+    rw [Vector.extract_set]
+    simp
+    split
+    next => simp_all
+    next c => absurd c; simp_all; omega
+    simp_all
+    simp_all
+
+@[simp]
+lemma bforall_idem {B : BDD} {i} {I : Vector Bool n} {h} :
+    ((B.bforall i).bforall ⟨i, by simp⟩).denotation h I = (B.bforall i).denotation (by simp_all) I := by
+  repeat (rw [bforall_denotation]; simp)
+
+lemma bforall_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
+    ((B.bforall i).bforall ⟨j, by simp⟩).denotation h I = ((B.bforall j).bforall ⟨i, by simp⟩).denotation (by simp_all) I := by
+  simp only [bforall_denotation, Bool.forall_bool, Bool.decide_and, Bool.decide_eq_true, Bool.and_eq_true]
+  cases decEq j.1 i.1 with
+  | isTrue ht => simp_rw [ht]
+  | isFalse hf =>
+    rw [show ((I.set (↑j) false _).set (↑i) false _) = _ by refine Vector.set_comm _ _ hf]
+    rw [show ((I.set (↑j) false _).set (↑i) true  _) = _ by refine Vector.set_comm _ _ hf]
+    rw [show ((I.set (↑j) true  _).set (↑i) false _) = _ by refine Vector.set_comm _ _ hf]
+    rw [show ((I.set (↑j) true  _).set (↑i) true  _) = _ by refine Vector.set_comm _ _ hf]
+    rw [Bool.and_assoc]
+    rw [Bool.and_assoc]
+    congr 1
+    conv =>
+      rhs
+      rw [Bool.and_comm]
+      rw [Bool.and_assoc]
+    congr 1
+    rw [Bool.and_comm]
+
+-- @[simp]
+-- private lemma List.length_cast {l : List (Fin n)} {h : n = m} : (h ▸ l).length = l.length := by
+--   subst h
+--   simp
+
+-- def bforalls (B : BDD) (l : List (Fin B.nvars)) : BDD :=
+--   match l with
+--   | [] => B
+--   | i :: t => (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t)
+-- termination_by l.length
+
+-- @[simp]
+-- lemma bforalls_nvars {B : BDD} {l} : (B.bforalls l).nvars = B.nvars := by
+--   unfold bforalls
+--   split
+--   next => simp
+--   next i t =>
+--     simp_rw [show B.nvars = (B.bforall i).nvars by simp]
+--     exact bforalls_nvars
+-- termination_by l.length
+
+-- @[simp]
+-- lemma bforalls_nil {B : BDD} : B.bforalls [] = B := by simp only [bforalls]
+
+-- @[simp]
+-- lemma bforalls_zero_length {B : BDD} {l} (h : l.length = 0) : B.bforalls l = B := by simp_all
+
+-- @[simp]
+-- lemma bforalls_one {B : BDD} {i} : (B.bforalls [i]) = (B.bforall i) := by simp [bforalls]
+
+-- @[simp]
+-- lemma bforalls_cons {B : BDD} {i} {t} : (B.bforalls (i :: t)) = (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t) := by
+--   simp [bforalls]
 
 def bexists (B : BDD) (i : Fin B.nvars) : BDD := (or (B.restrict false i) (B.restrict true i))
 
 @[simp]
 lemma bexists_nvars {B : BDD} {i} : (B.bexists i).nvars = B.nvars := by simp [bexists]
 
+private lemma bexists_spec {B : BDD} {i} {I} : (B.bexists i).denotation' I = ((∃ b, B.denotation (by simp) (I.set i b)) : Bool) := by simp [bexists]
+
 @[simp]
-lemma bexists_spec {B : BDD} {i} {I} : (B.bexists i).denotation' I = (∃ b, B.denotation' (Vector.cast bexists_nvars (I.set i b))) := by
-  simp only [denotation', bexists, or_spec, Bool.or_eq_true, Bool.exists_bool, eq_iff_iff]
-  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict false i).nvars := by simp
-  rw [denotation_cast (hn := by simp) (hm := by simp) that]
-  have := restrict_spec (B := B) (i := i) (b := false)
-  simp only [denotation'] at this
-  rw [this]
-  have that : max (B.restrict false i).nvars (B.restrict true i).nvars = (B.restrict true i).nvars := by simp
-  rw [denotation_cast (hn := by simp) (hm := by simp) that]
-  have := restrict_spec (B := B) (i := i) (b := true)
-  simp only [denotation'] at this
-  rw [this]
-  rfl
+lemma bexists_denotation {B : BDD} {i} {I : Vector Bool n} {h} :
+    (B.bexists i).denotation h I = ((∃ b, B.denotation (by simp_all) (I.set i b (by simp_all; omega))) : Bool) := by
+  simp only [Bool.exists_bool, Bool.decide_or, Bool.decide_eq_true]
+  nth_rw 1 [denotation_take']
+  simp only [bexists_spec, Bool.exists_bool, Bool.decide_or, Bool.decide_eq_true]
+  congr 1
+  · rw [show ((Vector.cast _ (I.take (B.bexists i).nvars)).set i.1 false _) = (Vector.cast _ ((I.take (B.bexists i).nvars).set i.1 false (by simp_all))) by rfl]
+    rw [denotation_cast]
+    nth_rw 2 [denotation_take (m := ((B.bexists i).nvars))] <;> simp_all
+    congr
+    rw [Vector.extract_set]
+    simp
+    split
+    next => simp_all
+    next c => absurd c; simp_all; omega
+    simp_all
+    simp_all
+  · rw [show ((Vector.cast _ (I.take (B.bexists i).nvars)).set i.1 true _) = (Vector.cast _ ((I.take (B.bexists i).nvars).set i.1 true (by simp_all))) by rfl]
+    rw [denotation_cast]
+    nth_rw 2 [denotation_take (m := ((B.bexists i).nvars))] <;> simp_all
+    congr
+    rw [Vector.extract_set]
+    simp
+    split
+    next => simp_all
+    next c => absurd c; simp_all; omega
+    simp_all
+    simp_all
 
 end BDD
 
