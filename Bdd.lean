@@ -1,7 +1,6 @@
 import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
-import Bdd.Compactify
 import Bdd.Relabel
 import Bdd.Nary
 import Bdd.Choice
@@ -127,7 +126,6 @@ def var (n : Nat) : ROBdd n.succ 1 :=
 
 end ROBdd
 
-open Compactify
 open Reduce
 
 namespace BDD
@@ -149,11 +147,12 @@ def var   : Nat  → BDD := fun n ↦ ⟨_, _, ROBdd.var n⟩
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   match h : max B.nvars C.nvars with
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
-  | .succ _ => ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
+  | .succ _ =>
+    ⟨_, _, ⟨(oreduce (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)).2, Reduce.oreduce_reduced⟩⟩
 
 private lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive : BDD → Prop} :
   (base : (h : B.nvars ⊔ C.nvars = 0) → motive (const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2)))) →
-  (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, ⟨⟨compactify' (reduce' (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩) →
+  (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, ⟨(oreduce (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)).2, Reduce.oreduce_reduced⟩⟩) →
   motive (apply op B C) := by
   intro base step
   simp only [apply]
@@ -247,8 +246,7 @@ private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars
     simp only
     rw [OBdd.lift_trivial_eq (h := h)]
     simp only [OBdd.evaluate_cast h]
-    rw [compactify_evaluate]
-    simp_rw [← reduce'_spec.2]
+    rw [oreduce_evaluate]
     rw [← Apply.apply'_spec]
     congr <;> rw [OBdd.evaluate_evaluate'] <;> rfl
   · exact apply_nvars
@@ -459,7 +457,7 @@ def find_some {B : BDD} {I : Vector Bool B.nvars} : B.find = some I → B.denota
   next hf _ => injection h with heq; simp [← heq]
 
 def restrict (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
-  ⟨_, _, ⟨⟨compactify' (reduce' (Restrict.orestrict B.robdd.1 b i)), compactify_ordered⟩, compactify_preserves_reduced reduce'_spec.1⟩⟩
+  ⟨_, _, ⟨(oreduce (Restrict.orestrict B.robdd.1 b i)).2, Reduce.oreduce_reduced⟩⟩
 
 @[simp]
 lemma restrict_nvars {B : BDD} {i} : (B.restrict b i).nvars = B.nvars := by simp only [restrict]
@@ -468,9 +466,8 @@ lemma restrict_nvars {B : BDD} {i} : (B.restrict b i).nvars = B.nvars := by simp
 private lemma restrict_spec {B : BDD} {i} {h1 : _ ≤ m} {h2 : m = B.nvars} :
     (B.restrict b i).denotation h1 = Nary.restrict (B.denotation h1) b ⟨i.1, by omega⟩ := by
   subst h2
-  simp only [restrict, denotation, OBdd.lift_trivial_eq, ← OBdd.evaluate_evaluate', compactify_evaluate]
-  simp_rw [← reduce'_spec.2]
-  simp [Restrict.orestrict_evaluate]
+  simp only [restrict, denotation, OBdd.lift_trivial_eq, ← OBdd.evaluate_evaluate']
+  simp
 
 @[simp]
 private lemma Vector.cast_set {v : Vector α n} {i : Fin m} :

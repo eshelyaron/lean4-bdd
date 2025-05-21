@@ -45,6 +45,7 @@ lemma restrict_ordered {O : OBdd n m} : Bdd.Ordered (restrict O b i) := sorry
 
 def orestrict (O : OBdd n m) (b : Bool) (i : Fin n) : OBdd n m := ⟨restrict O b i, restrict_ordered⟩
 
+@[simp]
 lemma orestrict_evaluate {O : OBdd n m} : (orestrict O b i).evaluate = Nary.restrict (O.evaluate) b i := sorry
 
 end Restrict

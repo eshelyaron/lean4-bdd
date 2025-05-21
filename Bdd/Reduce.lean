@@ -1,5 +1,6 @@
 import Bdd.Basic
 import Bdd.Collect
+import Bdd.Trim
 
 open Pointer
 open Bdd
@@ -854,6 +855,32 @@ lemma reduce'_spec {O : OBdd n m} :
       · rfl
     next O _ => exact (reduce_spec (O := O)).2
 
+private def reduce'' {n m : Nat} (O : OBdd n.succ m.succ) : Bdd n.succ m.succ × Fin m.succ :=
+  match O.1.root with
+  | terminal _ => ⟨O.1, 0⟩ -- Terminals are already reduced.
+  | node r =>
+    let ⟨B, S⟩ := (StateT.run (loop O.1.heap r (OBdd.discover O) n) initial)
+    ⟨B, S.nid + 1⟩
+
+private def zero_vars_to_bool : Bdd 0 m → Bool := fun B ↦
+  match B.root with
+  | .terminal b => b
+  | .node j => False.elim (Nat.not_lt_zero _ B.heap[j].var.2)
+
+def oreduce (O : OBdd n m) : Σ k, OBdd n k :=
+  match n with
+  | .zero => ⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal (zero_vars_to_bool O.1)⟩, Bdd.Ordered_of_terminal⟩⟩
+  | .succ _ =>
+    match m with
+    | .zero => ⟨0, O⟩
+    | .succ _ =>
+      let ⟨B, k⟩ := reduce'' O
+      ⟨k, ⟨Trim.trim B sorry sorry, Trim.trim_ordered sorry⟩⟩
+
+lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).2 := sorry
+
+@[simp]
+lemma oreduce_evaluate {O : OBdd n m} : (oreduce O).2.evaluate = O.evaluate := sorry
 
 -- lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
 --     (∀ (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)), i = O.1.heap[j].var → (get_id (node j) s).1 = terminal false) →
