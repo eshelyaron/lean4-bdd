@@ -2149,3 +2149,17 @@ lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p →
   cases Relation.reflTransGen_swap.mp h with
   | refl => rfl
   | tail => contradiction
+
+lemma Bdd.terminal_of_zero_vars {B : Bdd n m} : n = 0 → ∃ b, B.root = .terminal b := by
+  intro h
+  subst h
+  cases hr : B.root with
+  | terminal b => exact ⟨b, rfl⟩
+  | node j => exact False.elim (Nat.not_lt_zero _ B.heap[j].var.2)
+
+lemma Bdd.terminal_of_zero_heap {B : Bdd n m} : m = 0 → ∃ b, B.root = .terminal b := by
+  intro h
+  subst h
+  cases hr : B.root with
+  | terminal b => exact ⟨b, rfl⟩
+  | node j => exact False.elim (Nat.not_lt_zero _ j.2)
