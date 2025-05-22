@@ -130,7 +130,6 @@ lemma Bdd.RelevantEdge_from_Edge_Reachable
 def Bdd.RelevantMayPrecede (B : Bdd n m) (p q : B.RelevantPointer) := MayPrecede B.heap p.1 q.1
 
 /-- A BDD is `Ordered` if all edges relevant from the root respect the variable ordering. -/
-@[simp]
 def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (RelevantEdge B) (RelevantMayPrecede B)
 
 /-- Terminals induce `Ordered` BDDs. -/
@@ -377,7 +376,6 @@ instance Pointer.Redundant.instDecidable {n m} (w : Vector (Node n m) m) : Decid
 def Bdd.NoRedundancy (B : Bdd n m) := ∀ (p : B.RelevantPointer), ¬ Redundant B.heap p.1
 
 /-- A BDD is `Reduced` if its graph does not contain redundant nodes or distinct similar subgraphs. -/
-@[simp]
 def OBdd.Reduced {n m} (O : OBdd n m) : Prop
   -- No redundant pointers.
   := NoRedundancy O.1
