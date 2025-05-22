@@ -874,8 +874,8 @@ def oreduce (O : OBdd n m) : Σ k, OBdd n k :=
     match m with
     | .zero => ⟨0, O⟩
     | .succ _ =>
-      let ⟨B, k⟩ := reduce'' O
-      ⟨k, ⟨Trim.trim B sorry sorry, Trim.trim_ordered sorry⟩⟩
+      match h : reduce'' O with
+      | ⟨B, k⟩ => ⟨k, ⟨Trim.trim B sorry sorry, Trim.trim_ordered (by sorry)⟩⟩
 
 lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).2 := sorry
 
