@@ -556,39 +556,39 @@ lemma bforall_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
     congr 1
     rw [Bool.and_comm]
 
--- @[simp]
--- private lemma List.length_cast {l : List (Fin n)} {h : n = m} : (h ▸ l).length = l.length := by
---   subst h
---   simp
+@[simp]
+private lemma List.length_cast {l : List (Fin n)} {h : n = m} : (h ▸ l).length = l.length := by
+  subst h
+  simp
 
--- def bforalls (B : BDD) (l : List (Fin B.nvars)) : BDD :=
---   match l with
---   | [] => B
---   | i :: t => (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t)
--- termination_by l.length
+def bforalls (B : BDD) (l : List (Fin B.nvars)) : BDD :=
+  match l with
+  | [] => B
+  | i :: t => (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t)
+termination_by l.length
 
--- @[simp]
--- lemma bforalls_nvars {B : BDD} {l} : (B.bforalls l).nvars = B.nvars := by
---   unfold bforalls
---   split
---   next => simp
---   next i t =>
---     simp_rw [show B.nvars = (B.bforall i).nvars by simp]
---     exact bforalls_nvars
--- termination_by l.length
+@[simp]
+lemma bforalls_nvars {B : BDD} {l} : (B.bforalls l).nvars = B.nvars := by
+  unfold bforalls
+  split
+  next => simp
+  next i t =>
+    simp_rw [show B.nvars = (B.bforall i).nvars by simp]
+    exact bforalls_nvars
+termination_by l.length
 
--- @[simp]
--- lemma bforalls_nil {B : BDD} : B.bforalls [] = B := by simp only [bforalls]
+@[simp]
+lemma bforalls_nil {B : BDD} : B.bforalls [] = B := by simp only [bforalls]
 
--- @[simp]
--- lemma bforalls_zero_length {B : BDD} {l} (h : l.length = 0) : B.bforalls l = B := by simp_all
+@[simp]
+lemma bforalls_zero_length {B : BDD} {l} (h : l.length = 0) : B.bforalls l = B := by simp_all
 
--- @[simp]
--- lemma bforalls_one {B : BDD} {i} : (B.bforalls [i]) = (B.bforall i) := by simp [bforalls]
+@[simp]
+lemma bforalls_one {B : BDD} {i} : (B.bforalls [i]) = (B.bforall i) := by simp [bforalls]
 
--- @[simp]
--- lemma bforalls_cons {B : BDD} {i} {t} : (B.bforalls (i :: t)) = (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t) := by
---   simp [bforalls]
+@[simp]
+lemma bforalls_cons {B : BDD} {i} {t} : (B.bforalls (i :: t)) = (B.bforall i).bforalls (Eq.symm bforall_nvars ▸ t) := by
+  simp [bforalls]
 
 def bexists (B : BDD) (i : Fin B.nvars) : BDD := (or (B.restrict false i) (B.restrict true i))
 
@@ -632,8 +632,9 @@ end BDD
 -- #eval (BDD.const true).robdd.1
 -- #eval! (BDD.var 3).robdd.1
 -- #eval! (BDD.var 3).not.robdd.1
+--#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforalls [⟨1, by simp⟩, ⟨1, by simp⟩]).robdd.1
 --#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).robdd.1
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bexists ⟨1, by simp⟩).robdd.1
+--#eval! (((BDD.or (BDD.var 0) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).bforall ⟨0, by simp⟩).robdd.1
 --#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict true ⟨0, by simp⟩).robdd.1
 -- #eval! (BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).robdd.1
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict true ⟨1, by simp⟩).robdd.1
