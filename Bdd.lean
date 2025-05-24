@@ -7,6 +7,7 @@ import Bdd.Choice
 import Bdd.Restrict
 import Bdd.Lift
 import Bdd.Evaluate
+import Bdd.Sim
 
 def ROBdd n m := { O : OBdd n m // O.Reduced }
 
@@ -445,7 +446,10 @@ private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
   (Lift.olift (Nat.le_max_left ..) B.robdd.1).HSimilar (Lift.olift (Nat.le_max_right ..) C.robdd.1)
 
 private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
-  | _, _ => OBdd.instDecidableHSimilar _ _
+  | B, C =>
+    Sim.instDecidableRobddHSimilar
+      (Lift.olift (Nat.le_max_left ..) B.robdd.1)  (Lift.olift_reduced B.robdd.2)
+      (Lift.olift (Nat.le_max_right ..) C.robdd.1) (Lift.olift_reduced C.robdd.2)
 
 private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
     B.SemanticEquiv C ↔ B.SyntacticEquiv C := by

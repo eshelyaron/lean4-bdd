@@ -325,7 +325,8 @@ def OBdd.Similar : OBdd n m → OBdd n m → Prop := HSimilar
 instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Similar :=
   fun O U ↦ decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
 
-instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
+-- FIXME: Use the instance from Sim.lean instead.
+private instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
   decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
 
 def OBdd.SimilarRP (O : OBdd n m) (p q : O.1.RelevantPointer) :=
