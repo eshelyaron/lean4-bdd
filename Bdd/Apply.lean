@@ -1,5 +1,5 @@
 import Bdd.Basic
-import Bdd.Reduce
+import Bdd.Lift
 import Std.Data.HashMap.Lemmas
 
 namespace Apply
@@ -147,7 +147,7 @@ def apply {n m m' : Nat} : (Bool → Bool → Bool) → OBdd n.succ m → OBdd n
   ⟨state.heap, root⟩
 
 def apply' {n n' m m' p : Nat} : max n n' = p.succ → (Bool → Bool → Bool) → OBdd n m → OBdd n' m' → OBdd (max n n') (p2t m m') := fun h op O U ↦
-  ⟨h ▸ apply op (h ▸ O.lift (n' := max n n') (Nat.le_max_left ..)) (h ▸ U.lift (n' := max n n') (Nat.le_max_right ..)), sorry⟩
+  ⟨h ▸ apply op (h ▸ Lift.olift (n' := max n n') (Nat.le_max_left ..) O) (h ▸ Lift.olift (n' := max n n') (Nat.le_max_right ..) U), sorry⟩
 
 
 -- theorem apply_helper_spec' {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {s : State n m m'} :
@@ -297,7 +297,7 @@ theorem apply_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n.su
   (apply_helper_spec (by sorry)).2
 
 theorem apply'_spec {n n' m m' p : Nat} {h : max n n' = p.succ} {op : Bool → Bool → Bool} {O : OBdd n m} {U : OBdd n' m'} :
-    ∀ I : Vector Bool (n ⊔ n'), (op ((O.lift (by simp)).evaluate I) ((U.lift (by simp)).evaluate I)) = OBdd.evaluate (apply' h op O U) I := by
+    ∀ I : Vector Bool (n ⊔ n'), (op ((Lift.olift (by simp) O).evaluate I) ((Lift.olift (by simp) U).evaluate I)) = OBdd.evaluate (apply' h op O U) I := by
   sorry
 
 end Apply

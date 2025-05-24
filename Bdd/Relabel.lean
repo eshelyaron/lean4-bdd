@@ -200,6 +200,7 @@ lemma relabel_preserves_noRedundancy {B : Bdd n m} : B.NoRedundancy → (relabel
       simp only [relabel, relabel_heap, Fin.getElem_fin, relabel_node] at red
       exact red
 
+-- FIXME: Move to DecisionTree.lean
 def trelabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : DecisionTree n → DecisionTree (f n)
   | .leaf b => .leaf b
   | .branch i l h => .branch ⟨f i, hf i⟩ (trelabel hf l) (trelabel hf h)

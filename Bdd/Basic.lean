@@ -5,6 +5,7 @@ import Mathlib.Tactic.DeriveFintype
 import Mathlib.Tactic.Linarith
 import Mathlib.Data.Fintype.Vector
 import Bdd.Nary
+import Bdd.DecisionTree
 
 instance {α : Type u} [ToString α] : ToString (Vector α k) := ⟨fun v ↦ v.toList.toString⟩
 
@@ -57,22 +58,21 @@ structure Bdd (n) (m) where
   root : Pointer m
 deriving DecidableEq
 
-def Pointer' := Bool ⊕ Nat
+-- def Pointer' := Bool ⊕ Nat
 
-structure Node' where
-  var  : Nat
-  low  : Pointer'
-  high : Pointer'
+-- structure Node' where
+--   var  : Nat
+--   low  : Pointer'
+--   high : Pointer'
 
-def Edge' (M : Array Node') (j k : Nat) : Prop := ∃ h : j < M.size, ((M[j]'h).low = .inr k ∨ (M[j]'h).high = .inr k)
+-- def Edge' (M : Array Node') (j k : Nat) : Prop := ∃ h : j < M.size, ((M[j]'h).low = .inr k ∨ (M[j]'h).high = .inr k)
 
-def Pointer'.Safe (M : Array Node') (p : Pointer') := ∀ j, p = .inr j → ∀ k, Relation.ReflTransGen (Edge' M) j k → k < M.size
+-- def Pointer'.Safe (M : Array Node') (p : Pointer') := ∀ j, p = .inr j → ∀ k, Relation.ReflTransGen (Edge' M) j k → k < M.size
 
-/-- Raw BDD -/
-structure Bdd' where
-  heap : Array Node'
-  root : Pointer'
-  safe : root.Safe heap
+-- structure Bdd' where
+--   heap : Array Node'
+--   root : Pointer'
+--   safe : root.Safe heap
 
 instance Bdd.instToString : ToString (Bdd n m) := ⟨fun B => "⟨" ++ (toString B.heap) ++ ", " ++ (toString B.root)  ++ "⟩"⟩
 
@@ -215,11 +215,6 @@ instance OEdge.instWellFoundedRelation {n m} : WellFoundedRelation (OBdd n m) wh
   rel := flip OEdge
   wf  := flip_wellFounded
 
-inductive DecisionTree n where
-  | leaf   : Bool  → DecisionTree _
-  | branch : Fin n → DecisionTree n → DecisionTree n → DecisionTree n
-deriving DecidableEq
-
 lemma Bdd.ordered_of_reachable' {B : Bdd n m} :
     B.Ordered → Reachable B.heap B.root p → Ordered ⟨B.heap, p⟩ := by
   intro h1 h2
@@ -315,32 +310,6 @@ def OBdd.toTree (O : OBdd n m) : DecisionTree n :=
   | terminal b => .leaf b
   | node j     => .branch O.1.heap[j].var (toTree (O.low h)) (toTree (O.high h))
 termination_by O
-
-def DecisionTree.evaluate : DecisionTree n → Vector Bool n → Bool
-  | leaf b, _ => b
-  | branch j l h, v => if v[j] then h.evaluate v else l.evaluate v
-
-def DecisionTree.lift : n ≤ n' → DecisionTree n → DecisionTree n'
-  | _, leaf b => .leaf b
-  | e, branch j l h => .branch ⟨j.1, by omega⟩ (l.lift e) (h.lift e)
-
-lemma DecisionTree.lift_injective {n n' : Nat} {h : n ≤ n'} : Function.Injective (DecisionTree.lift h) := by
-  intro x y hxy
-  cases x with
-  | leaf _ =>
-    cases y with
-    | leaf _ => simp only [lift] at hxy; simp_all
-    | branch _ _ _ => contradiction
-  | branch _ _ _ =>
-    cases y with
-    | leaf _ => contradiction
-    | branch _ _ _ =>
-      simp only [lift] at hxy
-      injection hxy with a b c
-      rw [lift_injective b, lift_injective c]
-      simp_all only [Fin.mk.injEq, branch.injEq, and_self, and_true]
-      ext
-      simp_all only
 
 def OBdd.evaluate : OBdd n m → Vector Bool n → Bool := DecisionTree.evaluate ∘ OBdd.toTree
 
@@ -742,10 +711,6 @@ lemma OBdd.Independence' (O : OBdd n m) (i : Fin O.var) : Nary.IndependentOf (OB
       · exact hi
       · exact var_lt_low_var
 termination_by O
-
-def DecisionTree.size {n} : DecisionTree n → Nat
-  | leaf _ => 0
-  | branch _ l h => 1 + l.size + h.size
 
 def OBdd.size' {n m} : OBdd n m → Nat := DecisionTree.size ∘ OBdd.toTree
 
@@ -1155,219 +1120,6 @@ lemma OBdd.sub_eq_of_isTerminal {n m} {O : OBdd n m} (S : O.SubBdd) : O.isTermin
   | inr hr =>
     rcases (Relation.transGen_swap.mp hr) with e | ⟨_, e⟩ <;> exact False.elim (not_OEdge_of_isTerminal h e)
 
-@[simp]
-def Bdd.lift_node : n ≤ n' → Node n m → Node n' m := fun h N ↦ ⟨⟨N.var.1, by exact Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩
-
-lemma Bdd.lift_node_trivial_eq {n n' m : Nat} {h : n = n'} {N : Node n m} : lift_node (n' := n') (by rw [h]) N = h ▸ N := by
-  subst h
-  simp_all
-
-@[simp]
-def Bdd.lift_heap : n ≤ n' → Vector (Node n m) m → Vector (Node n' m) m := fun h v ↦ Vector.map (lift_node h) v
-
-@[simp]
-def Bdd.lift : n ≤ n' → Bdd n m → Bdd n' m := fun h B ↦ ⟨lift_heap h B.heap, B.root⟩
-
-lemma Bdd.lift_edge_iff {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : Edge B.heap p q ↔ Edge (B.lift h).heap p q := by
-  constructor
-  · intro e
-    cases e with
-    | low  _ => left;  simpa
-    | high _ => right; simpa
-  · intro e
-    cases e with
-    | low  _ => left;  simp_all
-    | high _ => right; simp_all
-
-lemma Bdd.lift_reachable_iff {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p : Pointer m} : Reachable B.heap B.root p ↔ Reachable (B.lift h).heap (B.lift h).root p := by
-  constructor
-  · intro r
-    induction r with
-    | refl => left
-    | tail _ e ih =>
-      right
-      · exact ih
-      · exact (lift_edge_iff.mp e)
-  · intro r
-    induction r with
-    | refl => left
-    | tail _ e ih =>
-      right
-      · exact ih
-      · exact (lift_edge_iff.mpr e)
-
-lemma Bdd.lift_preserves_MayPrecede {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} : MayPrecede (B.lift h).heap p q ↔ MayPrecede B.heap p q := by
-  constructor
-  · intro hm
-    cases p with
-    | terminal _ =>
-      absurd hm
-      exact not_terminal_MayPrecede
-    | node j =>
-      cases q with
-      | terminal _ =>
-        apply MayPrecede_node_terminal
-      | node j' =>
-        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, lift_node] at hm
-        apply (Fin.natCast_lt_natCast (by omega) (by omega)).mp at hm
-        simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin]
-        aesop
-  · intro hm
-    cases p with
-    | terminal _ =>
-      absurd hm
-      exact not_terminal_MayPrecede
-    | node j =>
-      cases q with
-      | terminal _ =>
-        apply MayPrecede_node_terminal
-      | node j' =>
-        simp only [MayPrecede, Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin] at hm
-        simp only [MayPrecede, Nat.succ_eq_add_one, lift, lift_heap, toVar_node_eq, Fin.getElem_fin, lift_node]
-        simp_all only [Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff, Vector.getElem_map, lift_node]
-        refine (Fin.natCast_lt_natCast ?_ ?_).mpr ?_ <;> omega
-
-lemma Bdd.lift_preserves_RelevantEdge {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
-    (∃ (hp : Reachable (B.lift h).heap (B.lift h).root p) (hq : Reachable (B.lift h).heap (B.lift h).root q), RelevantEdge (B.lift h) ⟨p, hp⟩ ⟨q, hq⟩) ↔
-    (∃ (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q), RelevantEdge B ⟨p, hp⟩ ⟨q, hq⟩) := by
-  constructor
-  · rintro ⟨hp, hq, hr⟩
-    use (lift_reachable_iff.mpr hp)
-    use (lift_reachable_iff.mpr hq)
-    cases hr with
-    | low  hl => simp at hl; left ; assumption
-    | high hh => simp at hh; right; assumption
-  · rintro ⟨hp, hq, hr⟩
-    use (lift_reachable_iff.mp hp)
-    use (lift_reachable_iff.mp hq)
-    cases hr with
-    | low  hl => simp at hl; left ; simpa
-    | high hh => simp at hh; right; simpa
-
-lemma Bdd.Ordered_of_lift {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (B.lift h).Ordered := by
-  rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
-  apply lift_preserves_MayPrecede.mpr
-  exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
-
-def OBdd.lift : n ≤ n' → OBdd n m → OBdd n' m := fun h O ↦ ⟨O.1.lift h, Bdd.Ordered_of_lift O.2⟩
-
-@[simp]
-lemma OBdd.lift_trivial_eq {n n' m : Nat} {h : n = n'} {O : OBdd n m} : (O.lift (n' := n') (by rw [h])) = h ▸ O := by
-  rcases O with ⟨⟨M, r⟩, o⟩
-  simp only [lift, Bdd.lift, lift_heap]
-  congr
-  · have : (lift_node (Eq.mpr (id (congrArg (fun _a ↦ _a ≤ n') h)) (le_refl n'))) = fun (x : Node n m) ↦ h ▸ x := by
-      ext
-      exact lift_node_trivial_eq
-    rw [this]
-    subst h
-    simp only
-    rcases M with ⟨V, l⟩
-    simp [Vector.map, List.map_id_fun', id_eq]
-  · subst h
-    simp
-
-lemma Bdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {B : Bdd n m} : (B.lift h).root = B.root := by simp
-
-@[simp]
-lemma OBdd.lift_preserves_root {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).1.root = O.1.root := Bdd.lift_preserves_root
-lemma OBdd.lift_low {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).low O_root_def = (O.low O_root_def).lift h := by
-  simp only [low, lift, Bdd.lift, lift_heap]
-  simp_rw [Bdd.low_heap_eq_heap]
-  simp_rw [O_root_def]
-  simp [Bdd.low]
-
-lemma OBdd.lift_high {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (O_root_def : O.1.root = node j): (O.lift h).high O_root_def = (O.high O_root_def).lift h := by
-  simp only [high, lift, Bdd.lift, lift_heap]
-  simp_rw [Bdd.high_heap_eq_heap]
-  simp_rw [O_root_def]
-  simp [Bdd.high]
-
-lemma OBdd.NoRedundancy_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O.1.NoRedundancy → (O.lift h).1.NoRedundancy := by
-  rintro hnr ⟨p, hp⟩ contra
-  simp only at contra
-  cases p_def : p with
-  | terminal _ =>
-    cases contra with
-    | red _ => contradiction
-  | node j =>
-    rw [p_def] at contra
-    cases contra with
-    | red red =>
-      simp only [lift, Bdd.lift, lift_heap, Fin.getElem_fin, lift_node] at red
-      apply hnr ⟨p, lift_reachable_iff.mpr hp⟩
-      simp_rw [p_def]
-      constructor
-      simp_all
-
-lemma OBdd.lift_preserves_toTree {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : (O.lift h).toTree = O.toTree.lift h := by
-  cases O_root_def : O.1.root with
-  | terminal b =>
-    simp only [toTree_terminal' O_root_def, DecisionTree.lift, lift, Bdd.lift]
-    simp_rw [O_root_def, toTree_terminal]
-  | node j =>
-    simp only [toTree_node O_root_def, DecisionTree.lift]
-    rw [← lift_preserves_toTree (h := h) (O := (O.low  O_root_def))]
-    rw [← lift_preserves_toTree (h := h) (O := (O.high O_root_def))]
-    rw [← lift_preserves_root (h := h)] at O_root_def
-    simp only [toTree_node O_root_def]
-    simp only [DecisionTree.branch.injEq]
-    constructor
-    · simp [lift]
-    · constructor
-      · rw [lift_low]
-      · rw [lift_high]
-termination_by O
-
-lemma vec_getElem_cast_eq {v : Vector α n} {h : n = m} {i : Nat} {hi : i < n} : v[i] = (h ▸ v)[i] := by
-  subst h
-  rfl
-
-lemma DecisionTree.lift_evaluate {n n' : Nat} {h : n ≤ n'} {T : DecisionTree n} {I : Vector Bool n'} :
-    (DecisionTree.lift h T).evaluate I = T.evaluate (Vector.cast (show (min n n') = n by simpa) (I.take n)) := by
-  cases T with
-  | leaf => simp [lift, evaluate]
-  | branch _ _ _ =>
-    simp only [lift, evaluate]
-    rw [lift_evaluate]
-    rw [lift_evaluate]
-    refine ite_congr ?_ (congrFun rfl) (congrFun rfl)
-    simp only [eq_iff_iff, Bool.coe_iff_coe, Fin.getElem_fin]
-    rename_i a _ _
-    have : (I.take n)[a.1] = I[a.1] := by
-      apply Vector.getElem_take
-    rw [← this]
-    rfl
-
-@[simp]
-lemma OBdd.lift_evaluate {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
-    (O.lift h).evaluate I = O.evaluate (Vector.cast (show (min n n') = n by simpa) (I.take n)) := by
-  simp only [evaluate, Function.comp_apply, lift_preserves_toTree]
-  rw [DecisionTree.lift_evaluate]
-
-lemma OBdd.SimilarRP_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m} {hp : Reachable (O.lift h).1.heap (O.lift h).1.root p} {hq : Reachable (O.lift h).1.heap (O.lift h).1.root q} :
-    (O.lift h).SimilarRP ⟨p, hp⟩ ⟨q, hq⟩ → O.SimilarRP ⟨p, lift_reachable_iff.mpr hp⟩ ⟨q, lift_reachable_iff.mpr hq⟩ := by
-  intro sim
-  simp only [SimilarRP, Similar, HSimilar] at sim
-  have : OBdd.toTree ⟨{heap := (O.lift h).1.heap, root := p}, ordered_of_reachable hp⟩ = OBdd.toTree (OBdd.lift h ⟨{heap := O.1.heap, root := p}, ordered_of_reachable (lift_reachable_iff.mpr hp)⟩) := by
-    rfl
-  rw [this] at sim
-  have : OBdd.toTree ⟨{heap := (O.lift h).1.heap, root := q}, ordered_of_reachable hq⟩ = OBdd.toTree (OBdd.lift h ⟨{heap := O.1.heap, root := q}, ordered_of_reachable (lift_reachable_iff.mpr hq)⟩) := by
-    rfl
-  rw [this] at sim
-  rw [lift_preserves_toTree] at sim
-  rw [lift_preserves_toTree] at sim
-  clear this
-  clear this
-  simp only [SimilarRP, Similar, HSimilar]
-  rw [DecisionTree.lift_injective sim]
-
-lemma OBdd.Reduced_of_lift {n n' m : Nat} {h : n ≤ n'} {O : OBdd n m} : O.Reduced → (O.lift h).Reduced := by
-  rintro ⟨r1, r2⟩
-  constructor
-  · exact NoRedundancy_of_lift r1
-  · rintro _ _ sim; exact r2 (SimilarRP_lift sim)
-
 lemma OBdd.card_RelevantPointer_le {O : OBdd n m} : Fintype.card O.1.RelevantPointer ≤ m + 2 := by
   conv =>
     rhs
@@ -1699,41 +1451,6 @@ lemma Pointer.mayPrecede_of_reachable {B : Bdd n m} :
     apply ho
     exact e
 
-inductive DecisionTree.lowerBoundedBy (p : Fin n) : DecisionTree n → Prop where
-  | leaf : lowerBoundedBy p (.leaf _)
-  | node : p ≤ q → lowerBoundedBy p l → lowerBoundedBy p h → lowerBoundedBy p (.branch q l h)
-
-lemma DecisionTree.lowerBoundedBy_low : lowerBoundedBy p (.branch q l h) → lowerBoundedBy p l := by
-  intro r
-  cases r with
-  | node _ _ _ => assumption
-
-lemma DecisionTree.lowerBoundedBy_high : lowerBoundedBy p (.branch q l h) → lowerBoundedBy p h := by
-  intro r
-  cases r with
-  | node _ _ _ => assumption
-
-lemma OBdd.toTree_lowerBoundedBy_var {O : OBdd n m} {p : Fin n} : p ≤ O.1.var → O.toTree.lowerBoundedBy p := by
-  intro h
-  cases O_root_def : O.1.root with
-  | terminal _ =>
-    simp only [toTree_terminal' O_root_def]
-    constructor
-  | node _ =>
-    simp only [toTree_node O_root_def]
-    constructor
-    · simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Bdd.var] at h
-      simp_all only [Ordered, toVar_node_eq, Nat.succ_eq_add_one, Fin.getElem_fin, Fin.coe_eq_castSucc, Fin.castSucc_le_castSucc_iff]
-    · apply toTree_lowerBoundedBy_var
-      trans O.1.var
-      · exact h
-      · exact le_of_lt var_lt_low_var
-    · apply toTree_lowerBoundedBy_var
-      trans O.1.var
-      · exact h
-      · exact le_of_lt var_lt_high_var
-termination_by O
-
 lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
     O.Reduced → (∀ i : Fin p, Nary.IndependentOf (O.evaluate) ⟨i.1, by omega⟩) → p ≤ O.1.var := by
   intro hr hp
@@ -2052,26 +1769,6 @@ lemma OBdd.usesVar_iff (i : Fin n) (O : OBdd n m) : O.1.usesVar i ↔ (∃ j, �
       | inl h => exact usesVar_of_low_usesVar h
       | inr h => exact usesVar_of_high_usesVar h
 
-inductive DecisionTree.usesVar (i : Fin n) : DecisionTree n → Prop where
-  | here : usesVar i (.branch i _ _)
-  | low : usesVar i l → usesVar i (.branch _ l _)
-  | high : usesVar i h → usesVar i (.branch _ _ h)
-
-lemma DecisionTree.usesVar_iff (i : Fin n) (T : DecisionTree n) : T.usesVar i ↔ (∃ i' l h, T = .branch i' l h ∧ (i = i' ∨ l.usesVar i ∨ h.usesVar i)) := by
-  constructor
-  · intro h
-    cases h with
-    | here => simp
-    | low hl => simp [hl]
-    | high hh => simp [hh]
-  · rintro ⟨i', l, h, h1, h2⟩
-    cases h2 with
-    | inl => simp_all [usesVar.here]
-    | inr h2 =>
-      cases h2 with
-      | inl => simp_all [usesVar.low]
-      | inr => simp_all [usesVar.high]
-
 lemma OBdd.toTree_usesVar {O : OBdd n m} : O.1.usesVar i ↔ O.toTree.usesVar i := by
   constructor
   · rw [OBdd.usesVar_iff]
@@ -2133,33 +1830,6 @@ instance OBdd.instDecidableUsesVar {O : OBdd n m} : DecidablePred O.1.usesVar :=
   intro i
   simp [usesVar]
   infer_instance
-
-def OBdd.evaluate' (O : OBdd n m) : Vector Bool n → Bool := fun I ↦
-  match h : O.1.root with
-  | terminal b => b
-  | node j => if I[O.1.heap[j].var] then (O.high h).evaluate' I else (O.low h).evaluate' I
-termination_by O
-
-lemma OBdd.evaluate_evaluate' {O : OBdd n m }: evaluate O = evaluate' O := by
-  ext I
-  unfold evaluate'
-  split
-  next b hb => simp [evaluate_terminal' hb]
-  next j hj =>
-    have := evaluate_evaluate' (O := O.low hj)
-    have := evaluate_evaluate' (O := O.high hj)
-    simp [evaluate_node'' hj, *]
-termination_by O
-
-lemma OBdd.evaluate'_terminal {O : OBdd n m} : O.1.root = terminal b → O.evaluate' = Function.const _ b := by
-  rw [← evaluate_evaluate']
-  exact evaluate_terminal'
-
-lemma OBdd.evaluate'_node {O : OBdd n m} (h : O.1.root = node j) :
-    O.evaluate' = fun I ↦ if I[O.1.heap[j].var] then (O.high h).evaluate' I else (O.low h).evaluate' I := by
-  rw [← evaluate_evaluate']
-  rw [evaluate_node'' h]
-  simp [evaluate_evaluate']
 
 lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p → p = (.terminal b) := by
   intro h
