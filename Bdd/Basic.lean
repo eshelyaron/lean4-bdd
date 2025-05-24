@@ -57,6 +57,23 @@ structure Bdd (n) (m) where
   root : Pointer m
 deriving DecidableEq
 
+def Pointer' := Bool ⊕ Nat
+
+structure Node' where
+  var  : Nat
+  low  : Pointer'
+  high : Pointer'
+
+def Edge' (M : Array Node') (j k : Nat) : Prop := ∃ h : j < M.size, ((M[j]'h).low = .inr k ∨ (M[j]'h).high = .inr k)
+
+def Pointer'.Safe (M : Array Node') (p : Pointer') := ∀ j, p = .inr j → ∀ k, Relation.ReflTransGen (Edge' M) j k → k < M.size
+
+/-- Raw BDD -/
+structure Bdd' where
+  heap : Array Node'
+  root : Pointer'
+  safe : root.Safe heap
+
 instance Bdd.instToString : ToString (Bdd n m) := ⟨fun B => "⟨" ++ (toString B.heap) ++ ", " ++ (toString B.root)  ++ "⟩"⟩
 
 open Bdd
