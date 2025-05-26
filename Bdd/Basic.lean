@@ -140,9 +140,8 @@ def Bdd.toRelevantPointer {n m} (B : Bdd n m) : B.RelevantPointer :=
 @[simp]
 abbrev Bdd.RelevantEdge (B : Bdd n m) (p q : B.RelevantPointer) := Edge B.heap p.1 q.1
 
-lemma Bdd.RelevantEdge_from_Edge_Reachable
-  {B : Bdd n m} (e : Edge B.heap p q)
-  (hp : Reachable B.heap B.root p) :
+lemma Bdd.relevantEdge_of_edge_of_reachable  {B : Bdd n m}
+    (e : Edge B.heap p q) (hp : Reachable B.heap B.root p) :
   RelevantEdge B ⟨p, hp⟩ ⟨q, .tail hp e⟩ := e
 
 /-- The `MayPrecede` relation lifted to `RelevantPointer`s. -/
@@ -215,10 +214,11 @@ instance OEdge.instWellFoundedRelation {n m} : WellFoundedRelation (OBdd n m) wh
 
 lemma Bdd.ordered_of_reachable' {B : Bdd n m} :
     B.Ordered → Reachable B.heap B.root p → Ordered ⟨B.heap, p⟩ :=
-  fun ho hr x _ _ ↦ ho (RelevantEdge_from_Edge_Reachable (by simp_all) (.trans hr x.2))
+  fun ho hr x _ _ ↦ ho (Bdd.relevantEdge_of_edge_of_reachable (by simp_all) (.trans hr x.2))
 
 lemma Bdd.ordered_of_reachable {O : OBdd n m} :
-    Reachable O.1.heap O.1.root p → Ordered ⟨O.1.heap, p⟩ := ordered_of_reachable' O.2
+    Reachable O.1.heap O.1.root p → Ordered ⟨O.1.heap, p⟩ :=
+  fun hp ⟨_, hx⟩ _ _ ↦ O.2 (Bdd.relevantEdge_of_edge_of_reachable (by simp_all) (.trans hp hx))
 
 /-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
 lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
@@ -895,7 +895,7 @@ def OBdd.Reduced' (O : OBdd n m) : Prop
 --       exact Isomorphism_of_Similiar (reduced_of_relevant' p h)  (reduced_of_relevant' q h) sim
 
 /-- Reduced OBDDs are canonical.  -/
-theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
+theorem OBdd.Canonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
     O.Reduced → U.Reduced → O.evaluate = U.evaluate → O.HSimilar U := by
   intro O_reduced U_reduced h
   cases O_root_def : O.1.root with
@@ -919,7 +919,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
           simp
       absurd U_reduced
       apply not_reduced_of_iso_high_low U_root_def
-      apply HCanonicity (high_reduced U_reduced) (low_reduced U_reduced) this
+      apply OBdd.Canonicity (high_reduced U_reduced) (low_reduced U_reduced) this
   | node j =>
     cases U_root_def : U.1.root with
     | terminal c =>
@@ -935,7 +935,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
           simp
       absurd O_reduced
       apply not_reduced_of_iso_high_low O_root_def
-      apply HCanonicity (high_reduced O_reduced) (low_reduced O_reduced) this
+      apply OBdd.Canonicity (high_reduced O_reduced) (low_reduced O_reduced) this
     | node i =>
       simp only [Similar, HSimilar, InvImage]
       rw [toTree_node O_root_def, toTree_node U_root_def]
@@ -950,7 +950,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
             simp only [Fin.eta] at this
             simp only [Nary.IndependentOf] at this
             have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
-              HCanonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+              OBdd.Canonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply U_reduced.1 U.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [U_root_def]
@@ -964,7 +964,7 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
             simp only [Ordered, Fin.eta] at this
             simp only [Nary.IndependentOf] at this
             have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
-              HCanonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+              OBdd.Canonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
             apply O_reduced.1 O.1.toRelevantPointer
             simp [toRelevantPointer]
             rw [O_root_def]
@@ -975,8 +975,8 @@ theorem OBdd.HCanonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
       constructor
       · assumption
       · constructor
-        · apply HCanonicity (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq'  h same_var)
-        · apply HCanonicity (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
+        · apply OBdd.Canonicity (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq'  h same_var)
+        · apply OBdd.Canonicity (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
 termination_by O.size' + U.size'
 decreasing_by
   simp [size_node U_root_def]; linarith
@@ -1005,7 +1005,7 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
       trans b
       · simp [evaluate_high_eq_evaluate_set_true, h]
       · simp [evaluate_low_eq_evaluate_set_false, h]
-    exact HCanonicity (high_reduced R) (low_reduced R) this
+    exact OBdd.Canonicity (high_reduced R) (low_reduced R) this
 
 
 theorem OBdd.Canonicity_reverse {O : OBdd n m} {U : OBdd n m'}:
@@ -1462,7 +1462,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
     suffices s : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate by
       absurd hr
       apply OBdd.not_reduced_of_iso_high_low O_root_def
-      apply OBdd.HCanonicity (OBdd.high_reduced hr) (OBdd.low_reduced hr) s
+      apply OBdd.Canonicity (OBdd.high_reduced hr) (OBdd.low_reduced hr) s
     ext I
     trans O.evaluate I
     · simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc, Fin.eta] at this
@@ -1556,7 +1556,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
     rw [← not_forall]
     intro contra
     apply not_reduced_of_iso_high_low (show O.1.root = node j by rw [O_def])
-    · apply HCanonicity
+    · apply OBdd.Canonicity
       · exact high_reduced hr'
       · exact low_reduced hr'
       · ext x

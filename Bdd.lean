@@ -455,7 +455,7 @@ private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
   constructor
   · intro h
     simp only [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
-    exact (OBdd.HCanonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
+    exact (OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
   · intro h
     simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
     exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)

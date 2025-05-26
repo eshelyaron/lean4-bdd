@@ -147,8 +147,7 @@ termination_by O
 lemma size_le {O : OBdd n m} : size O ≤ 2 ^ n - 1 := by
   trans 2 ^ (n - O.1.var.1) - 1
   · exact size_le'
-  · simp only [Nat.succ_eq_add_one, tsub_le_iff_right]
-    rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
+  · rw [tsub_le_iff_right, Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
     apply Nat.pow_le_pow_right <;> omega
 
 end Size
