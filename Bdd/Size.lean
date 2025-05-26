@@ -23,22 +23,6 @@ def bool_of_size_eq_zero {n m} (O : OBdd n m) (h : size O = 0) : Bool :=
   | .terminal b => b
   | .node _ => False.elim (not_isTerminal_of_root_eq_node O_root_def (isTerminal_iff_size_eq_zero.mp h))
 
-lemma size_gt_zero_of_Sub_root_eq_node {n m} {j} {O : OBdd n m} (S : O.SubBdd) : S.1.1.root = .node j → size O > 0 := by
-  contrapose
-  simp only [gt_iff_lt, not_lt, nonpos_iff_eq_zero]
-  intro h
-  have := OBdd.sub_eq_of_isTerminal S (isTerminal_iff_size_eq_zero.mp h)
-  rw [this]
-  rcases isTerminal_iff_size_eq_zero.mp h with ⟨b, hb⟩
-  rw [hb]
-  simp
-
-instance instNeZeroSize {j} {O : OBdd n m} (S : O.SubBdd) : S.1.1.root = .node j → NeZero (size O) := by
-  intro h
-  have := size_gt_zero_of_Sub_root_eq_node S h
-  constructor
-  linarith
-
 lemma size_spec {O : OBdd n m} : size O = Fintype.card { j // Pointer.Reachable O.1.heap O.1.root (.node j) } := by
   simp only [size, Function.comp_apply]
   simp_rw [Fintype.card, Finset.univ]

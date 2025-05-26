@@ -491,7 +491,7 @@ instance OBdd.instFintypeEitherRelevantPointer (O U : OBdd n m) (h : O.1.heap = 
   · infer_instance
 
 /-- The inverse image of a decidable relation is decidable. -/
-instance my_decidableRel_of_invImage2 {r : β → β → Prop} [DecidableRel r] {f : α → β} :
+private instance my_decidableRel_of_invImage2 {r : β → β → Prop} [DecidableRel r] {f : α → β} :
     DecidableRel (InvImage r f) :=
   fun a b ↦ decidable_of_decidable_of_iff (show (r (f a) (f b)) ↔ _ by simp [InvImage])
 
@@ -1028,26 +1028,6 @@ lemma OBdd.low_oreachable {n m} {j} {O U : OBdd n m} {U_root_def : U.1.root = no
 
 lemma OBdd.high_oreachable {n m} {j} {O U : OBdd n m} {U_root_def : U.1.root = node j} : O.OReachable U → O.OReachable (U.high U_root_def) := fun h ↦
   Relation.ReflTransGen.tail h oedge_of_high
-
-def OBdd.SubBdd {n m} (O : OBdd n m) := { U // O.OReachable U }
-
-def OBdd.toSubBdd {n m} (O : OBdd n m) : O.SubBdd := ⟨O, Relation.ReflTransGen.refl⟩
-
-def OBdd.SubBdd.low {n m} {j} {O : OBdd n m} (S : O.SubBdd) : S.1.1.root = node j → O.SubBdd := fun h ↦
-  ⟨S.1.low h, low_oreachable S.2⟩
-
-def OBdd.SubBdd.high {n m} {j} {O : OBdd n m} (S : O.SubBdd) : S.1.1.root = node j → O.SubBdd := fun h ↦
-  ⟨S.1.high h, high_oreachable S.2⟩
-
-lemma OBdd.sub_eq_of_isTerminal {n m} {O : OBdd n m} (S : O.SubBdd) : O.isTerminal → S.1 = O := by
-  rcases S with ⟨U, hU⟩
-  simp only
-  intro h
-  apply Relation.reflTransGen_iff_eq_or_transGen.mp at hU
-  cases hU with
-  | inl hl => assumption
-  | inr hr =>
-    rcases (Relation.transGen_swap.mp hr) with e | ⟨_, e⟩ <;> exact False.elim (not_OEdge_of_isTerminal h e)
 
 lemma OBdd.card_RelevantPointer_le {O : OBdd n m} : Fintype.card O.1.RelevantPointer ≤ m + 2 := by
   conv =>
