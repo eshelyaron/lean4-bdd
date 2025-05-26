@@ -20,6 +20,66 @@ structure BDD where
 
 namespace BDD
 
+
+@[simp]
+abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
+
+def lift (B : BDD) (h : B.nvars ≤ n) : BDD :=
+  ⟨n, _, Lift.olift h B.obdd, Lift.olift_reduced B.hred⟩
+
+@[simp]
+lemma lift_nvars {B : BDD} {h : B.nvars ≤ n} : (B.lift h).nvars = n := rfl
+
+@[simp]
+lemma lift_refl {B : BDD} : (B.lift (le_refl _)) = B := by simp [lift]
+
+def denotation (B : BDD) (h : B.nvars ≤ n) : Vector Bool n → Bool := (B.lift h).evaluate
+
+@[simp]
+lemma lift_denotation {B : BDD} {h1 : B.nvars ≤ n} {h2 : n ≤ m} :
+    (B.lift h1).denotation h2 = B.denotation (.trans h1 h2) := by
+  simp [denotation, lift, Evaluate.evaluate_evaluate]
+
+@[simp]
+lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) :
+    B.denotation hm (Vector.cast h I) = B.denotation hn I := by
+  subst h
+  simp
+
+lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
+    Nary.IndependentOf (B.denotation h1) i := by
+  rintro b I
+  simp only [denotation, Evaluate.evaluate_evaluate, Lift.olift_evaluate, lift]
+  suffices s : (I.set i b).take B.nvars = I.take B.nvars by rw [s]
+  ext j hj
+  simp only [Vector.getElem_take]
+  rw [Vector.getElem_set_ne _ _ (by omega)]
+
+def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
+  B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
+
+private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
+  (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) C.obdd)
+
+private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
+  | B, C =>
+    Sim.instDecidableRobddHSimilar
+      (Lift.olift (Nat.le_max_left  ..) B.obdd) (Lift.olift_reduced B.hred)
+      (Lift.olift (Nat.le_max_right ..) C.obdd) (Lift.olift_reduced C.hred)
+
+private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
+    B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
+  constructor
+  · intro h
+    simp only [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
+    exact (OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
+  · intro h
+    simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
+    exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
+
+instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
+  | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
+
 def size : BDD → Nat
   | B => Size.size B.obdd
 
@@ -175,36 +235,6 @@ def imp : BDD → BDD → BDD := apply (! · || ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 @[simp]
-private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
-
-def lift (B : BDD) (h : B.nvars ≤ n) : BDD :=
-  ⟨n, _, Lift.olift h B.obdd, Lift.olift_reduced B.hred⟩
-
-@[simp]
-lemma lift_nvars {B : BDD} {h : B.nvars ≤ n} : (B.lift h).nvars = n := rfl
-
-@[simp]
-lemma lift_refl {B : BDD} : (B.lift (le_refl _)) = B := by simp [lift]
-
-def denotation (B : BDD) (h : B.nvars ≤ n) : Vector Bool n → Bool := (B.lift h).evaluate
-
-@[simp]
-lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) : B.denotation hm (Vector.cast h I) = B.denotation hn I := by
-  subst h
-  simp
-
-lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
-    Nary.IndependentOf (B.denotation h1) i := by
-  rintro b I
-  simp only [denotation, Evaluate.evaluate_evaluate, Lift.olift_evaluate, lift]
-  suffices s : (I.set i b).take B.nvars = I.take B.nvars by rw [s]
-  ext j hj
-  rw [Vector.getElem_take]
-  rw [Vector.getElem_take]
-  rw [Vector.getElem_set_ne]
-  omega
-
-@[simp]
 lemma const_nvars : (const b).nvars = 0 := rfl
 
 @[simp]
@@ -266,7 +296,7 @@ private lemma apply_cast_nvars {B C : BDD} {op} {I : Vector Bool (apply op B C).
     ((apply op B C).denotation (n := B.nvars ⊔ C.nvars) (by rw [apply_nvars]) (Vector.cast apply_nvars I) ) := by
   simp only [denotation]
   simp only [Evaluate.evaluate_evaluate, Lift.olift_evaluate, lift]
-  congr <;> simp
+  congr 1
 
 private lemma apply_spec'' {B C : BDD} {op} {I : Vector Bool n} {h : n = (apply op B C).nvars} :
     (apply op B C).denotation (by omega) I =
@@ -419,31 +449,6 @@ private lemma relabel''_denotation {B : BDD} {f : Nat → Nat} {hf} {hu} {I : Ve
 lemma relabel_denotation {B : BDD} {f} {hf} {I : Vector Bool n} {h} :
     (relabel B f hf).denotation h I = B.denotation' (Vector.ofFn (fun i ↦ I[f i])) := by
   simp [relabel]
-
-def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
-  B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
-
-private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
-  (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) C.obdd)
-
-private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
-  | B, C =>
-    Sim.instDecidableRobddHSimilar
-      (Lift.olift (Nat.le_max_left ..) B.obdd)  (Lift.olift_reduced B.hred)
-      (Lift.olift (Nat.le_max_right ..) C.obdd) (Lift.olift_reduced C.hred)
-
-private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
-    B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
-  constructor
-  · intro h
-    simp only [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
-    exact (OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
-  · intro h
-    simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
-    exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
-
-instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
-  | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
 
 def choice {B : BDD} (s : ∃ I, B.denotation' I) : Vector Bool B.nvars :=
   Choice.choice B.obdd (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])
