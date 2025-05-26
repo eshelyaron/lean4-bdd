@@ -8,154 +8,152 @@ import Bdd.Restrict
 import Bdd.Lift
 import Bdd.Evaluate
 import Bdd.Sim
+import Bdd.Size
 
-def ROBdd n m := { O : OBdd n m // O.Reduced }
-
+/-- Abstract BDD type. -/
 structure BDD where
-  nvars : Nat
+  /-- BDD input size (number of variables). -/
+  nvars         : Nat
   private nheap : Nat
-  private robdd : ROBdd nvars nheap
-
-namespace ROBdd
-
-def const : Bool → ROBdd 0 0 := fun b ↦
-  ⟨⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩, OBdd.reduced_of_terminal ⟨b, rfl⟩⟩
-
-def var (n : Nat) : ROBdd n.succ 1 :=
-  ⟨⟨⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩,
-  by
-    apply Bdd.ordered_of_low_high_ordered rfl
-    · simp only [Bdd.low]
-      conv =>
-        congr
-        right
-        rw [Vector.singleton_def]
-        simp [Vector.getElem_singleton (show 0 < 1 by omega)]
-      apply Bdd.Ordered_of_terminal
-    · simp [Bdd.low, Fin.last]
-      apply Fin.lt_def.mpr
-      simp only [Fin.val_natCast]
-      refine Nat.lt_succ_of_le ?_
-      exact Nat.mod_le n (n + 1 + 1)
-    · simp only [Bdd.high]
-      conv =>
-        congr
-        right
-        rw [Vector.singleton_def]
-        simp [Vector.getElem_singleton (show 0 < 1 by omega)]
-      apply Bdd.Ordered_of_terminal
-    · simp [Bdd.high, Fin.last]
-      apply Fin.lt_def.mpr
-      simp only [Fin.val_natCast]
-      refine Nat.lt_succ_of_le ?_
-      exact Nat.mod_le n (n + 1 + 1)
-  ⟩,
-  by
-    constructor
-    · rintro ⟨p, hp⟩
-      simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue] at hp
-      simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue]
-      rintro ⟨contra⟩
-      simp_all
-    · rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
-      simp only [InvImage]
-      simp only [OBdd.SimilarRP] at hxy
-      cases Pointer.Reachable_iff.mp hx with
-      | inl hh =>
-        simp at hh
-        cases Pointer.Reachable_iff.mp hy with
-        | inl hhh =>
-          simp only at hhh
-          simp_rw [← hh, hhh]
-        | inr hhh =>
-          rcases hhh with ⟨j, hj, hhh⟩
-          simp only at hj
-          injection hj with hj
-          simp only at hhh
-          rw [← hj] at hhh
-          simp at hhh
-          rcases hhh with hhh | hhh <;>
-          apply Pointer.eq_terminal_of_reachable at hhh <;>
-          simp_rw [← hh, hhh] at hxy <;>
-          simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
-          unfold OBdd.toTree at hxy <;>
-          simp at hxy
-      | inr hh =>
-        simp only at hh
-        rcases hh with ⟨j, hj, hh⟩
-        injection hj with hj
-        rw [← hj] at hh
-        simp at hh
-        cases Pointer.Reachable_iff.mp hy with
-        | inl hhh =>
-          simp only at hhh
-          rcases hh with hh | hh <;>
-          apply Pointer.eq_terminal_of_reachable at hh <;>
-          simp_rw [hh, ← hhh] at hxy <;>
-          simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
-          unfold OBdd.toTree at hxy <;>
-          simp at hxy
-        | inr hhh =>
-          simp only at hhh
-          rcases hhh with ⟨i, hi, hhh⟩
-          injection hi with hi
-          rw [← hi] at hhh
-          simp at hhh
-          cases hh with
-          | inl hh =>
-            apply Pointer.eq_terminal_of_reachable at hh
-            cases hhh with
-            | inl hhh =>
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp_all
-            | inr hhh =>
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp_rw [hh, hhh] at hxy
-              simp [OBdd.Similar, OBdd.HSimilar] at hxy
-          | inr hh =>
-            cases hhh with
-            | inl hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              simp_rw [hh, hhh] at hxy
-              simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy
-              unfold OBdd.toTree at hxy
-              simp at hxy
-            | inr hhh =>
-              apply Pointer.eq_terminal_of_reachable at hh
-              apply Pointer.eq_terminal_of_reachable at hhh
-              rw [hh, hhh]
-  ⟩
-
-end ROBdd
-
-open Reduce
+  private obdd  : OBdd nvars nheap
+  private hred  : obdd.Reduced
 
 namespace BDD
 
-private def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
-  match B.robdd.1.1.root with
-  | .terminal b => b
-  | .node j => False.elim (Nat.not_lt_zero _ (Eq.subst h B.robdd.1.1.heap[j].var.2))
+def size : BDD → Nat
+  | B => Size.size B.obdd
 
-private lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.robdd.1.1.root = .terminal (B.zero_vars_to_bool h) := by
+private def zero_vars_to_bool (B : BDD) : B.nvars = 0 → Bool := fun h ↦
+  match B.obdd.1.root with
+  | .terminal b => b
+  | .node j => False.elim (Nat.not_lt_zero _ (Eq.subst h B.obdd.1.heap[j].var.2))
+
+private lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.obdd.1.root = .terminal (B.zero_vars_to_bool h) := by
   simp only [zero_vars_to_bool]
   split
   next => assumption
   next => contradiction
 
-def const : Bool → BDD := fun b ↦ ⟨_, _, ROBdd.const b⟩
-def var   : Nat  → BDD := fun n ↦ ⟨_, _, ROBdd.var n⟩
+def const : Bool → BDD
+  | b => ⟨0, 0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩, OBdd.reduced_of_terminal ⟨b, rfl⟩⟩
+
+private abbrev var_raw (n : Nat) : Bdd (n+1) 1 := ⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩
+
+private lemma var_raw_ordered : Bdd.Ordered (var_raw n) := by
+  apply Bdd.ordered_of_low_high_ordered rfl
+  · simp only [Bdd.low]
+    conv =>
+      congr
+      right
+      rw [Vector.singleton_def]
+      simp [Vector.getElem_singleton (show 0 < 1 by omega)]
+    apply Bdd.Ordered_of_terminal
+  · simp [Bdd.low, Fin.last]
+    apply Fin.lt_def.mpr
+    simp only [Fin.val_natCast]
+    refine Nat.lt_succ_of_le ?_
+    exact Nat.mod_le n (n + 1 + 1)
+  · simp only [Bdd.high]
+    conv =>
+      congr
+      right
+      rw [Vector.singleton_def]
+      simp [Vector.getElem_singleton (show 0 < 1 by omega)]
+    apply Bdd.Ordered_of_terminal
+  · simp [Bdd.high, Fin.last]
+    apply Fin.lt_def.mpr
+    simp only [Fin.val_natCast]
+    refine Nat.lt_succ_of_le ?_
+    exact Nat.mod_le n (n + 1 + 1)
+
+private lemma var_raw_reduced : OBdd.Reduced ⟨(var_raw n), var_raw_ordered⟩ := by
+  constructor
+  · rintro ⟨p, hp⟩
+    simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue] at hp
+    simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue]
+    rintro ⟨contra⟩
+    simp_all
+  · rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
+    simp only [InvImage]
+    simp only [OBdd.SimilarRP] at hxy
+    cases Pointer.Reachable_iff.mp hx with
+    | inl hh =>
+      simp at hh
+      cases Pointer.Reachable_iff.mp hy with
+      | inl hhh =>
+        simp only at hhh
+        simp_rw [← hh, hhh]
+      | inr hhh =>
+        rcases hhh with ⟨j, hj, hhh⟩
+        simp only at hj
+        injection hj with hj
+        simp only at hhh
+        rw [← hj] at hhh
+        simp at hhh
+        rcases hhh with hhh | hhh <;>
+        apply Pointer.eq_terminal_of_reachable at hhh <;>
+        simp_rw [← hh, hhh] at hxy <;>
+        simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
+        unfold OBdd.toTree at hxy <;>
+        simp at hxy
+    | inr hh =>
+      simp only at hh
+      rcases hh with ⟨j, hj, hh⟩
+      injection hj with hj
+      rw [← hj] at hh
+      simp at hh
+      cases Pointer.Reachable_iff.mp hy with
+      | inl hhh =>
+        simp only at hhh
+        rcases hh with hh | hh <;>
+        apply Pointer.eq_terminal_of_reachable at hh <;>
+        simp_rw [hh, ← hhh] at hxy <;>
+        simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
+        unfold OBdd.toTree at hxy <;>
+        simp at hxy
+      | inr hhh =>
+        simp only at hhh
+        rcases hhh with ⟨i, hi, hhh⟩
+        injection hi with hi
+        rw [← hi] at hhh
+        simp at hhh
+        cases hh with
+        | inl hh =>
+          apply Pointer.eq_terminal_of_reachable at hh
+          cases hhh with
+          | inl hhh =>
+            apply Pointer.eq_terminal_of_reachable at hhh
+            simp_all
+          | inr hhh =>
+            apply Pointer.eq_terminal_of_reachable at hhh
+            simp_rw [hh, hhh] at hxy
+            simp [OBdd.Similar, OBdd.HSimilar] at hxy
+        | inr hh =>
+          cases hhh with
+          | inl hhh =>
+            apply Pointer.eq_terminal_of_reachable at hh
+            apply Pointer.eq_terminal_of_reachable at hhh
+            simp_rw [hh, hhh] at hxy
+            simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy
+            unfold OBdd.toTree at hxy
+            simp at hxy
+          | inr hhh =>
+            apply Pointer.eq_terminal_of_reachable at hh
+            apply Pointer.eq_terminal_of_reachable at hhh
+            rw [hh, hhh]
+
+def var   : Nat  → BDD
+  | n => ⟨n+1, _, ⟨var_raw n, var_raw_ordered⟩, var_raw_reduced⟩
 
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   match h : max B.nvars C.nvars with
   | .zero   => const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2))
   | .succ _ =>
-    ⟨_, _, ⟨(oreduce (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)).2, Reduce.oreduce_reduced⟩⟩
+    ⟨_, _, (Reduce.oreduce (Apply.apply' (by simpa) op B.obdd C.obdd)).2, Reduce.oreduce_reduced⟩
 
 private lemma apply_induction {B C : BDD} {op : Bool → Bool → Bool} {motive : BDD → Prop} :
   (base : (h : B.nvars ⊔ C.nvars = 0) → motive (const (op (zero_vars_to_bool B (Nat.max_eq_zero_iff.mp h).1) (zero_vars_to_bool C (Nat.max_eq_zero_iff.mp h).2)))) →
-  (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, ⟨(oreduce (Apply.apply' (by simpa) op B.robdd.1 C.robdd.1)).2, Reduce.oreduce_reduced⟩⟩) →
+  (step : ∀ p : Nat, (h : B.nvars ⊔ C.nvars = p.succ) → motive ⟨_, _, (Reduce.oreduce (Apply.apply' (by simpa) op B.obdd C.obdd)).2, Reduce.oreduce_reduced⟩) →
   motive (apply op B C) := by
   intro base step
   simp only [apply]
@@ -177,10 +175,10 @@ def imp : BDD → BDD → BDD := apply (! · || ·)
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 @[simp]
-private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.robdd.1
+private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
 
 def lift (B : BDD) (h : B.nvars ≤ n) : BDD :=
-  ⟨n, B.nheap, ⟨Lift.olift h B.robdd.1, Lift.olift_reduced B.robdd.2⟩⟩
+  ⟨n, _, Lift.olift h B.obdd, Lift.olift_reduced B.hred⟩
 
 @[simp]
 lemma lift_nvars {B : BDD} {h : B.nvars ≤ n} : (B.lift h).nvars = n := rfl
@@ -211,14 +209,14 @@ lemma const_nvars : (const b).nvars = 0 := rfl
 
 @[simp]
 lemma const_denotation : (const b).denotation h = Function.const _ b := by
-  simp [denotation, const, ROBdd.const, Evaluate.evaluate_terminal _, lift]
+  simp [denotation, const, Evaluate.evaluate_terminal _, lift]
 
 @[simp]
 lemma var_nvars : (var i).nvars = i + 1 := rfl
 
 @[simp]
 lemma var_denotation : (var i).denotation h I = I[i] := by
-  simp [denotation, evaluate, var, lift, ROBdd.var, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
+  simp [denotation, evaluate, var, lift, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
   rename_i n
   rw [var_nvars] at h
   have : (I.take (i + 1))[i] = I[i] := by
@@ -253,7 +251,7 @@ private lemma apply_spec' {B C : BDD} {op} {I : Vector Bool (B.nvars ⊔ C.nvars
     simp only [evaluate, Nat.succ_eq_add_one, id_eq, lift, Lift.olift_trivial_eq, Vector.cast_rfl]
     rw [Evaluate.evaluate_evaluate]
     simp only [OBdd.evaluate_cast h]
-    rw [oreduce_evaluate]
+    rw [Reduce.oreduce_evaluate]
     rw [← Apply.apply'_spec]
     congr <;> rw [← Evaluate.evaluate_evaluate] <;> rfl
   · exact apply_nvars
@@ -366,14 +364,15 @@ private def relabel' (B : BDD) (f : Nat → Nat)
       (h1 : ∀ i : Fin B.nvars, f i < f B.nvars)
       (h2 : ∀ i i', i < i' → Nary.DependsOn B.denotation' i → Nary.DependsOn B.denotation' i' → f i < f i') :
     BDD :=
-  ⟨f B.nvars, B.nheap,
-  ⟨Relabel.orelabel B.robdd.1 h1 (by
-    intro i i' hii' hi hi'
-    rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi
-    rw [OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2] at hi'
-    simp only [denotation, Evaluate.evaluate_evaluate, Lift.olift_trivial_eq, lift] at h2
-    exact h2 i i' hii' hi hi'),
-   Relabel.orelabel_reduced B.robdd.2⟩⟩
+  ⟨ f B.nvars, _,
+    Relabel.orelabel B.obdd h1 (by
+      intro i i' hii' hi hi'
+      rw [OBdd.usesVar_iff_dependsOn_of_reduced B.hred] at hi
+      rw [OBdd.usesVar_iff_dependsOn_of_reduced B.hred] at hi'
+      simp only [denotation, Evaluate.evaluate_evaluate, Lift.olift_trivial_eq, lift] at h2
+      exact h2 i i' hii' hi hi'),
+    Relabel.orelabel_reduced B.hred
+  ⟩
 
 def relabel'' (B : BDD) (f : Nat → Nat)
       (h1 : ∀ i : Fin B.nvars, f i < f B.nvars)
@@ -443,32 +442,33 @@ def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
 
 private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
-  (Lift.olift (Nat.le_max_left ..) B.robdd.1).HSimilar (Lift.olift (Nat.le_max_right ..) C.robdd.1)
+  (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) C.obdd)
 
 private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
   | B, C =>
     Sim.instDecidableRobddHSimilar
-      (Lift.olift (Nat.le_max_left ..) B.robdd.1)  (Lift.olift_reduced B.robdd.2)
-      (Lift.olift (Nat.le_max_right ..) C.robdd.1) (Lift.olift_reduced C.robdd.2)
+      (Lift.olift (Nat.le_max_left ..) B.obdd)  (Lift.olift_reduced B.hred)
+      (Lift.olift (Nat.le_max_right ..) C.obdd) (Lift.olift_reduced C.hred)
 
 private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
     B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
   constructor
   · intro h
     simp only [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
-    exact (OBdd.HCanonicity (Lift.olift_reduced B.robdd.2) (Lift.olift_reduced C.robdd.2) h)
+    exact (OBdd.HCanonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
   · intro h
     simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
-    exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.robdd.2) (Lift.olift_reduced C.robdd.2) h)
+    exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
 
 instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
 
-def choice {B : BDD} (s : ∃ I, B.denotation' I) : Vector Bool B.nvars := Choice.choice B.robdd.1 (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])
+def choice {B : BDD} (s : ∃ I, B.denotation' I) : Vector Bool B.nvars :=
+  Choice.choice B.obdd (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])
 
 @[simp]
 lemma choice_denotation {B : BDD} {s : ∃ I, B.denotation' I} : B.denotation' (B.choice s) = true := by
-  simp [choice, denotation, lift, Evaluate.evaluate_evaluate, Choice.choice_spec B.robdd.2 (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])]
+  simp [choice, denotation, lift, Evaluate.evaluate_evaluate, Choice.choice_evaluate B.hred (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])]
 
 private lemma find_aux {B : BDD} :
     ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool (max B.nvars 0)), B.denotation (by simp) I := by
@@ -521,7 +521,7 @@ def find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
 
 def restrict (B : BDD) (b : Bool) (i : Nat) : BDD :=
   if h : i < B.nvars
-  then ⟨_, _, ⟨(oreduce (Restrict.orestrict B.robdd.1 b ⟨i, h⟩)).2, Reduce.oreduce_reduced⟩⟩
+  then ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b ⟨i, h⟩)).2, Reduce.oreduce_reduced⟩
   else B
 
 lemma restrict_geq_eq_self {B : BDD} : i ≥ B.nvars → B.restrict b i = B := by
@@ -532,7 +532,7 @@ lemma restrict_geq_eq_self {B : BDD} : i ≥ B.nvars → B.restrict b i = B := b
   next => simp
 
 private lemma restrict_induction {B : BDD} {b : Bool} {i : Nat} {motive : BDD → Prop} :
-    ((ht : i < B.nvars) → motive ⟨_, _, ⟨(oreduce (Restrict.orestrict B.robdd.1 b ⟨i, ht⟩)).2, Reduce.oreduce_reduced⟩⟩) →
+    ((ht : i < B.nvars) → motive ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b ⟨i, ht⟩)).2, Reduce.oreduce_reduced⟩) →
     (¬ i < B.nvars → motive B) →
     motive (restrict B b i) := by
   intro h1 h2
@@ -561,7 +561,7 @@ lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
   refine restrict_induction (i := i) (b := b) (B := B) (motive := fun C ↦ ∀ h', C.denotation h' I = (Nary.restrict (B.denotation (by simp_all)) b ⟨i, by simp_all⟩) I) ?_ ?_ h
   · intro h1 h2
     simp only [denotation, lift, Nary.restrict, evaluate, eq_mp_eq_cast, id_eq, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
-    simp only [Vector.take_eq_extract, oreduce_evaluate, Restrict.orestrict_evaluate, Nary.restrict]
+    simp only [Vector.take_eq_extract, Reduce.oreduce_evaluate, Restrict.orestrict_evaluate, Nary.restrict]
     congr 1
     have :
         (Vector.cast (show min B.nvars n = B.nvars by simp_all) (I.extract 0 B.nvars)).set i b =
@@ -576,10 +576,10 @@ lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
     rw [← denotation_independentOf_of_geq_nvars (h2 := h1) (h1 := h2) (i := ⟨i, hi⟩)]
 
 instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := by
-  suffices s : Nary.DependsOn B.denotation' = B.robdd.1.1.usesVar by rw [s]; infer_instance
+  suffices s : Nary.DependsOn B.denotation' = B.obdd.1.usesVar by rw [s]; infer_instance
   simp only [denotation, Lift.olift_trivial_eq, Evaluate.evaluate_evaluate, lift]
   ext i
-  exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.robdd.2)
+  exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.hred)
 
 def bforall (B : BDD) (i : Nat) : BDD := (and (B.restrict false i) (B.restrict true i))
 

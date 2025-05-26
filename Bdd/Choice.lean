@@ -108,7 +108,8 @@ def choice_helper_spec {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = node j) 
       apply choice_helper_spec (high_reduced hr)
 termination_by O
 
-def choice_spec {O : OBdd n m} (hr : O.Reduced) (ht : ∃ I, O.evaluate I) : O.evaluate (choice O ht) := by
+@[simp]
+def choice_evaluate {O : OBdd n m} (hr : O.Reduced) (ht : ∃ I, O.evaluate I) : O.evaluate (choice O ht) := by
   simp only [choice]
   split
   next O_root_def => rw [evaluate_terminal' O_root_def]; simp

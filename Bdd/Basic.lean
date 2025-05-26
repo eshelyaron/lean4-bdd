@@ -77,10 +77,13 @@ deriving DecidableEq
 instance Bdd.instToString : ToString (Bdd n m) := ⟨fun B => "⟨" ++ (toString B.heap) ++ ", " ++ (toString B.root)  ++ "⟩"⟩
 
 open Bdd
+-- example : Bdd n 0 := ⟨Vector.emptyWithCapacity 0, .terminal true⟩
 
-inductive Edge (w : Vector (Node n m) m) : Pointer m → Pointer m → Prop where
-  | low  : w[j].low  = p → Edge w (node j) p
-  | high : w[j].high = p → Edge w (node j) p
+-- example : Bdd 1 1 := ⟨Vector.singleton ⟨0, .node 0, .node 0⟩, .node 0⟩
+
+inductive Edge (M : Vector (Node n m) m) : Pointer m → Pointer m → Prop where
+  | low  : M[j].low  = p → Edge M (node j) p
+  | high : M[j].high = p → Edge M (node j) p
 
 /-- Terminals have no outgoing edges. -/
 lemma not_terminal_edge {q} : ¬ Edge w (terminal b) q := by
@@ -125,7 +128,7 @@ def Pointer.Reachable {n m} (w : Vector (Node n m) m) := Relation.ReflTransGen (
 theorem Pointer.Reachable.trans (hab : Reachable v a b) (hbc : Reachable v b c) : Reachable v a c := Relation.ReflTransGen.trans hab hbc
 
 /-- `B.RelevantPointer` is the subtype of pointers reachable from `B.root`. -/
-def Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
+abbrev Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
 
 instance Bdd.instDecidableEqRelevantPointer : DecidableEq (Bdd.RelevantPointer B) :=
   fun _ _ ↦ decidable_of_iff _ (symm Subtype.eq_iff)
@@ -135,19 +138,19 @@ def Bdd.toRelevantPointer {n m} (B : Bdd n m) : B.RelevantPointer :=
 
 /-- The `Edge` relation lifted to `RelevantPointer`s. -/
 @[simp]
-def Bdd.RelevantEdge (B : Bdd n m) (p q : B.RelevantPointer) := Edge B.heap p.1 q.1
+abbrev Bdd.RelevantEdge (B : Bdd n m) (p q : B.RelevantPointer) := Edge B.heap p.1 q.1
 
 lemma Bdd.RelevantEdge_from_Edge_Reachable
   {B : Bdd n m} (e : Edge B.heap p q)
-  (hp : Reachable B.heap B.root p) (hq : Reachable B.heap B.root q) :
-  RelevantEdge B ⟨p, hp⟩ ⟨q, hq⟩ := e
+  (hp : Reachable B.heap B.root p) :
+  RelevantEdge B ⟨p, hp⟩ ⟨q, .tail hp e⟩ := e
 
 /-- The `MayPrecede` relation lifted to `RelevantPointer`s. -/
 @[simp]
 def Bdd.RelevantMayPrecede (B : Bdd n m) (p q : B.RelevantPointer) := MayPrecede B.heap p.1 q.1
 
 /-- A BDD is `Ordered` if all edges relevant from the root respect the variable ordering. -/
-def Bdd.Ordered {n m} (B : Bdd n m) := Subrelation (RelevantEdge B) (RelevantMayPrecede B)
+def Bdd.Ordered (B : Bdd n m) := Subrelation (RelevantEdge B) (RelevantMayPrecede B)
 
 /-- Terminals induce `Ordered` BDDs. -/
 lemma Bdd.Ordered_of_terminal : Bdd.Ordered ⟨M, terminal b⟩ := by
@@ -161,7 +164,7 @@ lemma Bdd.Ordered_of_terminal' {B : Bdd n m} : B.root = terminal b → B.Ordered
   rw [h]
   apply Ordered_of_terminal
 
-def OBdd n m := { B : Bdd n m // Ordered B }
+def OBdd n m := { B : Bdd n m // B.Ordered }
 
 def OEdge (O U : OBdd n m) := O.1.heap = U.1.heap ∧ Edge O.1.heap O.1.root U.1.root
 
@@ -192,38 +195,30 @@ theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
 
 /-- The `OEdge` relation between Ordered BDDs is converse well-founded. -/
 theorem OEdge.flip_wellFounded {n m} : @WellFounded (OBdd n m) (flip OEdge) := by
-  have : Subrelation (flip (@OEdge n m)) (InvImage Nat.lt OBdd.rav) := by
-    rintro ⟨x, hx⟩ ⟨y, hy⟩ ⟨h1, h2⟩
-    simp_all only [Ordered]
-    rw [← h1] at h2
-    let ys := y.toRelevantPointer
-    let xs : y.RelevantPointer := ⟨x.root, Relation.ReflTransGen.tail Relation.ReflTransGen.refl h2⟩
-    have h3 : RelevantEdge y ys xs := h2
-    apply hy at h3
-    simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
-    simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, gt_iff_lt, xs, ys]
-    rcases hp : y.root
-    case terminal =>
-      simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq,
-                     Fin.natCast_eq_last, Fin.val_last, Nat.sub_self, Nat.not_lt_zero, xs, ys]
-      apply Fin.ne_last_of_lt at h3
-      contradiction
-    case node j => rcases hq : x.root <;> refine Nat.sub_lt_sub_left ?_ ?_ <;> simp_all
-  exact Subrelation.wf this (InvImage.wf _ (Nat.lt_wfRel.wf))
+  refine Subrelation.wf ?_ (InvImage.wf OBdd.rav (Nat.lt_wfRel.wf))
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ ⟨h1, h2⟩
+  simp_all only
+  rw [← h1] at h2
+  let ys := y.toRelevantPointer
+  let xs : y.RelevantPointer := ⟨x.root, .tail .refl h2⟩
+  have h3 : RelevantEdge y ys xs := h2
+  apply hy at h3
+  simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
+  simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, gt_iff_lt, xs, ys]
+  cases hp : y.root with
+  | terminal => rw [hp] at h2; contradiction
+  | node j => cases _ : x.root <;> refine Nat.sub_lt_sub_left ?_ ?_ <;> simp_all
 
 instance OEdge.instWellFoundedRelation {n m} : WellFoundedRelation (OBdd n m) where
   rel := flip OEdge
   wf  := flip_wellFounded
 
 lemma Bdd.ordered_of_reachable' {B : Bdd n m} :
-    B.Ordered → Reachable B.heap B.root p → Ordered ⟨B.heap, p⟩ := by
-  intro h1 h2
-  rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
-  exact h1 (RelevantEdge_from_Edge_Reachable e (Relation.ReflTransGen.trans h2 hx) (Relation.ReflTransGen.trans h2 hy))
+    B.Ordered → Reachable B.heap B.root p → Ordered ⟨B.heap, p⟩ :=
+  fun ho hr x _ _ ↦ ho (RelevantEdge_from_Edge_Reachable (by simp_all) (.trans hr x.2))
 
 lemma Bdd.ordered_of_reachable {O : OBdd n m} :
-    Reachable O.1.heap O.1.root p → Ordered {heap := O.1.heap, root := p} := ordered_of_reachable' O.2
+    Reachable O.1.heap O.1.root p → Ordered ⟨O.1.heap, p⟩ := ordered_of_reachable' O.2
 
 /-- All BDDs in the graph of an `Ordered` BDD are `Ordered`. -/
 lemma Bdd.ordered_of_relevant (O : OBdd n m) (S : O.1.RelevantPointer) :
