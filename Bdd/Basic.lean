@@ -1750,3 +1750,15 @@ lemma Bdd.terminal_of_zero_heap {B : Bdd n m} : m = 0 → ∃ b, B.root = .termi
   cases hr : B.root with
   | terminal b => exact ⟨b, rfl⟩
   | node j => exact False.elim (Nat.not_lt_zero _ j.2)
+
+lemma Pointer.toVar_lt_of_trans_edge_of_ordered :
+    Bdd.Ordered ⟨M, x⟩ → Relation.TransGen (Edge M) x y → x.toVar M < y.toVar M := by
+  intro h1 h2
+  induction h2 with
+  | single e =>
+    have := h1 (relevantEdge_of_edge_of_reachable e .refl)
+    simp_all
+  | tail r e t =>
+    have := h1 (relevantEdge_of_edge_of_reachable e (Relation.TransGen.to_reflTransGen r))
+    simp_all only [Nat.succ_eq_add_one, RelevantMayPrecede, MayPrecede, gt_iff_lt]
+    omega
