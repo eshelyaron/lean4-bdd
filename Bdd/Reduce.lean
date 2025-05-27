@@ -5,11 +5,11 @@ import Bdd.Trim
 open Pointer
 open Bdd
 
-def OBdd.discover_helper : List (Fin m) → Vector (Node n m ) m → Vector (List (Fin m)) n → Vector (List (Fin m)) n
+private def OBdd.discover_helper : List (Fin m) → Vector (Node n m ) m → Vector (List (Fin m)) n → Vector (List (Fin m)) n
   | [], _, I => I
   | head :: tail, v, I => discover_helper tail v (I.set v[head].var (head :: I[v[head].var]))
 
-lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m)) n} {i : Fin n}: j ∈ I[i] → j ∈ (discover_helper l v I)[i] := by
+private lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m)) n} {i : Fin n}: j ∈ I[i] → j ∈ (discover_helper l v I)[i] := by
   intro h
   cases l with
   | nil => assumption
@@ -28,7 +28,7 @@ lemma OBdd.discover_helper_retains_found (O : OBdd n m) {I : Vector (List (Fin m
       right
       assumption
 
-lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
+private lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
     j ∈ l → j ∈ (discover_helper l v I).get v[j].var := by
   intro h
   cases h with
@@ -57,40 +57,40 @@ theorem OBdd.discover_spec_reverse {O : OBdd n m} {j : Fin m} :
     j ∈ (discover O).get i → (Reachable O.1.heap O.1.root (node j)) ∧ O.1.heap[j].var = i := sorry
 
 namespace Reduce
-structure State (n) (m) where
+private structure State (n) (m) where
   out : Vector (Node n m) m
   ids : Vector (Pointer m) m
   nid : Fin m
 
-def initial {n m : Nat} : State n.succ m.succ :=
+private def initial {n m : Nat} : State n.succ m.succ :=
   ⟨ (Vector.replicate m.succ {var := 0, low := terminal false, high := terminal true}),
     (Vector.replicate m.succ (terminal false)),
     Fin.last m
   ⟩
 
-def get_out : StateM (State n m) (Vector (Node n m) m) := get >>= fun s ↦ pure s.out
+private def get_out : StateM (State n m) (Vector (Node n m) m) := get >>= fun s ↦ pure s.out
 
-def get_id : Pointer m → StateM (State n m) (Pointer m)
+private def get_id : Pointer m → StateM (State n m) (Pointer m)
   | terminal b => pure (terminal b)
   | node j => get >>= fun s ↦ pure (s.ids[j])
 
-def set_id : Fin m → Pointer m → StateM (State n m) Unit :=
+private def set_id : Fin m → Pointer m → StateM (State n m) Unit :=
   fun j p ↦ get >>= fun s ↦ set (⟨s.out, s.ids.set j p, s.nid⟩ : State n m)
 
-def set_id_to_nid : Fin m → StateM (State n m) Unit :=
+private def set_id_to_nid : Fin m → StateM (State n m) Unit :=
   fun j ↦ get >>= fun s ↦ set_id j (node s.nid)
 
-def set_out {n m : Nat} : Node n.succ m.succ → StateM (State n.succ m.succ) Unit :=
+private def set_out {n m : Nat} : Node n.succ m.succ → StateM (State n.succ m.succ) Unit :=
   fun N ↦ get >>= fun s ↦
     have : (s.nid.1 + 1) % m.succ < m.succ := by simp [Nat.mod_lt]
     set (⟨s.out.set ((s.nid.1 + 1) % m.succ) N, s.ids, s.nid + 1⟩ : State n.succ m.succ)
 
 @[simp]
-lemma set_out_preserves_ids {n m : Nat} {s : State n.succ m.succ} {p : Node n.succ m.succ} : (set_out p s).2.ids = s.ids := by
+private lemma set_out_preserves_ids {n m : Nat} {s : State n.succ m.succ} {p : Node n.succ m.succ} : (set_out p s).2.ids = s.ids := by
   simp [set_out, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set]
 
 @[simp]
-lemma set_out_preserves_id {n m : Nat} {s : State n.succ m.succ} {p : Node n.succ m.succ} {j : Pointer m.succ}: (get_id j (set_out p s).2).1 = (get_id j s).1 := by
+private lemma set_out_preserves_id {n m : Nat} {s : State n.succ m.succ} {p : Node n.succ m.succ} {j : Pointer m.succ}: (get_id j (set_out p s).2).1 = (get_id j s).1 := by
   nth_rw 1 [get_id.eq_def]
   split
   next =>
@@ -99,7 +99,7 @@ lemma set_out_preserves_id {n m : Nat} {s : State n.succ m.succ} {p : Node n.suc
     simp only [bind, StateT.bind, pure, get, getThe, MonadStateOf.get, StateT.get, StateT.pure, get_id]
     rw [set_out_preserves_ids]
 
-def populate_queue (v : Vector (Node n m) m) (acc : List ((Pointer m × Pointer m) × Fin m)) : List (Fin m) → StateM (State n m) (List ((Pointer m × Pointer m) × Fin m))
+private def populate_queue (v : Vector (Node n m) m) (acc : List ((Pointer m × Pointer m) × Fin m)) : List (Fin m) → StateM (State n m) (List ((Pointer m × Pointer m) × Fin m))
   | [] => pure acc
   | j :: tail => do
     let lid ← get_id v[j].low
@@ -112,7 +112,7 @@ def populate_queue (v : Vector (Node n m) m) (acc : List ((Pointer m × Pointer 
       populate_queue v acc tail
     else populate_queue v (⟨⟨lid, hid⟩, j⟩ :: acc) tail
 
-def process_record {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (curkey : Pointer m.succ × Pointer m.succ) : (Pointer m.succ × Pointer m.succ) × Fin m.succ → StateM (State n.succ m.succ) (Pointer m.succ × Pointer m.succ) := fun ⟨key, j⟩ ↦ do
+private def process_record {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (curkey : Pointer m.succ × Pointer m.succ) : (Pointer m.succ × Pointer m.succ) × Fin m.succ → StateM (State n.succ m.succ) (Pointer m.succ × Pointer m.succ) := fun ⟨key, j⟩ ↦ do
   if key = curkey
   then
     -- isomorphism in original BDD, reduce.
@@ -125,18 +125,18 @@ def process_record {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (curkey 
     set_id_to_nid j
     pure key
 
-def process_queue {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (curkey : Pointer m.succ × Pointer m.succ) :
+private def process_queue {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (curkey : Pointer m.succ × Pointer m.succ) :
   List ((Pointer m.succ × Pointer m.succ) × Fin m.succ) → StateM (State n.succ m.succ) Unit
   | [] => pure ()
   | head :: tail => do
     let newkey ← process_record v curkey head
     process_queue v newkey tail
 
-def step {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (vlist : Vector (List (Fin m.succ)) n.succ) (i : Fin n.succ) : StateM (State n.succ m.succ) Unit := do
+private def step {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (vlist : Vector (List (Fin m.succ)) n.succ) (i : Fin n.succ) : StateM (State n.succ m.succ) Unit := do
   let Q ← populate_queue v [] vlist[i]
   process_queue v ⟨node 0, node 0⟩ (List.mergeSort Q)
 
-def loop {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (r : Fin m.succ) (vlist : Vector (List (Fin m.succ)) n.succ) (i : Fin n.succ) : StateM (State n.succ m.succ) (Bdd n.succ m.succ) := do
+private def loop {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (r : Fin m.succ) (vlist : Vector (List (Fin m.succ)) n.succ) (i : Fin n.succ) : StateM (State n.succ m.succ) (Bdd n.succ m.succ) := do
   step v vlist i
   match h : i.1 - v[r].var.1 with
   | Nat.zero =>
@@ -148,7 +148,7 @@ def loop {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (r : Fin m.succ) (
 termination_by i.1 - v[r].var.1
 decreasing_by simp_all
 
-theorem loop_induction {n m : Nat} {motive : Bdd n.succ m.succ → Prop}
+private theorem loop_induction {n m : Nat} {motive : Bdd n.succ m.succ → Prop}
     (v : Vector (Node n.succ m.succ) m.succ) (r : Fin m.succ) (vlist : Vector (List (Fin m.succ)) n.succ) (i : Fin n.succ) (s : State n.succ m.succ)
     (one : i.1 - v[r].var.1 = 0 → motive {heap := (step v vlist i s).2.out, root := (get_id (node r) (step v vlist i s).2).1})
     (two : ∀ (d : Nat), (h : i.1 - v[r].var.1 = d.succ) → motive (loop v r vlist ⟨(d + v[r].var.1), by omega⟩ (step v vlist i s).2).1) :
@@ -171,46 +171,46 @@ theorem loop_induction {n m : Nat} {motive : Bdd n.succ m.succ → Prop}
       convert (two d h)
       rw [heq]
 
-def reduce {n m : Nat} (O : OBdd n.succ m.succ) : Bdd n.succ m.succ :=
+private def reduce {n m : Nat} (O : OBdd n.succ m.succ) : Bdd n.succ m.succ :=
   match O.1.root with
   | terminal _ => O.1 -- Terminals are already reduced.
   | node r => (StateT.run (loop O.1.heap r (OBdd.discover O) n) initial).1
 
-def GoodNid {n m : Nat} (O : OBdd n.succ m.succ)  (s : State n.succ m.succ) : Prop :=
+private def GoodNid {n m : Nat} (O : OBdd n.succ m.succ)  (s : State n.succ m.succ) : Prop :=
     ∀ (j : Fin m.succ), j < s.nid + 1 →
     let B : Bdd n.succ m.succ := {heap := s.out, root := node j}
       ∃ (hB : B.Ordered), OBdd.Reduced ⟨B, hB⟩
     ∧ ∃ (j' : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j')), (get_id (node j') s).1 = (node j)
     ∧ OBdd.evaluate ⟨B, hB⟩ = OBdd.evaluate ⟨{heap := O.1.heap, root := node j'}, ordered_of_relevant O ⟨node j', hj⟩⟩
 
-def GoodInputPointer {n m : Nat} (O : OBdd n.succ m.succ) (s : State n.succ m.succ) (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)) : Prop :=
+private def GoodInputPointer {n m : Nat} (O : OBdd n.succ m.succ) (s : State n.succ m.succ) (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)) : Prop :=
     let p := (get_id (node j) s).1
     let B : Bdd n.succ m.succ := {heap := s.out, root := p}
     ∃ (hB : B.Ordered), OBdd.Reduced ⟨B, hB⟩
     ∧ OBdd.evaluate ⟨{heap := O.1.heap, root := node j}, ordered_of_relevant O ⟨node j, hj⟩⟩ = OBdd.evaluate ⟨B, hB⟩
 
-def GoodVar {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
+private def GoodVar {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
     ∀ (j : Fin m.succ), (hj : Reachable O.1.heap O.1.root (node j)) → i < O.1.heap[j].var → GoodInputPointer O s j hj
 
-def GreatVar {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
+private def GreatVar {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
     ∀ (j : Fin m.succ), (hj : Reachable O.1.heap O.1.root (node j)) → i ≤ O.1.heap[j].var → GoodInputPointer O s j hj
 
-lemma GoodNid_of_initial {n m : Nat} {O : OBdd n.succ m.succ} : GoodNid O initial := by
+private lemma GoodNid_of_initial {n m : Nat} {O : OBdd n.succ m.succ} : GoodNid O initial := by
   intro _ h
   simp [initial] at h
 
-lemma GoodVar_of_initial {n m : Nat} {O : OBdd n.succ m.succ} : GoodVar O n initial := by
+private lemma GoodVar_of_initial {n m : Nat} {O : OBdd n.succ m.succ} : GoodVar O n initial := by
   intro _ _ contra
   apply Fin.ne_last_of_lt at contra
   simp at contra
 
-def Invariant {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
+private def Invariant {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
   GoodNid O s ∧ GoodVar O i s
 
-def Invariant' {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
+private def Invariant' {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) : Prop :=
   GoodNid O s ∧ GreatVar O i s
 
-lemma Invariant_of_Invariant' {n m : Nat} {O : OBdd n.succ m.succ} {i i' : Fin n.succ} {s : State n.succ m.succ} :
+private lemma Invariant_of_Invariant' {n m : Nat} {O : OBdd n.succ m.succ} {i i' : Fin n.succ} {s : State n.succ m.succ} :
     Invariant' O i s → i.1 = i'.1.succ → Invariant O i' s := by
   intro h1 h2
   constructor
@@ -219,31 +219,31 @@ lemma Invariant_of_Invariant' {n m : Nat} {O : OBdd n.succ m.succ} {i i' : Fin n
     apply h1.2
     omega
 
-lemma Invariant_of_initial {n m : Nat} (O : OBdd n.succ m.succ) : Invariant O n initial :=
+private lemma Invariant_of_initial {n m : Nat} (O : OBdd n.succ m.succ) : Invariant O n initial :=
  ⟨GoodNid_of_initial, GoodVar_of_initial⟩
 
 @[simp]
-lemma get_id_preserves_state : (get_id p s).2 = s := by
+private lemma get_id_preserves_state : (get_id p s).2 = s := by
   simp [get_id]
   split <;> rfl
 
 @[simp]
-lemma set_id_preserves_nid : (set_id j p s).2.nid = s.nid := by
+private lemma set_id_preserves_nid : (set_id j p s).2.nid = s.nid := by
   simp [set_id, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set]
 
 @[simp]
-lemma set_id_preserves_out : (set_id j p s).2.out = s.out := by
+private lemma set_id_preserves_out : (set_id j p s).2.out = s.out := by
   simp [set_id, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set]
 
 @[simp]
-lemma set_id_to_nid_preserves_nid : (set_id_to_nid j s).2.nid = s.nid := by
+private lemma set_id_to_nid_preserves_nid : (set_id_to_nid j s).2.nid = s.nid := by
   simp [set_id_to_nid, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set]
 
 @[simp]
-lemma set_id_to_nid_preserves_out : (set_id_to_nid j s).2.out = s.out := by
+private lemma set_id_to_nid_preserves_out : (set_id_to_nid j s).2.out = s.out := by
   simp [set_id_to_nid, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set]
 
-lemma set_id_to_nid_preserves_GoodNid {n m : Nat} {j : Fin m.succ} {O : OBdd n.succ m.succ} {s : State n.succ m.succ} :
+private lemma set_id_to_nid_preserves_GoodNid {n m : Nat} {j : Fin m.succ} {O : OBdd n.succ m.succ} {s : State n.succ m.succ} :
    (get_id (node j) s).1 = terminal false → GoodNid O s → GoodNid O (set_id_to_nid j s).2 := by
   intro hj h
   simp only [set_id_to_nid, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set_id, set, StateT.set, pure]
@@ -265,7 +265,7 @@ lemma set_id_to_nid_preserves_GoodNid {n m : Nat} {j : Fin m.succ} {O : OBdd n.s
       contradiction
     · assumption
 
-lemma set_out_preserves_ordered {n m : Nat} {j : Fin m.succ} {s : State n.succ m.succ} {N : Node n.succ m.succ}:
+private lemma set_out_preserves_ordered {n m : Nat} {j : Fin m.succ} {s : State n.succ m.succ} {N : Node n.succ m.succ}:
     Bdd.Ordered {heap := s.out, root := node j} → Bdd.Ordered {heap := (set_out N s).2.out, root := node j} := by
   intro h
   simp only [set_out, bind, StateT.bind, get, getThe, MonadStateOf.get, StateT.get, set, StateT.set, pure]
@@ -285,12 +285,12 @@ lemma set_out_preserves_ordered {n m : Nat} {j : Fin m.succ} {s : State n.succ m
 --       populate_queue v acc tail
 --     else populate_queue v (⟨⟨lid, hid⟩, j⟩ :: acc) tail
 
-lemma get_id_set_id_of_ne (h : i ≠ j) : (get_id (node j) (set_id i p s).2).1 = (get_id (node j) s).1 := by
+private lemma get_id_set_id_of_ne (h : i ≠ j) : (get_id (node j) (set_id i p s).2).1 = (get_id (node j) s).1 := by
   apply Vector.getElem_set_ne
   · simp_all only [ne_eq, Fin.is_lt]
   · simp_all only [ne_eq, Fin.is_lt, Fin.val_ne_of_ne h, not_false_eq_true]
 
-lemma populate_queue_preserves_invariant_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
+private lemma populate_queue_preserves_invariant_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
     (∀ j ∈ nodes, O.1.heap[j].var = i ∧ (get_id (node j) s).1 = terminal false) →
     List.Nodup nodes →
     Invariant O i s → Invariant O i (populate_queue O.1.heap acc nodes s).2 := by
@@ -370,7 +370,7 @@ lemma populate_queue_preserves_invariant_helper {n m : Nat} (O : OBdd n.succ m.s
           · exact List.Nodup.of_cons nd
           · assumption
 
-lemma populate_queue_preserves_invariant {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
+private lemma populate_queue_preserves_invariant {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
     (∀ j ∈ O.discover[i], (get_id (node j) s).1 = terminal false) →
     Invariant O i s → Invariant O i (populate_queue O.1.heap [] (O.discover)[i] s).2 := by
   intro h
@@ -394,7 +394,7 @@ lemma populate_queue_preserves_invariant {n m : Nat} (O : OBdd n.succ m.succ) (i
 --         fun I ↦ if I[O.1.heap[j].var] then (OBdd.evaluate ⟨h, hh⟩ I) else  (OBdd.evaluate ⟨l, hl⟩ I)) := by
 --   sorry
 
-lemma populate_queue_accumulates {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (s : State n.succ m.succ) (r : (Pointer m.succ × Pointer m.succ) × Fin m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
+private lemma populate_queue_accumulates {n m : Nat} (v : Vector (Node n.succ m.succ) m.succ) (s : State n.succ m.succ) (r : (Pointer m.succ × Pointer m.succ) × Fin m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
     r ∈ acc → r ∈ (populate_queue v acc nodes s).1 := by
   intro hrin
   cases nodes with
@@ -411,7 +411,7 @@ lemma populate_queue_accumulates {n m : Nat} (v : Vector (Node n.succ m.succ) m.
         next hf =>
           exact populate_queue_accumulates v s2 r _ tail (.tail _ hrin)
 
-lemma populate_queue_spec_helper2 {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
+private lemma populate_queue_spec_helper2 {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
     (hnodes : ∀ j ∈ nodes, (get_id (node j) s).1 = terminal false ∧ Reachable O.1.heap O.1.root (node j) ∧ i = O.1.heap[j].var) →
     Invariant O i s →
     ∀ j (hjin : j ∈ nodes),
@@ -468,7 +468,7 @@ lemma populate_queue_spec_helper2 {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin 
               simp only at this
               assumption
 
-lemma populate_queue_spec_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
+private lemma populate_queue_spec_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) (acc : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (nodes : List (Fin m.succ)) :
     (hnodes : ∀ j ∈ nodes, (get_id (node j) s).1 = terminal false ∧ Reachable O.1.heap O.1.root (node j) ∧ i = O.1.heap[j].var) →
     Invariant O i s →
     ∀ j (hjin : j ∈ nodes),
@@ -528,7 +528,7 @@ lemma populate_queue_spec_helper {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n
 
 -- XXX Also look at bv_decide
 
-lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
+private lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) (s : State n.succ m.succ) :
     (∀ (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)), i = O.1.heap[j].var → (get_id (node j) s).1 = terminal false) →
     Invariant O i s →
     ∀ (j : Fin m.succ) (hj : Reachable O.1.heap O.1.root (node j)), i = O.1.heap[j].var →
@@ -561,7 +561,7 @@ lemma populate_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (i : Fin n.succ) 
 --     set_id_to_nid j
 --     pure key
 
-lemma process_record_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer m.succ × Pointer m.succ) (rcrd : (Pointer m.succ × Pointer m.succ) × Fin m.succ) (s : State n.succ m.succ) :
+private lemma process_record_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer m.succ × Pointer m.succ) (rcrd : (Pointer m.succ × Pointer m.succ) × Fin m.succ) (s : State n.succ m.succ) :
     (get_id (node rcrd.2) s).1 = terminal false → GoodNid O s → GoodNid O (process_record O.1.heap curkey rcrd s).2 := by
   intro hf h
   unfold process_record
@@ -609,7 +609,7 @@ lemma process_record_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer
                   sorry
 
 
-lemma process_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer m.succ × Pointer m.succ) (Q : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (s : State n.succ m.succ) :
+private lemma process_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer m.succ × Pointer m.succ) (Q : List ((Pointer m.succ × Pointer m.succ) × Fin m.succ)) (s : State n.succ m.succ) :
     GoodNid O s →  GoodNid O (process_queue O.1.heap curkey Q s).2 := by
   intro h
   unfold process_queue
@@ -625,7 +625,7 @@ lemma process_queue_spec {n m : Nat} (O : OBdd n.succ m.succ) (curkey : Pointer 
       sorry
 
 
-def step_spec {n m : Nat} {O : OBdd n.succ m.succ} {i : Fin n.succ} {s : State n.succ m.succ} :
+private def step_spec {n m : Nat} {O : OBdd n.succ m.succ} {i : Fin n.succ} {s : State n.succ m.succ} :
     Invariant O i s → Invariant' O i (step O.1.heap O.discover i s).2 := by
   intro hinv
   simp only [step, bind, StateT.bind]
@@ -638,7 +638,7 @@ def step_spec {n m : Nat} {O : OBdd n.succ m.succ} {i : Fin n.succ} {s : State n
       sorry
     · sorry
 
-def loop_spec_helper_ordered {n m : Nat} {O : OBdd n.succ m.succ} {r} {i} {s} :
+private def loop_spec_helper_ordered {n m : Nat} {O : OBdd n.succ m.succ} {r} {i} {s} :
     Invariant O i s →
     O.1.root = node r →
     (loop O.1.heap r O.discover i s).1.Ordered := by
@@ -670,7 +670,7 @@ def loop_spec_helper_ordered {n m : Nat} {O : OBdd n.succ m.succ} {r} {i} {s} :
 termination_by i.1 - O.1.heap[r].var.1
 decreasing_by simp_all
 
-def loop_spec_helper' {n m : Nat} {O : OBdd n.succ m.succ} {r} {i} {s} :
+private def loop_spec_helper' {n m : Nat} {O : OBdd n.succ m.succ} {r} {i} {s} :
     Invariant O i s →
     O.1.root = node r →
     let R := (loop O.1.heap r O.discover i s).1
@@ -794,13 +794,13 @@ decreasing_by simp_all
 -- termination_by i.1 - v[r].var.1
 -- decreasing_by simp_all
 
-def loop_spec {n m : Nat} {O : OBdd n.succ m.succ} {r} :
+private def loop_spec {n m : Nat} {O : OBdd n.succ m.succ} {r} :
     O.1.root = node r →
     let R := (loop O.1.heap r O.discover n initial).1
     ∃ (ho : R.Ordered), OBdd.Reduced ⟨R, ho⟩ ∧ O.evaluate = OBdd.evaluate ⟨R, ho⟩ :=
   loop_spec_helper' (Invariant_of_initial O)
 
-def reduce_spec {n m : Nat} {O : OBdd n.succ m.succ} : ∃ (ho : (reduce O).Ordered), (OBdd.Reduced ⟨reduce O, ho⟩ ∧ O.evaluate = OBdd.evaluate ⟨reduce O, ho⟩) := by
+private def reduce_spec {n m : Nat} {O : OBdd n.succ m.succ} : ∃ (ho : (reduce O).Ordered), (OBdd.Reduced ⟨reduce O, ho⟩ ∧ O.evaluate = OBdd.evaluate ⟨reduce O, ho⟩) := by
   cases O_root_def : O.1.root with
   | terminal b =>
     simp only [reduce]
@@ -817,7 +817,7 @@ def reduce_spec {n m : Nat} {O : OBdd n.succ m.succ} : ∃ (ho : (reduce O).Orde
     simp only [StateT.run]
     exact loop_spec O_root_def
 
-def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
+private def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
   match n with
   | .zero => O
   | .succ _ =>
@@ -825,7 +825,7 @@ def reduce' {n m : Nat} (O : OBdd n m) : OBdd n m :=
     | .zero => O
     | .succ _ => ⟨reduce O, reduce_spec.1⟩
 
-lemma reduce'_spec {O : OBdd n m} :
+private lemma reduce'_spec {O : OBdd n m} :
     OBdd.Reduced (reduce' O) ∧ O.evaluate = (reduce' O).evaluate := by
   simp only [reduce']
   split
@@ -875,7 +875,7 @@ def oreduce (O : OBdd n m) : Σ k, OBdd n k :=
     | .zero => ⟨0, O⟩
     | .succ _ =>
       match h : reduce'' O with
-      | ⟨B, k⟩ => ⟨k, ⟨Trim.trim B sorry sorry, Trim.trim_ordered (by sorry)⟩⟩
+      | ⟨B, k⟩ => ⟨k, ⟨Trim.trim B (by simp) sorry, Trim.trim_ordered (by sorry)⟩⟩
 
 lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).2 := sorry
 

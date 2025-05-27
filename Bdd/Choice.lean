@@ -5,7 +5,7 @@ namespace Choice
 open Pointer
 open OBdd
 
-def choice_helper (O : OBdd n m) : O.1.root = .node j → Vector Bool n → Vector Bool n := fun hj I ↦
+private def choice_helper (O : OBdd n m) : O.1.root = .node j → Vector Bool n → Vector Bool n := fun hj I ↦
   match hl : O.1.heap[j].low with
   | .node j => choice_helper (O.low hj) hl I
   | .terminal true => I.set O.1.heap[j].var false
@@ -29,7 +29,7 @@ private lemma Vector.get_set_ne {xs : Vector α n} {x : α} (hi : i < n) {j : Fi
   simp only [Vector.get]
   aesop
 
-def choice_helper_spec' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = .node j) (i : Fin n) :
+private def choice_helper_spec' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = .node j) (i : Fin n) :
     i < O.1.heap[j].var → (choice_helper O hj (Vector.replicate n false)).get i = false := by
   intro hi
   unfold choice_helper
@@ -60,12 +60,12 @@ def choice_helper_spec' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = .node j
       · omega
 termination_by O
 
-def choice_helper_spec'' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = node j) (i : Fin n) :
+private def choice_helper_spec'' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = node j) (i : Fin n) :
     i < O.1.heap[j].var → (choice_helper O hj (Vector.replicate n false))[i] = false := by
   have := choice_helper_spec' hr hj i
   exact this
 
-def choice_helper_spec {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = node j) :
+private def choice_helper_spec {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = node j) :
     O.evaluate (choice_helper O hj (Vector.replicate n false)) := by
   unfold choice_helper
   split

@@ -3,23 +3,15 @@ import Bdd.Lift
 import Std.Data.HashMap.Lemmas
 
 namespace Apply
-inductive RawPointer where
-  | terminal : Bool → RawPointer
-  | node     : Nat  → RawPointer
-
-structure RawNode (n) where
-  var  : Fin n
-  low  : RawPointer
-  high : RawPointer
 
 abbrev p2t : Nat → Nat → Nat := fun l r ↦ (l + 2) * (r + 2)
 
-structure State (n) (m) (m') where
+private structure State (n) (m) (m') where
   cache : Std.HashMap (Pointer m × Pointer m') (Pointer (p2t m m'))
   heap : Vector (Node n (p2t m m')) (p2t m m')
   next : Fin (p2t m m')
 
-def GoodState (op : Bool → Bool → Bool) (Ov : Vector (Node n m) m) (Uv : Vector (Node n m') m') : State n m m' → Prop := fun s ↦
+private def GoodState (op : Bool → Bool → Bool) (Ov : Vector (Node n m) m) (Uv : Vector (Node n m') m') : State n m m' → Prop := fun s ↦
   ∀ key (hk : key ∈ s.cache),
   ∃ (o : Bdd.Ordered ⟨s.heap, s.cache[key]'hk⟩) (o1 : Bdd.Ordered ⟨Ov, key.1⟩) (o2 : Bdd.Ordered ⟨Uv, key.2⟩),
   ∀ I,
@@ -63,19 +55,19 @@ def GoodState (op : Bool → Bool → Bool) (Ov : Vector (Node n m) m) (Uv : Vec
 --         else sorry
 --       else sorry
 
-def cache_get {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') :
+private def cache_get {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') :
     StateM (State n m m') (Option (Pointer (p2t m m'))) := fun s ↦
   ⟨(s.cache.get? ⟨O_root, U_root⟩), s⟩
 
-lemma mem_cache_of_cache_get_eq_some : (cache_get l r s).1.isSome → ⟨l, r⟩ ∈ s.cache := by
+private lemma mem_cache_of_cache_get_eq_some : (cache_get l r s).1.isSome → ⟨l, r⟩ ∈ s.cache := by
   simp only [cache_get]
   intro h
   simp_all only [Std.HashMap.get?_eq_getElem?, isSome_getElem?]
 
-lemma cache_get_preserves_state : (cache_get l r s).2 = s := by
+private lemma cache_get_preserves_state : (cache_get l r s).2 = s := by
   simp only [cache_get]
 
-def cache_put {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (val : Pointer (p2t m m')) :
+private def cache_put {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (val : Pointer (p2t m m')) :
     StateM (State n m m') Unit := fun s ↦
   ⟨(), ⟨s.cache.insert ⟨O_root, U_root⟩ val, s.heap, s.next⟩⟩
 
@@ -84,13 +76,13 @@ def cache_put {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (val : P
 --     StateM (State n m m') Unit := fun s ↦
 --   ⟨(), ⟨s.cache, s.heap.set s.next N, s.next + 1⟩⟩
 
-def heap_push {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (N : Node n (p2t m m')) :
+private def heap_push {n m m' : Nat} (O_root : Pointer m) (U_root : Pointer m') (N : Node n (p2t m m')) :
     StateM (State n m m') (Pointer (p2t m m')) := fun s ↦
   ⟨.node s.next, ⟨s.cache.insert ⟨O_root, U_root⟩ (.node s.next), s.heap.set s.next N, s.next + 1⟩⟩
 
-def next : StateM (State n m m') (Fin (p2t m m')) := fun s ↦ ⟨s.next, s⟩
+private def next : StateM (State n m m') (Fin (p2t m m')) := fun s ↦ ⟨s.next, s⟩
 
-def apply_helper {n m m' : Nat} (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n m') :
+private def apply_helper {n m m' : Nat} (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n m') :
     StateM (State n m m') (Pointer (p2t m m')) := do
   let cache_hit ← cache_get O.1.root U.1.root
   match cache_hit with
@@ -172,7 +164,7 @@ def apply' {n n' m m' p : Nat} : max n n' = p.succ → (Bool → Bool → Bool) 
 --       | none =>
 --         sorry
 
-theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {initial_state : State n m m'} :
+private theorem apply_helper_spec {n m m' : Nat} {op : (Bool → Bool → Bool)} {O : OBdd n m} {U : OBdd n m'} {initial_state : State n m m'} :
     GoodState op O.1.heap U.1.heap initial_state →
     let ⟨root, s'⟩ := apply_helper op O U initial_state
     GoodState op O.1.heap U.1.heap s' ∧

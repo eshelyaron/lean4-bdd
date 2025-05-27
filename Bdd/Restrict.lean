@@ -3,15 +3,15 @@ import Bdd.Nary
 
 namespace Restrict
 
-structure State (n) (m) where
+private structure State (n) (m) where
   visited : Vector (Option (Pointer m)) m
   newheap : Vector (Node n m) m
 
-def lookup (j : Fin m) : StateM (State n m) (Option (Pointer m)) := fun ⟨V, M⟩ ↦ ⟨V[j], V, M⟩
-def store (j : Fin m) (p : Pointer m) : StateM (State n m) (Pointer m) := fun ⟨V, M⟩ ↦ ⟨p, V.set j p, M⟩
-def setj (j : Fin m) : Node n m → StateM (State n m) Unit := fun N ⟨V, M⟩ ↦ ⟨(), V, M.set j N⟩
+private def lookup (j : Fin m) : StateM (State n m) (Option (Pointer m)) := fun ⟨V, M⟩ ↦ ⟨V[j], V, M⟩
+private def store (j : Fin m) (p : Pointer m) : StateM (State n m) (Pointer m) := fun ⟨V, M⟩ ↦ ⟨p, V.set j p, M⟩
+private def setj (j : Fin m) : Node n m → StateM (State n m) Unit := fun N ⟨V, M⟩ ↦ ⟨(), V, M.set j N⟩
 
-def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) :
+private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) :
     StateM (State n m) (Pointer m) := do
   let r := O.1.root
   match hr : r with
@@ -37,11 +37,34 @@ def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) :
           store j (if b then N.high else N.low)
 termination_by O
 
-def restrict (O : OBdd n m) (b : Bool) (i : Fin n) : Bdd n m :=
+private def restrict (O : OBdd n m) (b : Bool) (i : Fin n) : Bdd n m :=
   let ⟨r, _, M⟩ := restrict_helper O b i ⟨Vector.replicate m none, O.1.heap⟩
   ⟨M,r⟩
 
-lemma restrict_ordered {O : OBdd n m} : Bdd.Ordered (restrict O b i) := sorry
+@[simp]
+private lemma restrict_toVar : Pointer.toVar (restrict O b i).heap p = Pointer.toVar O.1.heap p := by
+  sorry
+
+private lemma restrict_edge_trans : Edge (restrict O b i).heap p q → Relation.TransGen (Edge O.1.heap) p q := by
+  sorry
+
+private lemma restrict_reachable : Pointer.Reachable (restrict O b i).heap (restrict O b i).root p → Pointer.Reachable O.1.heap O.1.root p := by
+  intro h
+  induction h with
+  | refl =>
+    simp only [restrict]
+    split
+    next M heq => sorry
+  | tail r e ih =>
+    exact .trans ih (Relation.TransGen.to_reflTransGen (restrict_edge_trans e))
+
+private lemma restrict_ordered : Bdd.Ordered (restrict O b i) := by
+  rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
+  simp_all only [Bdd.RelevantEdge, Bdd.RelevantMayPrecede, Pointer.MayPrecede, Nat.succ_eq_add_one]
+  have : Pointer.Reachable O.1.heap O.1.root x := restrict_reachable hx
+  rw [restrict_toVar]
+  rw [restrict_toVar]
+  exact Pointer.toVar_lt_of_trans_edge_of_ordered (Bdd.ordered_of_reachable this) (restrict_edge_trans hxy)
 
 def orestrict (O : OBdd n m) (b : Bool) (i : Fin n) : OBdd n m := ⟨restrict O b i, restrict_ordered⟩
 

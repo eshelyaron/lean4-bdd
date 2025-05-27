@@ -22,7 +22,7 @@ namespace BDD
 
 
 @[simp]
-abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
+private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
 
 def lift (B : BDD) (h : B.nvars ≤ n) : BDD :=
   ⟨n, _, Lift.olift h B.obdd, Lift.olift_reduced B.hred⟩
@@ -403,7 +403,7 @@ private def relabel' (B : BDD) (f : Nat → Nat)
     Relabel.orelabel_reduced B.hred
   ⟩
 
-def relabel'' (B : BDD) (f : Nat → Nat)
+private def relabel'' (B : BDD) (f : Nat → Nat)
       (h1 : ∀ i : Fin B.nvars, f i < f B.nvars)
       (h2 : ∀ i i' : (Nary.Dependency B.denotation'), i.1 < i'.1 → f i.1 < f i'.1) :
     BDD :=
@@ -647,8 +647,8 @@ lemma bexists_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
     congr 1
     rw [Bool.or_comm]
 
-abbrev majority3 :=
-    (or (or (and (var 0) (var 1)) (and (var 0) (var 2))) (and (var 1) (var 2)))
+-- abbrev majority3 :=
+--     (or (or (and (var 0) (var 1)) (and (var 0) (var 2))) (and (var 1) (var 2)))
 
 -- abbrev majority3' :=
 --     (and (imp (var 0) (or (var 1) (var 2))) (imp (var 0).not (and (var 1) (var 2))))

@@ -336,11 +336,11 @@ def OBdd.Similar.instEquivalence {n m} : Equivalence (α := OBdd n m) OBdd.Simil
   apply InvImage.equivalence
   constructor <;> simp_all [Similar, HSimilar]
 
-instance OBdd.Similar.instReflexive : Reflexive (α := OBdd n m) OBdd.Similar := instEquivalence.refl
+-- instance OBdd.Similar.instReflexive : Reflexive (α := OBdd n m) OBdd.Similar := instEquivalence.refl
 
-instance OBdd.Similar.instSymmetric : Symmetric (α := OBdd n m) OBdd.Similar := fun _ _ ↦ instEquivalence.symm
+-- instance OBdd.Similar.instSymmetric : Symmetric (α := OBdd n m) OBdd.Similar := fun _ _ ↦ instEquivalence.symm
 
-instance OBdd.Similar.instTransitive : Transitive (α := OBdd n m) OBdd.Similar := fun _ _ _ ↦ instEquivalence.trans
+-- instance OBdd.Similar.instTransitive : Transitive (α := OBdd n m) OBdd.Similar := fun _ _ _ ↦ instEquivalence.trans
 
 /-- A pointer is redundant if it point to node `N` with `N.low = N.high`. -/
 inductive Pointer.Redundant (M : Vector (Node n m) m) : Pointer m → Prop where

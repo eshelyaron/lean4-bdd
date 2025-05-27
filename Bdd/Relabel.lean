@@ -3,16 +3,16 @@ import Bdd.DecisionTree
 
 namespace Relabel
 
-def relabel_node {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : Node n m → Node (f n) m
+private def relabel_node {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : Node n m → Node (f n) m
   | ⟨var, low, high⟩ => ⟨⟨f var.1, hf _⟩, low, high⟩
 
-def relabel_heap {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) :
+private def relabel_heap {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) :
     Vector (Node n m) m → Vector (Node (f n) m) m := Vector.map (relabel_node hf)
 
-def relabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : Bdd n m → Bdd (f n) m
+private def relabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : Bdd n m → Bdd (f n) m
   | ⟨heap, root⟩ => ⟨relabel_heap hf heap, root⟩
 
-lemma relabel_edge_iff {B : Bdd n m} {x y : Pointer m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
+private lemma relabel_edge_iff {B : Bdd n m} {x y : Pointer m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
     Edge B.heap x y ↔ Edge (relabel hf B).heap x y := by
   constructor
   · intro e
@@ -24,7 +24,7 @@ lemma relabel_edge_iff {B : Bdd n m} {x y : Pointer m} {f : Nat → Nat} {hf : �
     | low  _ => left;  simp_all [relabel, relabel_heap, relabel_node]; assumption
     | high _ => right; simp_all [relabel, relabel_heap, relabel_node]; assumption
 
-lemma relabel_reachable_iff {B : Bdd n m} : Pointer.Reachable B.heap B.root x ↔ Pointer.Reachable (relabel h B).heap (relabel h B).root x := by
+private lemma relabel_reachable_iff {B : Bdd n m} : Pointer.Reachable B.heap B.root x ↔ Pointer.Reachable (relabel h B).heap (relabel h B).root x := by
   constructor
   · intro r
     induction r with
@@ -41,7 +41,7 @@ lemma relabel_reachable_iff {B : Bdd n m} : Pointer.Reachable B.heap B.root x �
       · exact ih
       · exact (relabel_edge_iff.mpr e)
 
-lemma relabel_relevantMayPrecede {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
+private lemma relabel_relevantMayPrecede {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i'}
     {x y : Pointer m}
     {hx : Pointer.Reachable (relabel hf B).heap (relabel hf B).root x}
@@ -73,7 +73,7 @@ lemma relabel_relevantMayPrecede {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : F
         · exact relabel_reachable_iff.mpr hy
         · rfl
 
-lemma relabel_relevantEdge {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
+private lemma relabel_relevantEdge {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {x y : Pointer m}
     {hx : Pointer.Reachable (relabel hf B).heap (relabel hf B).root x}
     {hy : Pointer.Reachable (relabel hf B).heap (relabel hf B).root y} :
@@ -90,7 +90,7 @@ lemma relabel_relevantEdge {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, 
     simp_all [relabel_node]
     assumption
 
-lemma relabel_preserves_ordered {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
+private lemma relabel_preserves_ordered {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
     (∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') → Bdd.Ordered B → Bdd.Ordered (relabel hf B) := by
   intro hu ho
   rintro _ _ hxy
@@ -103,7 +103,7 @@ def orelabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') : OBdd (f n) m :=
     ⟨(relabel hf O.1), relabel_preserves_ordered hu O.2⟩
 
-lemma orelabel_low {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma orelabel_low {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') :
     (OBdd.low (orelabel O hf hu) h) = orelabel (O.low h) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi')) := by
   rcases O with ⟨B, o⟩
@@ -117,7 +117,7 @@ lemma orelabel_low {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf
   simp_all only [Fin.getElem_fin, Vector.getElem_map]
   rfl
 
-lemma orelabel_high {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma orelabel_high {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') :
     (OBdd.high (orelabel O hf hu) h) = orelabel (O.high h) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi')) := by
   rcases O with ⟨B, o⟩
@@ -131,13 +131,13 @@ lemma orelabel_high {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (h
   simp_all only [Fin.getElem_fin, Vector.getElem_map]
   rfl
 
-lemma brelabel_low {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma brelabel_low {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
     (OBdd.low ⟨relabel hf B, relabel_preserves_ordered hu o⟩ h) =
       ⟨relabel hf (OBdd.low ⟨B, o⟩ h).1, relabel_preserves_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi')) (OBdd.low ⟨B, o⟩ h).2⟩ := by
   exact orelabel_low (O := ⟨B, o⟩) hf hu
 
-lemma brelabel_high {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma brelabel_high {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
     (OBdd.high ⟨relabel hf B, relabel_preserves_ordered hu o⟩ h) =
       ⟨relabel hf (OBdd.high ⟨B, o⟩ h).1, relabel_preserves_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi')) (OBdd.high ⟨B, o⟩ h).2⟩ := by
@@ -182,7 +182,7 @@ theorem orelabel_evaluate (O : OBdd n m) {f : Nat → Nat} {hf : ∀ i : Fin n, 
       rfl
 termination_by O
 
-lemma relabel_preserves_noRedundancy {B : Bdd n m} : B.NoRedundancy → (relabel hf B).NoRedundancy := by
+private lemma relabel_preserves_noRedundancy {B : Bdd n m} : B.NoRedundancy → (relabel hf B).NoRedundancy := by
   rintro hnr ⟨p, hp⟩ contra
   simp only at contra
   cases p_def : p with
@@ -201,7 +201,7 @@ lemma relabel_preserves_noRedundancy {B : Bdd n m} : B.NoRedundancy → (relabel
       simp only [relabel, relabel_heap, Fin.getElem_fin, relabel_node] at red
       exact red
 
-lemma relabel_toTree_relabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma relabel_toTree_relabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') :
     OBdd.toTree (orelabel O hf hu) = DecisionTree.relabel hf (OBdd.toTree O) := by
   simp only [orelabel]
@@ -227,11 +227,11 @@ lemma relabel_toTree_relabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin 
       exact this
 termination_by O
 
-lemma relabel_toTree_relabel' {B : Bdd n m} {o : B.Ordered} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+private lemma relabel_toTree_relabel' {B : Bdd n m} {o : B.Ordered} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
     OBdd.toTree ⟨relabel hf B, relabel_preserves_ordered hu o⟩ = DecisionTree.relabel hf (OBdd.toTree ⟨B, o⟩) := relabel_toTree_relabel ⟨B, o⟩ hf hu
 
-lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
+private lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i'}
     {p q : Pointer m}
     {hp : Pointer.Reachable (orelabel O hf hu).1.heap (orelabel O hf hu).1.root p}
@@ -414,7 +414,7 @@ lemma orelabel_reduced {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i
     exact r2 (orelabel_preserves_similarRP sim)
 
 @[simp]
-lemma relabel_id {B : Bdd n m} : relabel (f := id) (by simp) B = B := by
+private lemma relabel_id {B : Bdd n m} : relabel (f := id) (by simp) B = B := by
   simp only [id_eq, relabel, relabel_heap]
   congr
   ext i hi
