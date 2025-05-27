@@ -24,28 +24,35 @@ namespace BDD
 @[simp]
 private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
 
+/-- Raise the input size (`BDD.nvars`) of a `BDD` to `n`, given a proof that the current input size is at most `n`. -/
 def lift (B : BDD) (h : B.nvars ≤ n) : BDD :=
   ⟨n, _, Lift.olift h B.obdd, Lift.olift_reduced B.hred⟩
 
+/-- Lifting a `BDD` to `n` yields a `BDD` with input size (`BDD.nvars`) of `n`. -/
 @[simp]
 lemma lift_nvars {B : BDD} {h : B.nvars ≤ n} : (B.lift h).nvars = n := rfl
 
+/-- Lifting a `BDD` `B` to its current input size (`BDD.nvars`) yields back `B`. -/
 @[simp]
 lemma lift_refl {B : BDD} : (B.lift (le_refl _)) = B := by simp [lift]
 
+/-- The `denotation` of a `BDD` is the Boolean function that it represents. -/
 def denotation (B : BDD) (h : B.nvars ≤ n) : Vector Bool n → Bool := (B.lift h).evaluate
 
+/-- `BDD.lift` does not affect `BDD.denotation`. -/
 @[simp]
 lemma lift_denotation {B : BDD} {h1 : B.nvars ≤ n} {h2 : n ≤ m} :
     (B.lift h1).denotation h2 = B.denotation (.trans h1 h2) := by
   simp [denotation, lift, Evaluate.evaluate_evaluate]
 
+/-- `BDD.denotation` absorbs `Vector.cast`. -/
 @[simp]
 lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n = m) :
     B.denotation hm (Vector.cast h I) = B.denotation hn I := by
   subst h
   simp
 
+/-- The `denotation` of a `BDD` is independent of indices that exceed its input size. -/
 lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
     Nary.IndependentOf (B.denotation h1) i := by
   rintro b I
@@ -55,6 +62,7 @@ lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 
   simp only [Vector.getElem_take]
   rw [Vector.getElem_set_ne _ _ (by omega)]
 
+/-- `BDD`s are semantically equivalent when their `denotation`s coincide. -/
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
 
@@ -336,7 +344,6 @@ lemma apply_denotation {B C : BDD} {op} {I : Vector Bool n} {h} :
     simp only [OBdd.Reduced.eq_1, Bdd.Ordered.eq_1, Vector.take_eq_extract, Lift.olift_evaluate,
       Vector.extract_extract, Nat.add_zero, Nat.sub_zero, Vector.cast_cast, lift]
     congr 1
-    have : (min (0 + B.nvars) (max B.nvars C.nvars)) = B.nvars := by omega
     simp only [Vector.cast_eq_cast]
     ext i
     simp_all
@@ -347,7 +354,6 @@ lemma apply_denotation {B C : BDD} {op} {I : Vector Bool n} {h} :
     simp only [OBdd.Reduced.eq_1, Bdd.Ordered.eq_1, Vector.take_eq_extract, Lift.olift_evaluate,
       Vector.extract_extract, Nat.add_zero, Nat.sub_zero, Vector.cast_cast, lift]
     congr 1
-    have : (min (0 + B.nvars) (max B.nvars C.nvars)) = B.nvars := by omega
     simp only [Vector.cast_eq_cast]
     ext i
     simp_all
@@ -484,7 +490,7 @@ def find {B : BDD} : Option (Vector Bool B.nvars) :=
 --   next ht _ => exact ht
 --   next hf _ => contradiction
 
-def find_none {B : BDD} : B.find.isNone → B.denotation' = Function.const _ false := by
+lemma find_none {B : BDD} : B.find.isNone → B.denotation' = Function.const _ false := by
   intro h
   ext I
   simp only [find] at h
@@ -498,7 +504,7 @@ def find_none {B : BDD} : B.find.isNone → B.denotation' = Function.const _ fal
     simpa
   next hf => contradiction
 
-def find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
+lemma find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
   intro h
   simp only [find] at h
   split at h
@@ -677,3 +683,5 @@ end BDD
 -- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
 --#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
 -- #eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
+
+--#lint
