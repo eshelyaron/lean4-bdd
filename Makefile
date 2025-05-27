@@ -1,6 +1,6 @@
 BDD_LEAN_FILES := $(wildcard Bdd/*.lean)
 
-BASE = https://eshelyaron.com/lean4-bdd/docs/Bdd/
+BASE = https://eshelyaron.com/man/lean4/Bdd/
 
 dependencies.svg: dependencies.dot
 	dot -Tsvg dependencies.dot > $@
@@ -15,3 +15,6 @@ dependencies.dot: $(BDD_LEAN_FILES)
 		fi;)
 	@(grep -nr "import Bdd" Bdd/*.lean | awk -F '[./]' '{print $$4 " -> " $$2}') >> $@
 	@echo "}" >> $@
+
+doc:
+	cd docbuild && lake build Bdd:docs
