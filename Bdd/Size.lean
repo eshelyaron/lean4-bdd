@@ -23,8 +23,8 @@ def bool_of_size_eq_zero {n m} (O : OBdd n m) (h : size O = 0) : Bool :=
   | .terminal b => b
   | .node _ => False.elim (not_isTerminal_of_root_eq_node O_root_def (isTerminal_iff_size_eq_zero.mp h))
 
-lemma size_spec {O : OBdd n m} : size O = Fintype.card { j // Pointer.Reachable O.1.heap O.1.root (.node j) } := by
-  simp only [size, Function.comp_apply]
+lemma size_spec {O : OBdd n m} : size O = OBdd.size O := by
+  simp only [size, OBdd.size, Function.comp_apply]
   simp_rw [Fintype.card, Finset.univ]
   have : (Collect.collect O).length = (Multiset.ofList (Collect.collect O)).card := by rfl
   rw [this]
@@ -41,9 +41,8 @@ lemma size_spec {O : OBdd n m} : size O = Fintype.card { j // Pointer.Reachable 
 
 lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
     size O ≤ 1 + (size (O.low h)) + (size (O.high h)) := by
-  rw [size_spec]
-  rw [size_spec]
-  rw [size_spec]
+  repeat rw [size_spec]
+  repeat rw [OBdd.size]
   rw [show 1 = Fintype.card {j' // j' = j} by simp]
   rw [add_assoc]
   rw [← Fintype.card_sum]
@@ -81,15 +80,15 @@ lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
         next => simp_all
         next => split at hxy <;> (refine Subtype.eq ?_; simp_all))
 
-lemma size_le' {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
+lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
   cases O_root_def : O.1.root with
   | terminal b => simp [isTerminal_iff_size_eq_zero.mpr ⟨b, O_root_def⟩]
   | node j =>
     calc _
       _ ≤ 1 + (size (O.low O_root_def)) + (size (O.high O_root_def)) := size_node_le
       _ ≤ 1 + (2 ^ (n - (O.low O_root_def).1.var.1) - 1) + (2 ^ (n - (O.high O_root_def).1.var.1) - 1) := by
-        have := size_le' (O := O.low O_root_def)
-        have := size_le' (O := O.high O_root_def)
+        have := size_le_helper (O := O.low O_root_def)
+        have := size_le_helper (O := O.high O_root_def)
         omega
       _ ≤ 1 + (2 ^ (n - (O.1.var.1 + 1)) - 1) + (2 ^ (n - (O.high O_root_def).1.var.1) - 1) := by
         simp only [Nat.succ_eq_add_one, OBdd.low_heap_eq_heap, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
@@ -130,7 +129,7 @@ termination_by O
 
 lemma size_le {O : OBdd n m} : size O ≤ 2 ^ n - 1 := by
   trans 2 ^ (n - O.1.var.1) - 1
-  · exact size_le'
+  · exact size_le_helper
   · rw [tsub_le_iff_right, Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
     apply Nat.pow_le_pow_right <;> omega
 

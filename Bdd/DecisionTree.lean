@@ -74,4 +74,34 @@ lemma lift_evaluate {h : n ≤ n'} {T : DecisionTree n} {I : Vector Bool n'} :
     rw [← this]
     rfl
 
+def relabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : DecisionTree n → DecisionTree (f n)
+  | .leaf b => .leaf b
+  | .branch i l h => .branch ⟨f i, hf i⟩ (relabel hf l) (relabel hf h)
+
+lemma relabel_injective {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} {h : ∀ i i' : Fin n, T1.usesVar i → T2.usesVar i' → f i = f i' → i = i'} :
+    relabel hf T1 = relabel hf T2 → T1 = T2 := by
+  intro h
+  cases T1 with
+  | leaf _ =>
+    cases T2 with
+    | leaf _ => simp only [relabel] at h; simp_all
+    | branch _ _ _ => contradiction
+  | branch i tl th =>
+    cases T2 with
+    | leaf _ => contradiction
+    | branch i' tl' th' =>
+      simp only [relabel] at h
+      injection h with a b c
+      rw [relabel_injective b (hf := hf) (f := f)]
+      rw [relabel_injective c (hf := hf) (f := f)]
+      simp_all only [Fin.mk.injEq, branch.injEq, and_self, and_true]
+      apply h
+      · exact .here
+      · exact .here
+      · exact a
+      · intro ii ii' hii hii' hfi
+        apply h _ _ (usesVar.high hii) (usesVar.high hii') hfi
+      · intro ii ii' hii hii' hfi
+        apply h _ _ (usesVar.low hii) (usesVar.low hii') hfi
+
 end DecisionTree

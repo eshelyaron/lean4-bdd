@@ -1,4 +1,5 @@
 import Bdd.Basic
+import Bdd.DecisionTree
 
 namespace Relabel
 
@@ -200,40 +201,9 @@ lemma relabel_preserves_noRedundancy {B : Bdd n m} : B.NoRedundancy → (relabel
       simp only [relabel, relabel_heap, Fin.getElem_fin, relabel_node] at red
       exact red
 
--- FIXME: Move to DecisionTree.lean
-def trelabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : DecisionTree n → DecisionTree (f n)
-  | .leaf b => .leaf b
-  | .branch i l h => .branch ⟨f i, hf i⟩ (trelabel hf l) (trelabel hf h)
-
-lemma trelabel_injective {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} {h : ∀ i i' : Fin n, T1.usesVar i → T2.usesVar i' → f i = f i' → i = i'} :
-    trelabel hf T1 = trelabel hf T2 → T1 = T2 := by
-  intro h
-  cases T1 with
-  | leaf _ =>
-    cases T2 with
-    | leaf _ => simp only [trelabel] at h; simp_all
-    | branch _ _ _ => contradiction
-  | branch i tl th =>
-    cases T2 with
-    | leaf _ => contradiction
-    | branch i' tl' th' =>
-      simp only [trelabel] at h
-      injection h with a b c
-      rw [trelabel_injective b (hf := hf) (f := f)]
-      rw [trelabel_injective c (hf := hf) (f := f)]
-      simp_all only [Fin.mk.injEq, DecisionTree.branch.injEq, and_self, and_true]
-      apply h
-      · exact .here
-      · exact .here
-      · exact a
-      · intro ii ii' hii hii' hfi
-        apply h _ _ (DecisionTree.usesVar.high hii) (DecisionTree.usesVar.high hii') hfi
-      · intro ii ii' hii hii' hfi
-        apply h _ _ (DecisionTree.usesVar.low hii) (DecisionTree.usesVar.low hii') hfi
-
-lemma relabel_toTree_trelabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+lemma relabel_toTree_relabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') :
-    OBdd.toTree (orelabel O hf hu) = trelabel hf (OBdd.toTree O) := by
+    OBdd.toTree (orelabel O hf hu) = DecisionTree.relabel hf (OBdd.toTree O) := by
   simp only [orelabel]
   cases O_root_def : O.1.root with
   | terminal _ =>
@@ -241,7 +211,7 @@ lemma relabel_toTree_trelabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin
     rw [OBdd.toTree_terminal' O_root_def]
     simp_rw [O_root_def]
     rw [OBdd.toTree_terminal]
-    simp [trelabel]
+    simp [DecisionTree.relabel]
   | node _ =>
     rw [OBdd.toTree_node O_root_def]
     rw [OBdd.toTree_node (by trans O.1.root; rfl; exact O_root_def)]
@@ -249,17 +219,17 @@ lemma relabel_toTree_trelabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin
     congr 1
     · simp only [relabel, relabel_heap, Vector.getElem_map, relabel_node, Fin.eta, Bdd.Ordered.eq_1, Fin.mk.injEq, Nat.add_right_cancel_iff]
       rfl
-    · have := relabel_toTree_trelabel (O := (O.low O_root_def)) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi'))
+    · have := relabel_toTree_relabel (O := (O.low O_root_def)) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi'))
       rw [← orelabel_low] at this
       exact this
-    · have := relabel_toTree_trelabel (O := (O.high O_root_def)) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi'))
+    · have := relabel_toTree_relabel (O := (O.high O_root_def)) hf (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi'))
       rw [← orelabel_high] at this
       exact this
 termination_by O
 
-lemma relabel_toTree_trelabel' {B : Bdd n m} {o : B.Ordered} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
+lemma relabel_toTree_relabel' {B : Bdd n m} {o : B.Ordered} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
-    OBdd.toTree ⟨relabel hf B, relabel_preserves_ordered hu o⟩ = trelabel hf (OBdd.toTree ⟨B, o⟩) := relabel_toTree_trelabel ⟨B, o⟩ hf hu
+    OBdd.toTree ⟨relabel hf B, relabel_preserves_ordered hu o⟩ = DecisionTree.relabel hf (OBdd.toTree ⟨B, o⟩) := relabel_toTree_relabel ⟨B, o⟩ hf hu
 
 lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i'}
@@ -344,11 +314,11 @@ lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i 
           apply Bdd.usesVar_of_low_usesVar hx
         conv at hb =>
           lhs
-          rw [relabel_toTree_trelabel' (o := (by apply Bdd.low_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hp))) hf (by simp_all)]
+          rw [relabel_toTree_relabel' (o := (by apply Bdd.low_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hp))) hf (by simp_all)]
         conv at hb =>
           rhs
-          rw [relabel_toTree_trelabel' (o := (by apply Bdd.low_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hq))) hf (by simp_all)]
-        rw [trelabel_injective hb]
+          rw [relabel_toTree_relabel' (o := (by apply Bdd.low_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hq))) hf (by simp_all)]
+        rw [DecisionTree.relabel_injective hb]
         intro ii ii' hii hii' hfi
         rw [← OBdd.toTree_usesVar] at hii hii'
         contrapose hfi
@@ -399,11 +369,11 @@ lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i 
           apply Bdd.usesVar_of_high_usesVar hx
         conv at hc =>
           lhs
-          rw [relabel_toTree_trelabel' (o := (by apply Bdd.high_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hp))) hf (by simp_all)]
+          rw [relabel_toTree_relabel' (o := (by apply Bdd.high_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hp))) hf (by simp_all)]
         conv at hc =>
           rhs
-          rw [relabel_toTree_trelabel' (o := (by apply Bdd.high_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hq))) hf (by simp_all)]
-        rw [trelabel_injective hc]
+          rw [relabel_toTree_relabel' (o := (by apply Bdd.high_ordered; exact Bdd.ordered_of_reachable (relabel_reachable_iff.mpr hq))) hf (by simp_all)]
+        rw [DecisionTree.relabel_injective hc]
         intro ii ii' hii hii' hfi
         rw [← OBdd.toTree_usesVar] at hii hii'
         contrapose hfi

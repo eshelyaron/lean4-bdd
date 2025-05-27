@@ -465,6 +465,10 @@ instance Pointer.instDecidableReachable {n m} (O : OBdd n m) :
     DecidablePred (Reachable O.1.heap O.1.root) :=
   OBdd.instDecidableReflTransGen O ⟨O.1.root, Relation.ReflTransGen.refl⟩
 
+--set_option trace.Meta.synthInstance true
+
+def OBdd.size {n m} (O : OBdd n m) := Fintype.card { j // Reachable O.1.heap O.1.root (.node j) }
+
 instance OBdd.instFintypeRelevantPointer {n m} (O : OBdd n m) : Fintype (O.1.RelevantPointer) := by
   convert Subtype.fintype _ <;> infer_instance
 
