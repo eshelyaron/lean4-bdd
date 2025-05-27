@@ -676,40 +676,31 @@ lemma OBdd.evaluate_node'' {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node
   rw [toTree_node h]
   simp [DecisionTree.evaluate]
 
-lemma OBdd.var_lt_high_var {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.var < (O.high h).var := by
+lemma OBdd.var_lt_high_var {O : OBdd n m} {h : O.1.root = node j} :
+    O.var < (O.high h).var := by
   have e := Bdd.edge_of_high (h := h) O.1
   exact @O.2 O.1.toRelevantPointer ⟨(O.high h).1.root, reachable_of_edge e⟩ e
 
-lemma OBdd.var_lt_low_var  {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} : O.var < (O.low  h).var := by
+lemma OBdd.var_lt_low_var {O : OBdd n m} {h : O.1.root = node j} :
+    O.var < (O.low h).var := by
   have e := Bdd.edge_of_low (h := h) O.1
   exact @O.2 O.1.toRelevantPointer ⟨(O.low h).1.root, reachable_of_edge e⟩ e
 
-lemma OBdd.Independence' (O : OBdd n m) (i : Fin O.var) : Nary.IndependentOf (OBdd.evaluate O) ⟨i.1, Fin.val_lt_of_le i (Fin.is_le _)⟩ := by
-  cases O_root_def : O.1.root with
-  | terminal _ =>
-    intro b I
-    simp [evaluate_terminal' O_root_def]
+lemma OBdd.independentOf_lt_root (O : OBdd n m) (i : Fin O.var) :
+    Nary.IndependentOf (O.evaluate) ⟨i.1, Fin.val_lt_of_le i (Fin.is_le _)⟩ := by
+  cases h : O.1.root with
+  | terminal _ => simp [evaluate_terminal' h]
   | node j =>
     intro b I
-    simp only
-    rw [OBdd.evaluate_node'' O_root_def]
+    rw [evaluate_node'' h]
     simp only
     rcases i with ⟨i, hi⟩
     congr 1
     · simp only [eq_iff_iff, Bool.coe_iff_coe]
       symm
-      apply Vector.getElem_set_ne
-      have : O.1.heap[j].var = O.var := by simp [var, Bdd.var, O_root_def, toVar_node_eq]
-      rw [this]
-      exact Nat.ne_of_lt hi
-    · refine (Independence' (O.high O_root_def) ⟨i, ?_⟩) b I
-      trans O.var
-      · exact hi
-      · exact var_lt_high_var
-    · refine (Independence' (O.low  O_root_def) ⟨i, ?_⟩) b I
-      trans O.var
-      · exact hi
-      · exact var_lt_low_var
+      apply Vector.getElem_set_ne _ _ (Nat.ne_of_lt (by simp_all))
+    · exact (independentOf_lt_root (O.high h) ⟨i, .trans hi var_lt_high_var⟩) b I
+    · exact (independentOf_lt_root (O.low  h) ⟨i, .trans hi var_lt_low_var⟩) b I
 termination_by O
 
 def OBdd.size' {n m} : OBdd n m → Nat := DecisionTree.size ∘ OBdd.toTree
@@ -748,12 +739,12 @@ lemma OBdd.evaluate_high_eq_evaluate_low_of_independentOf_root {n m} {O : OBdd n
   · rw [i true I]
     rw [evaluate_node'' h]
     simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte]
-    exact (Independence' (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩) true I
+    exact (independentOf_lt_root (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩) true I
   · rw [i false I]
     rw [evaluate_node'' h]
     simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte]
     symm
-    exact (Independence' (O := O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var  (O := O); simp; rw [h]; simp)⟩) false I
+    exact (independentOf_lt_root (O := O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var  (O := O); simp; rw [h]; simp)⟩) false I
 
 lemma OBdd.evaluate_high_eq_evaluate_set_true {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
     (O.high h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var true := by
@@ -766,7 +757,7 @@ lemma OBdd.evaluate_high_eq_evaluate_set_true {n m} {O : OBdd n m} {j : Fin m} {
   simp [var] at this
   rw [h] at this
   simp only [toVar_node_eq, Nat.succ_eq_add_one, Fin.getElem_fin, Fin.coe_eq_castSucc] at this
-  apply Independence' (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩
+  apply independentOf_lt_root (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩
 
 lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
     (O.low h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var false := by
@@ -780,7 +771,7 @@ lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {
   simp [var] at this
   rw [h] at this
   simp at this
-  apply Independence' (O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var (O := O); simp; rw [h]; simp)⟩
+  apply independentOf_lt_root (O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var (O := O); simp; rw [h]; simp)⟩
 
 lemma OBdd.evaluate_high_eq_of_evaluate_eq_and_var_eq' {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'} {j : Fin m} {i : Fin m'} {ho : O.1.root = node j} {hu : U.1.root = node i} :
     O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.high ho).evaluate = (U.high hu).evaluate := by
@@ -798,7 +789,7 @@ lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq' {n m m' : Nat} {O : OBdd n
 lemma OBdd.evaluate_low_eq_of_evaluate_eq_and_var_eq {n m} {O U : OBdd n m} {j i : Fin m} {ho : O.1.root = node j} {hu : U.1.root = node i} :
   O.evaluate = U.evaluate → O.1.heap[j].var = U.1.heap[i].var → (O.low ho).evaluate = (U.low hu).evaluate := evaluate_low_eq_of_evaluate_eq_and_var_eq'
 
-lemma OBdd.not_reduced_of_iso_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
+lemma OBdd.not_reduced_of_sim_high_low {n m} {O : OBdd n m} {j : Fin m} (h : O.1.root = node j) :
     Similar (O.high h) (O.low h) → ¬ O.Reduced := by
   intro iso R
   apply R.1 O.1.toRelevantPointer
@@ -832,9 +823,9 @@ def OBdd.Reduced' (O : OBdd n m) : Prop
    ∧ Subrelation (RelevantIsomorphism O) (InvImage Eq Subtype.val)
 
 /-- Reduced OBDDs are canonical.  -/
-theorem OBdd.Canonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
-    O.Reduced → U.Reduced → O.evaluate = U.evaluate → O.HSimilar U := by
-  intro O_reduced U_reduced h
+theorem OBdd.Canonicity {O : OBdd n m} {U : OBdd n m'} (ho : O.Reduced) (hu : U.Reduced) :
+    O.evaluate = U.evaluate → O.HSimilar U := by
+  intro h
   cases O_root_def : O.1.root with
   | terminal b =>
     cases U_root_def : U.1.root with
@@ -854,9 +845,9 @@ theorem OBdd.Canonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
         · rw [evaluate_low_eq_evaluate_set_false]
           rw [← h]
           simp
-      absurd U_reduced
-      apply not_reduced_of_iso_high_low U_root_def
-      apply OBdd.Canonicity (high_reduced U_reduced) (low_reduced U_reduced) this
+      absurd hu
+      apply not_reduced_of_sim_high_low U_root_def
+      apply OBdd.Canonicity (high_reduced hu) (low_reduced hu) this
   | node j =>
     cases U_root_def : U.1.root with
     | terminal c =>
@@ -870,50 +861,50 @@ theorem OBdd.Canonicity {n m m' : Nat} {O : OBdd n m} {U : OBdd n m'}:
         · rw [evaluate_low_eq_evaluate_set_false]
           rw [h]
           simp
-      absurd O_reduced
-      apply not_reduced_of_iso_high_low O_root_def
-      apply OBdd.Canonicity (high_reduced O_reduced) (low_reduced O_reduced) this
+      absurd ho
+      apply not_reduced_of_sim_high_low O_root_def
+      apply OBdd.Canonicity (high_reduced ho) (low_reduced ho) this
     | node i =>
       simp only [Similar, HSimilar, InvImage]
       rw [toTree_node O_root_def, toTree_node U_root_def]
       simp only [Ordered, DecisionTree.branch.injEq]
       have same_var : O.1.heap[j].var = U.1.heap[i].var := by
         apply eq_iff_le_not_lt.mpr
-        · constructor
-          · apply le_of_not_lt
-            intro contra
-            have := Independence' O ⟨U.1.heap[i].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [O_root_def]; simpa⟩
-            rw [h] at this
-            simp only [Fin.eta] at this
-            simp only [Nary.IndependentOf] at this
-            have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
-              OBdd.Canonicity (high_reduced U_reduced) (low_reduced U_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
-            apply U_reduced.1 U.1.toRelevantPointer
-            simp [toRelevantPointer]
-            rw [U_root_def]
-            constructor
-            have iso : SimilarRP U ⟨(U.high U_root_def).1.root, reachable_of_edge (edge_of_high (h := U_root_def) U.1)⟩
-                                   ⟨(U.low  U_root_def).1.root, reachable_of_edge (edge_of_low  (h := U_root_def) U.1)⟩ := that
-            exact (symm (U_reduced.2 iso))
-          · intro contra
-            have := Independence' U ⟨O.1.heap[j].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [U_root_def]; simpa⟩
-            rw [← h] at this
-            simp only [Ordered, Fin.eta] at this
-            simp only [Nary.IndependentOf] at this
-            have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
-              OBdd.Canonicity (high_reduced O_reduced) (low_reduced O_reduced) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
-            apply O_reduced.1 O.1.toRelevantPointer
-            simp [toRelevantPointer]
-            rw [O_root_def]
-            constructor
-            have iso : SimilarRP O ⟨(O.high O_root_def).1.root, reachable_of_edge (edge_of_high (h := O_root_def) O.1)⟩
-                                   ⟨(O.low  O_root_def).1.root, reachable_of_edge (edge_of_low  (h := O_root_def) O.1)⟩ := that
-            exact (symm (O_reduced.2 iso))
+        constructor
+        · apply le_of_not_lt
+          intro contra
+          have := independentOf_lt_root O ⟨U.1.heap[i].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [O_root_def]; simpa⟩
+          rw [h] at this
+          simp only [Fin.eta] at this
+          simp only [Nary.IndependentOf] at this
+          have that : OBdd.Similar (U.high U_root_def) (U.low U_root_def) :=
+            OBdd.Canonicity (high_reduced hu) (low_reduced hu) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+          apply hu.1 U.1.toRelevantPointer
+          simp [toRelevantPointer]
+          rw [U_root_def]
+          constructor
+          have iso : SimilarRP U ⟨(U.high U_root_def).1.root, reachable_of_edge (edge_of_high (h := U_root_def) U.1)⟩
+                                  ⟨(U.low  U_root_def).1.root, reachable_of_edge (edge_of_low  (h := U_root_def) U.1)⟩ := that
+          exact (symm (hu.2 iso))
+        · intro contra
+          have := independentOf_lt_root U ⟨O.1.heap[j].var.1, by simp only [Fin.getElem_fin, var, Nat.succ_eq_add_one, Bdd.var]; rw [U_root_def]; simpa⟩
+          rw [← h] at this
+          simp only [Ordered, Fin.eta] at this
+          simp only [Nary.IndependentOf] at this
+          have that : OBdd.Similar (O.high O_root_def) (O.low O_root_def) :=
+            OBdd.Canonicity (high_reduced ho) (low_reduced ho) (evaluate_high_eq_evaluate_low_of_independentOf_root this)
+          apply ho.1 O.1.toRelevantPointer
+          simp [toRelevantPointer]
+          rw [O_root_def]
+          constructor
+          have iso : SimilarRP O ⟨(O.high O_root_def).1.root, reachable_of_edge (edge_of_high (h := O_root_def) O.1)⟩
+                                  ⟨(O.low  O_root_def).1.root, reachable_of_edge (edge_of_low  (h := O_root_def) O.1)⟩ := that
+          exact (symm (ho.2 iso))
       constructor
-      · assumption
+      · exact same_var
       · constructor
-        · apply OBdd.Canonicity (low_reduced  O_reduced) (low_reduced  U_reduced) (evaluate_low_eq_of_evaluate_eq_and_var_eq'  h same_var)
-        · apply OBdd.Canonicity (high_reduced O_reduced) (high_reduced U_reduced) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
+        · apply OBdd.Canonicity (low_reduced  ho) (low_reduced  hu) (evaluate_low_eq_of_evaluate_eq_and_var_eq'  h same_var)
+        · apply OBdd.Canonicity (high_reduced ho) (high_reduced hu) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
 termination_by O.size' + U.size'
 decreasing_by
   simp [size_node U_root_def]; linarith
@@ -936,7 +927,7 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
     simpa
   case node j =>
     exfalso
-    refine not_reduced_of_iso_high_low O_root_def ?_ R
+    refine not_reduced_of_sim_high_low O_root_def ?_ R
     have : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate := by
       ext I
       trans b
@@ -944,13 +935,9 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
       · simp [evaluate_low_eq_evaluate_set_false, h]
     exact OBdd.Canonicity (high_reduced R) (low_reduced R) this
 
-
 theorem OBdd.Canonicity_reverse {O : OBdd n m} {U : OBdd n m'}:
-    O.Reduced → U.Reduced → O.HSimilar U → O.evaluate = U.evaluate := by
-  intro _ _ h
-  simp only [Similar, HSimilar] at h
-  simp only [evaluate, Function.comp_apply]
-  rw [h]
+    O.HSimilar U → O.evaluate = U.evaluate := by
+  simp_all [evaluate, Function.comp_apply, Similar, HSimilar]
 
 /-- An acyclicity lemma: an edge from `O` to `U` implies that `O` is not reachable from `U`.  -/
 lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachable O.1.heap U.1.root O.1.root := by
@@ -1378,7 +1365,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
     simp only [Nat.succ_eq_add_one] at this
     suffices s : (O.high O_root_def).evaluate = (O.low O_root_def).evaluate by
       absurd hr
-      apply OBdd.not_reduced_of_iso_high_low O_root_def
+      apply not_reduced_of_sim_high_low O_root_def
       apply OBdd.Canonicity (OBdd.high_reduced hr) (OBdd.low_reduced hr) s
     ext I
     trans O.evaluate I
@@ -1389,7 +1376,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       simp only [Fin.getElem_fin, Vector.getElem_set_self]
       simp only [↓reduceIte]
       suffices s : Nary.IndependentOf (O.high O_root_def).evaluate O.1.heap[j.1].var by rw [← s true I]
-      refine OBdd.Independence' (O.high O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
+      refine independentOf_lt_root (O.high O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
       convert OBdd.var_lt_high_var
       simp [O_root_def]
     · symm
@@ -1400,7 +1387,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       simp only [Fin.getElem_fin, Vector.getElem_set_self]
       simp only [Bool.false_eq_true, ↓reduceIte]
       suffices s : Nary.IndependentOf (O.low O_root_def).evaluate O.1.heap[j.1].var by rw [s false I]
-      refine OBdd.Independence' (O.low O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
+      refine independentOf_lt_root (O.low O_root_def) ⟨O.1.heap[j.1].var.1, ?_⟩
       convert OBdd.var_lt_low_var
       simp [O_root_def]
 
@@ -1472,7 +1459,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
     simp only [Fin.getElem_fin, Vector.getElem_set_self, Bool.false_eq_true, ↓reduceIte, ne_eq]
     rw [← not_forall]
     intro contra
-    apply not_reduced_of_iso_high_low (show O.1.root = node j by rw [O_def])
+    apply not_reduced_of_sim_high_low (show O.1.root = node j by rw [O_def])
     · apply OBdd.Canonicity
       · exact high_reduced hr'
       · exact low_reduced hr'
@@ -1486,7 +1473,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
               simp_rw [show heap = O.1.heap by rw [O_def]]
               rw [show O.1.heap[j].var = O.var by simp [O_def]]
               apply var_lt_high_var
-            apply Independence' (O.high (by rw [O_def])) ⟨i.1, hhi⟩
+            apply independentOf_lt_root (O.high (by rw [O_def])) ⟨i.1, hhi⟩
           _ = (O.low (by rw [O_def])).evaluate (x.set i false) := by symm; assumption
           _ = _ := by
             symm
@@ -1495,7 +1482,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
               simp_rw [show heap = O.1.heap by rw [O_def]]
               rw [show O.1.heap[j].var = O.var by simp [O_def]]
               apply var_lt_low_var
-            apply Independence' (O.low (by rw [O_def])) ⟨i.1, hhi⟩
+            apply independentOf_lt_root (O.low (by rw [O_def])) ⟨i.1, hhi⟩
     · exact hr'
   | tail r e =>
     rename_i p
@@ -1614,7 +1601,7 @@ lemma OBdd.usesVar_of_dependsOn {O : OBdd n m} {i : Fin n} :
           simp only [Bool.false_eq_true, ↓reduceIte, ne_eq] at h
           exact usesVar_of_low_usesVar (usesVar_of_dependsOn h)
       | inr hr =>
-        have := (Independence' O ⟨i.1, by simp [var, Bdd.var, O_root_def]; omega⟩) b v
+        have := (independentOf_lt_root O ⟨i.1, by simp [var, Bdd.var, O_root_def]; omega⟩) b v
         contradiction
     | isTrue ht =>
       use j

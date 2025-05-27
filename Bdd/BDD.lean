@@ -58,8 +58,8 @@ lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
 
-private def SyntacticEquiv : BDD → BDD → Prop := fun B C ↦
-  (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) C.obdd)
+private def SyntacticEquiv (B : BDD) (B' : BDD) :=
+  (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) B'.obdd)
 
 private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
   | B, C =>
@@ -68,14 +68,13 @@ private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
       (Lift.olift (Nat.le_max_right ..) C.obdd) (Lift.olift_reduced C.hred)
 
 private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
-    B.SemanticEquiv C ↔ B.SyntacticEquiv C := by
-  constructor
-  · intro h
-    simp only [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
-    exact (OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
-  · intro h
+    B.SemanticEquiv C ↔ B.SyntacticEquiv C := ⟨l_to_r, r_to_l⟩ where
+  l_to_r h := by
+    simp [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
+    exact OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h
+  r_to_l h := by
     simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
-    exact (OBdd.Canonicity_reverse (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h)
+    exact OBdd.Canonicity_reverse h
 
 instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
