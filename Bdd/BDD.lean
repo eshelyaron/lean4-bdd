@@ -313,13 +313,13 @@ private lemma apply_spec'' {B C : BDD} {op} {I : Vector Bool n} {h : n = (apply 
     congr
     simp
 
-private lemma denotation_take {B : BDD} {hn : B.nvars ≤ n} {hm1 : B.nvars ≤ m} {hm2 : m ≤ n}:
+lemma denotation_take {B : BDD} {hn : B.nvars ≤ n} {hm1 : B.nvars ≤ m} {hm2 : m ≤ n}:
     B.denotation hn I = B.denotation (by simp_all) (I.take m) := by
   simp [denotation, Evaluate.evaluate_evaluate, lift]
   congr!
   omega
 
-private lemma denotation_take' {B : BDD} {hn : B.nvars ≤ n} :
+lemma denotation_take' {B : BDD} {hn : B.nvars ≤ n} :
     B.denotation hn I = B.denotation (le_refl _) (Vector.cast (by simp_all) (I.take B.nvars)) := by
   simp [denotation, Evaluate.evaluate_evaluate, lift]
 
