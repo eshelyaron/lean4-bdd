@@ -17,9 +17,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) :
   match hr : r with
   | .terminal _ => return r
   | .node j =>
-    -- TODO: there must be a nicer way to write this get-match-return-or-else dance.
-    let cached ← lookup j
-    match cached with
+    match ← lookup j with
     | some p => return p
     | none =>
       let N := O.1.heap[j]

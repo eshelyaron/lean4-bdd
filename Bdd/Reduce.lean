@@ -860,7 +860,7 @@ private def reduce'' {n m : Nat} (O : OBdd n.succ m.succ) : Bdd n.succ m.succ ×
   | terminal _ => ⟨O.1, 0⟩ -- Terminals are already reduced.
   | node r =>
     let ⟨B, S⟩ := (StateT.run (loop O.1.heap r (OBdd.discover O) n) initial)
-    ⟨B, S.nid + 1⟩
+    ⟨B, S.nid⟩
 
 private def zero_vars_to_bool : Bdd 0 m → Bool := fun B ↦
   match B.root with
@@ -869,13 +869,16 @@ private def zero_vars_to_bool : Bdd 0 m → Bool := fun B ↦
 
 def oreduce (O : OBdd n m) : Σ k, OBdd n k :=
   match n with
-  | .zero => ⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal (zero_vars_to_bool O.1)⟩, Bdd.Ordered_of_terminal⟩⟩
+  | .zero =>
+    ⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal (zero_vars_to_bool O.1)⟩, Bdd.Ordered_of_terminal⟩⟩
   | .succ _ =>
     match m with
-    | .zero => ⟨0, O⟩
+    | .zero =>
+      ⟨0, O⟩
     | .succ _ =>
       match h : reduce'' O with
-      | ⟨B, k⟩ => ⟨k, ⟨Trim.trim B (by simp) sorry, Trim.trim_ordered (by sorry)⟩⟩
+      | ⟨B, k⟩ =>
+        ⟨k + 1, ⟨Trim.trim B (by omega) sorry, Trim.trim_ordered (by sorry)⟩⟩
 
 lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).2 := sorry
 

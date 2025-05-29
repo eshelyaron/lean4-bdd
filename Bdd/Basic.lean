@@ -1762,3 +1762,215 @@ lemma Pointer.toVar_lt_of_trans_edge_of_ordered :
     have := h1 (relevantEdge_of_edge_of_reachable e (Relation.TransGen.to_reflTransGen r))
     simp_all only [Nat.succ_eq_add_one, RelevantMayPrecede, MayPrecede, gt_iff_lt]
     omega
+
+lemma baz (op : Bool → Bool → Bool) (c bt bt' bf bf' : Bool) :
+    op (if c then bt else bf) (if c then bt' else bf') = (if c then (op bt bt') else (op bf bf')) := by
+  cases c <;> simp
+
+def Pointer.equiv (p : Pointer m) (p' : Pointer m') :=
+  (∀ b, p = .terminal b → p' = .terminal b) ∧ (∀ j, p = .node j → ∃ (j' : Fin m'), p' = .node j' ∧ j.1 = j'.1)
+
+lemma Pointer.equiv_refl (p : Pointer m) : p.equiv p := by
+  simp only [Pointer.equiv]
+  constructor
+  · intro b hb
+    exact hb
+  · intro j hj
+    use j
+
+lemma Pointer.equiv_symm {p : Pointer m} : p.equiv q → q.equiv p := by
+  simp only [Pointer.equiv]
+  simp_all only [Bool.forall_bool, and_imp]
+  intro h1 h2 h3
+  constructor
+  · constructor
+    · intro hq
+      cases p with
+      | terminal b =>
+        cases b with
+        | false => rfl
+        | true => rw [h2 rfl] at hq; simp_all only [terminal.injEq, Bool.true_eq_false]
+      | node _ =>
+        rcases (h3 _ rfl) with ⟨_, hc⟩
+        rw [hc.1] at hq; contradiction
+    · intro hq
+      cases p with
+      | terminal b =>
+        cases b with
+        | true => rfl
+        | false => rw [h1 rfl] at hq; simp_all only [terminal.injEq, Bool.true_eq_false]
+      | node _ =>
+        rcases (h3 _ rfl) with ⟨_, hc⟩
+        rw [hc.1] at hq; contradiction
+  · intro j hj
+    cases p with
+    | terminal b =>
+      cases b with
+      | false => rw [h1 rfl] at hj; contradiction
+      | true => rw [h2 rfl] at hj; contradiction
+    | node j' =>
+      rcases h3 j' rfl with ⟨j'', hj1, hj2⟩
+      rw [hj1] at hj
+      injection hj with heq
+      subst heq
+      use j'
+      simp [hj2]
+
+def Node.equiv (N : Node n m) (N' : Node n' m') :=
+  N.var.1 = N'.var.1 ∧ Pointer.equiv N.low N'.low ∧ Pointer.equiv N.high N'.high
+
+lemma Node.equiv_refl (N : Node n m) : N.equiv N := by
+  simp only [Node.equiv]
+  simp
+  constructor
+  · exact Pointer.equiv_refl N.low
+  · exact Pointer.equiv_refl N.high
+
+lemma Node.equiv_symm : Node.equiv N M → Node.equiv M N := by
+  simp only [Node.equiv]
+  simp_all
+  intro h1 h2 h3
+  constructor
+  · exact Pointer.equiv_symm h2
+  · exact Pointer.equiv_symm h3
+
+lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m') :
+    (∀ j : Fin m', Reachable B.heap B.root (node j) → ∃ hj : j.1 < m, Node.equiv O.1.heap[j.1] B.heap[j]) →
+    (∀ j, B.root = .node j → ∃ hj, O.1.root = .node ⟨j.1, hj⟩) →
+    Ordered B := by
+  intro h1 h2
+  cases B_root_def : B.root with
+  | terminal b => exact Ordered_of_terminal' B_root_def
+  | node j =>
+    rcases h2 _ B_root_def with ⟨hj1', hj2'⟩
+    apply ordered_of_low_high_ordered B_root_def
+    · apply ordered_of_ordered_heap_all_reachable_eq (O.low hj2')
+      · intro jj hrjj
+        simp only [low_heap_eq_heap]
+        apply h1
+        apply Relation.reflTransGen_swap.mpr
+        right
+        exact Relation.reflTransGen_swap.mp hrjj
+        exact edge_of_low B
+      · intro jl B_low_def
+        simp only [OBdd.low, Bdd.low, Fin.getElem_fin]
+        rcases h1 jl (.tail .refl (by rw [← B_low_def]; exact edge_of_low _)) with ⟨hjl1, _⟩
+        rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
+        rcases Pointer.equiv_symm hj3 with ⟨hj31, hj32⟩
+        use hjl1
+        simp only [Bdd.low] at B_low_def
+        rcases hj32 _ B_low_def with ⟨j', hj1', hj2'⟩
+        rw [hj1']
+        simp only [node.injEq]
+        exact Fin.eq_mk_iff_val_eq.mpr (id (Eq.symm hj2'))
+    · rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
+      have := OBdd.var_lt_low_var (O := O) (h := hj2')
+      simp_all [OBdd.var, Bdd.var, OBdd.low, Bdd.low]
+      apply Fin.lt_iff_val_lt_val.mpr
+      simp only [Fin.coe_castSucc]
+      have that : (toVar B.heap B.heap[j.1].low).1 = (toVar O.1.heap O.1.heap[j.1].low).1 := by
+        rcases Pointer.equiv_symm hj3 with ⟨hj31, hj32⟩
+        cases hl : B.heap[↑j].low with
+        | terminal b =>
+          simp [hj31 b hl]
+        | node jl =>
+          rcases hj32 jl hl with ⟨jl', hjl1', hjl2'⟩
+          rw [hjl1']
+          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin, Fin.coe_eq_castSucc,
+            Fin.coe_castSucc]
+          simp_rw [← hjl2']
+          rcases h1 jl (by rw [← hl]; exact reachable_of_edge (.low rfl)) with ⟨hs1, hs2, _, _⟩
+          exact symm hs2
+      rw [that]
+      exact this
+    · apply ordered_of_ordered_heap_all_reachable_eq (O.high hj2')
+      · intro jj hrjj
+        simp only [high_heap_eq_heap]
+        apply h1
+        apply Relation.reflTransGen_swap.mpr
+        right
+        exact Relation.reflTransGen_swap.mp hrjj
+        exact edge_of_high B
+      · intro jl B_high_def
+        simp only [OBdd.high, Bdd.high, Fin.getElem_fin]
+        rcases h1 jl (.tail .refl (by rw [← B_high_def]; exact edge_of_high _)) with ⟨hjl1, _⟩
+        rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
+        rcases Pointer.equiv_symm hj4 with ⟨hj41, hj42⟩
+        use hjl1
+        simp only [Bdd.high] at B_high_def
+        rcases hj42 _ B_high_def with ⟨j', hj1', hj2'⟩
+        rw [hj1']
+        simp only [node.injEq]
+        exact Fin.eq_mk_iff_val_eq.mpr (id (Eq.symm hj2'))
+    · rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
+      have := OBdd.var_lt_high_var (O := O) (h := hj2')
+      simp_all [OBdd.var, Bdd.var, OBdd.high, Bdd.high]
+      apply Fin.lt_iff_val_lt_val.mpr
+      simp only [Fin.coe_castSucc]
+      have that : (toVar B.heap B.heap[j.1].high).1 = (toVar O.1.heap O.1.heap[j.1].high).1 := by
+        rcases Pointer.equiv_symm hj4 with ⟨hj41, hj42⟩
+        cases hl : B.heap[↑j].high with
+        | terminal b =>
+          simp [hj41 b hl]
+        | node jl =>
+          rcases hj42 jl hl with ⟨jl', hjl1', hjl2'⟩
+          rw [hjl1']
+          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin, Fin.coe_eq_castSucc,
+            Fin.coe_castSucc]
+          simp_rw [← hjl2']
+          rcases h1 jl (by rw [← hl]; exact reachable_of_edge (.high rfl)) with ⟨hs1, hs2, _, _⟩
+          exact symm hs2
+      rw [that]
+      exact this
+termination_by O
+
+lemma OBdd.toTree_eq_toTree_of_ordered_heap_all_reachable_eq (O : OBdd n m) (U : OBdd n m') :
+    (∀ j : Fin m', Reachable U.1.heap U.1.root (node j) → ∃ hj : j.1 < m, Node.equiv O.1.heap[j.1] U.1.heap[j]) →
+    Pointer.equiv U.1.root O.1.root →
+    O.toTree = U.toTree := by
+  intro h1 h2
+  cases U_root_def : U.1.root with
+  | terminal b =>
+    simp only [Pointer.equiv] at h2
+    have := h2.1 b U_root_def
+    simp_all [OBdd.toTree_terminal']
+  | node j =>
+    simp only [Pointer.equiv] at h2
+    have := h2.2 j U_root_def
+    rcases this with ⟨j', hj', hjj'⟩
+    rw [OBdd.toTree_node U_root_def]
+    rw [OBdd.toTree_node hj']
+    have := h1 j (by simp [U_root_def]; left)
+    rcases this with ⟨hj, hev, hel, heh⟩
+    congr 1
+    · simp_all [hjj']; apply Fin.eq_of_val_eq; exact hev
+    · apply toTree_eq_toTree_of_ordered_heap_all_reachable_eq
+      · intro jj hrjj
+        simp only [low_heap_eq_heap]
+        apply h1
+        apply Relation.reflTransGen_swap.mpr
+        right
+        exact Relation.reflTransGen_swap.mp hrjj
+        exact oedge_of_low.2
+      · simp_all [OBdd.low, Bdd.low]
+        exact Pointer.equiv_symm hel
+    · apply toTree_eq_toTree_of_ordered_heap_all_reachable_eq
+      · intro jj hrjj
+        simp only [high_heap_eq_heap]
+        apply h1
+        apply Relation.reflTransGen_swap.mpr
+        right
+        exact Relation.reflTransGen_swap.mp hrjj
+        exact oedge_of_high.2
+      · simp_all [OBdd.high, Bdd.high]
+        exact Pointer.equiv_symm heh
+termination_by O
+
+lemma OBdd.evaluate_eq_evaluate_of_ordered_heap_all_reachable_eq (O : OBdd n m) (U : OBdd n m') :
+    (∀ j : Fin m', Reachable U.1.heap U.1.root (node j) → ∃ hj : j.1 < m, Node.equiv O.1.heap[j.1] U.1.heap[j]) →
+    Pointer.equiv U.1.root O.1.root →
+    O.evaluate = U.evaluate := by
+  intro h1 h2
+  ext I
+  simp only [OBdd.evaluate, Function.comp_apply]
+  rw [toTree_eq_toTree_of_ordered_heap_all_reachable_eq O U h1 h2]

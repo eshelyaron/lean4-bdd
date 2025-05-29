@@ -14,3 +14,5 @@ require "leanprover-community" / "batteries"
 @[default_target]
 lean_lib «Bdd» where
   -- add any library configuration options here
+
+lean_exe SatSolver
