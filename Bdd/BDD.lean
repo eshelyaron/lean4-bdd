@@ -115,7 +115,7 @@ private lemma denotation_eq_of_denotation_eq_geq (B C : BDD) (hn : max B.nvars C
   rw [denotation_append (hm := hnm) (J := Vector.replicate _ false)]
   rw [h]
 
-lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : max B.nvars C.nvars ≤ n) (hm : max B.nvars C.nvars ≤ m) :
+lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : B.nvars ⊔ C.nvars ≤ n) (hm : B.nvars ⊔ C.nvars ≤ m) :
     B.denotation (n := n) (by omega) = C.denotation (n := n) (by omega) →
     B.denotation (n := m) (by omega) = C.denotation (n := m) (by omega) := fun h ↦
   if hleq : n ≤ m
@@ -123,14 +123,9 @@ lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : max B.nvars C.nvars ≤ n
   else denotation_eq_of_denotation_eq_geq _ _ hm hn (le_of_not_le hleq) h
 
 theorem SemanticEquiv.equivalence : Equivalence SemanticEquiv :=
-  { refl := (fun _ ↦ rfl),
-    symm := (by
-      intro B C h
-      simp_all only [SemanticEquiv]
-      symm
-      apply denotation_eq_of_denotation_eq (by omega) (by omega) h
-    ),
-    trans := (by
+  { refl := fun _ ↦ rfl,
+    symm := fun h ↦ Eq.symm (denotation_eq_of_denotation_eq (by omega) (by omega) h),
+    trans := by
       intro B C D hBC hCD
       simp_all only [SemanticEquiv]
       let m := max (max B.nvars C.nvars) D.nvars
@@ -138,7 +133,6 @@ theorem SemanticEquiv.equivalence : Equivalence SemanticEquiv :=
       trans C.denotation (by omega)
       · exact denotation_eq_of_denotation_eq .refl (by omega) hBC
       · exact denotation_eq_of_denotation_eq .refl (by omega) hCD
-    )
   }
 
 private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
@@ -185,12 +179,16 @@ private lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.obdd.1.root
   next => assumption
   next => contradiction
 
-def const : Bool → BDD
-  | b => ⟨0, 0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩, OBdd.reduced_of_terminal ⟨b, rfl⟩⟩
+def const (b : Bool) : BDD :=
+  { nvars := 0,
+    nheap := 0,
+    obdd  := ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩,
+    hred  := Bdd.reduced_of_terminal
+  }
 
 private abbrev var_raw (n : Nat) : Bdd (n+1) 1 := ⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩
 
-private lemma var_raw_ordered : Bdd.Ordered (var_raw n) := by
+private lemma var_ordered : Bdd.Ordered (var_raw n) := by
   apply Bdd.ordered_of_low_high_ordered rfl
   · simp only [Bdd.low]
     conv =>
@@ -217,7 +215,7 @@ private lemma var_raw_ordered : Bdd.Ordered (var_raw n) := by
     refine Nat.lt_succ_of_le ?_
     exact Nat.mod_le n (n + 1 + 1)
 
-private lemma var_raw_reduced : OBdd.Reduced ⟨(var_raw n), var_raw_ordered⟩ := by
+private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
   constructor
   · rintro ⟨p, hp⟩
     simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue] at hp
@@ -293,8 +291,12 @@ private lemma var_raw_reduced : OBdd.Reduced ⟨(var_raw n), var_raw_ordered⟩ 
             apply Pointer.eq_terminal_of_reachable at hhh
             rw [hh, hhh]
 
-def var   : Nat  → BDD
-  | n => ⟨n+1, _, ⟨var_raw n, var_raw_ordered⟩, var_raw_reduced⟩
+def var (n : Nat) : BDD :=
+  { nvars := n + 1,
+    nheap := 1,
+    obdd  := ⟨⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩, var_ordered⟩,
+    hred  := var_reduced
+  }
 
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   ⟨_, _, (Reduce.oreduce (Apply.oapply op B.obdd C.obdd).2.1).2, Reduce.oreduce_reduced⟩

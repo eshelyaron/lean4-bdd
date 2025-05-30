@@ -571,7 +571,9 @@ lemma OBdd.reduced_of_terminal {n m} {O : OBdd n m} : O.isTerminal → O.Reduced
   · intro p q _
     calc p.1
       _ = terminal b :=         (eq_terminal_of_relevant (by rw [← h]) p)
-      _ = q.1    := Eq.symm (eq_terminal_of_relevant (by rw [← h]) q)
+      _ = q.1        := Eq.symm (eq_terminal_of_relevant (by rw [← h]) q)
+
+lemma Bdd.reduced_of_terminal : OBdd.Reduced ⟨⟨M, terminal b⟩, o⟩ := OBdd.reduced_of_terminal ⟨b, rfl⟩
 
 /-- Sub-BDDs of a reduced BDD are reduced. -/
 lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
