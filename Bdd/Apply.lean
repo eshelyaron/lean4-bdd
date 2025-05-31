@@ -75,7 +75,7 @@ private structure State (n) (n') (m) (m') where
   heap : Vector (RawNode (max n n')) size
   cache : Std.HashMap (Pointer m × Pointer m') RawPointer
 
-private def initial : State n n' m m' := ⟨_, (Vector.emptyWithCapacity 0), Std.HashMap.emptyWithCapacity⟩
+private def initial : State n n' m m' := ⟨_, (Vector.emptyWithCapacity (m ⊔ m')), Std.HashMap.emptyWithCapacity (m ⊔ m')⟩
 
 def toVar_or (M : Vector (Node n m) m) : Pointer m → Nat → Nat
   | .terminal _, i => i
@@ -405,8 +405,7 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
       (∀ (k : Pointer m × Pointer m'),
         (∀ p, s.cache[k]? = some p → r.1.cache[k]? = some p) ∧
         (r.1.cache[k]? = none → s.cache[k]? = none) ∧
-        (s.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2)) ∧
-      (∀ j h, r.2 = .inr j → (r.1.heap[j]'h).va.1 = (toVar_or O.1.heap O.1.root (n ⊔ n')) ⊓ (toVar_or U.1.heap U.1.root (n ⊔ n')))
+        (s.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2))
     } :=
   ⟨⟨⟨s.size + 1, s.heap.push N, s.cache.insert ⟨O.1.root, U.1.root⟩ (.inr s.size)⟩, .inr s.size⟩, by
     simp only [Prod.exists]
@@ -416,14 +415,7 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
       · simp only [Std.HashMap.getElem?_insert_self]
       · constructor
         · simp only [le_add_iff_nonneg_right, zero_le]
-        · constructor
-          swap
-          · intro j hj1 hj2
-            injection hj2 with hji
-            subst hji
-            simp only [Vector.getElem_push_eq]
-            exact hNv
-          intro k
+        · intro k
           constructor
           · intro p hkp
             rw [← hkp]
@@ -626,8 +618,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
       (∀ (k : Pointer m × Pointer m'),
         (∀ p, s0.cache[k]? = some p → r.1.cache[k]? = some p) ∧
         (r.1.cache[k]? = none → s0.cache[k]? = none) ∧
-        (s0.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2)) ∧
-      (∀ j h, r.2 = .inr j → (r.1.heap[j]'h).va.1 = (toVar_or O.1.heap O.1.root (n ⊔ n')) ⊓ (toVar_or U.1.heap U.1.root (n ⊔ n')))
+        (s0.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2))
     } :=
   match hc : cache_get O.1.root U.1.root s0 with
   | some root =>
@@ -643,12 +634,6 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
           · rintro h ⟨_, c⟩
             rw [h] at c
             contradiction,
-      by
-        simp only [Nat.succ_eq_add_one, Bdd.var]
-        intro j hj1 hj2
-        simp only [cache_get] at hc
-        rw [hj2] at hc
-        exact (inv.2 _ _ hc).1 _ _ rfl
       ⟩
     ⟩
   | none =>
@@ -664,7 +649,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             · simp only [O_root_def, U_root_def, Std.HashMap.getElem?_insert_self]
             · constructor
               · exact .refl
-              · constructor
+              ·
                 intro k
                 constructor
                 · intro p hp
@@ -688,7 +673,6 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       · left
                       · left
                     next heq => rw [h1] at hp; contradiction
-                · intro _ _ _; contradiction
         ⟩
       | .node j' =>
         let ⟨⟨sl, rl⟩, ⟨invl, hl, hsl, hlp⟩⟩ := apply_helper op O (U.low U_root_def) s0 inv
@@ -699,7 +683,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             (by
               use ⟨O.1.root, ((U.low U_root_def).1.root)⟩
               simp only
-              exact (hhp.1 _).1 _ hl
+              exact (hhp _).1 _ hl
             )
             ⟨_, hh⟩
             (by
@@ -712,7 +696,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               intro j hj1
               simp only [Fin.getElem_fin]
               intro hj2
-              have := (hhp.1 _).1 _ hl
+              have := (hhp _).1 _ hl
               simp only at this
               rw [hj2] at this
               have that := (invh.2 _ (.inr j) this).1 _ hj1 rfl
@@ -724,7 +708,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               intro j hj1
               simp only [Fin.getElem_fin]
               intro hj2
-              have := hhp.2 _ hj1 hj2
+              have := (invh.2 _ _ hh).1 _ hj1 hj2
               rw [this]
               exact aux_lt1_high O_root_def U_root_def
             )
@@ -774,7 +758,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   rfl
                 symm
                 have : sh.cache[(⟨O.1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
-                  apply (hhp.1 _).1
+                  apply (hhp _).1
                   exact hl
                 have := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
                 calc _
@@ -795,13 +779,13 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               | some val =>
                 cases heqq : sl.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? with
                 | none =>
-                  have := ((hhp.1 _).2.2 heqq ⟨val, heq⟩).2
+                  have := ((hhp _).2.2 heqq ⟨val, heq⟩).2
                   simp only [OBdd.high_heap_eq_heap] at this
                   absurd this
                   apply OBdd.not_oedge_reachable
                   exact oedge_of_high
                 | some val =>
-                  have := ((hlp.1 _).2.2 hc ⟨_, heqq⟩).2
+                  have := ((hlp _).2.2 hc ⟨_, heqq⟩).2
                   simp only [OBdd.low_heap_eq_heap] at this
                   absurd this
                   apply OBdd.not_oedge_reachable
@@ -812,32 +796,28 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
           (by rw [O_root_def, U_root_def] at hv; exact hv),
           .trans hsl (.trans hsh hsv),
           by
-            constructor
-            swap
-            · rw [← O_root_def, ← U_root_def]
-              exact hvp.2
             intro k
             constructor
             · intro p hp
-              apply (hvp.1 _).1
-              apply (hhp.1 _).1
-              apply (hlp.1 _).1
+              apply (hvp _).1
+              apply (hhp _).1
+              apply (hlp _).1
               exact hp
             · constructor
               · intro hk
-                apply (hlp.1 _).2.1
-                apply (hhp.1 _).2.1
-                apply (hvp.1 _).2.1
+                apply (hlp _).2.1
+                apply (hhp _).2.1
+                apply (hvp _).2.1
                 exact hk
               · intro hk hkp
                 rw [← O_root_def, ← U_root_def]
                 cases heq : sh.cache[k]? with
                 | none =>
-                  apply (hvp.1 _).2.2 heq hkp
+                  apply (hvp _).2.2 heq hkp
                 | some w =>
                   cases heqq : sl.cache[k]? with
                   | none =>
-                    have := (hhp.1 _).2.2 heqq ⟨_, heq⟩
+                    have := (hhp _).2.2 heqq ⟨_, heq⟩
                     constructor
                     · exact this.1
                     · trans (U.high U_root_def).1.root
@@ -845,7 +825,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                         exact oedge_of_high.2
                       · exact this.2
                   | some ww =>
-                    have := (hlp.1 _).2.2 hk ⟨_, heqq⟩
+                    have := (hlp _).2.2 hk ⟨_, heqq⟩
                     constructor
                     · exact this.1
                     · trans (U.low U_root_def).1.root
@@ -861,7 +841,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
         let ⟨r, ⟨invv, hv, hsv, hvp⟩⟩ :=
           heap_push (O := O) (U := U)
             ⟨⟨O.1.heap[j].var.1, by omega⟩, rl, rh⟩ sh invh
-            ⟨_, (hhp.1 _).1 _ hl⟩
+            ⟨_, (hhp _).1 _ hl⟩
             ⟨_, hh⟩
             (by
               simp only
@@ -873,7 +853,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               intro j hj1
               simp only [Fin.getElem_fin]
               intro hj2
-              have := (hhp.1 _).1 _ hl
+              have := (hhp _).1 _ hl
               simp only at this
               rw [hj2] at this
               have that := (invh.2 _ (.inr j) this).1 _ hj1 rfl
@@ -885,7 +865,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               intro j hj1
               simp only [Fin.getElem_fin]
               intro hj2
-              have := hhp.2 _ hj1 hj2
+              have := (invh.2 _ _ hh).1 _ hj1 hj2
               rw [this]
               exact aux_lt2_high O_root_def U_root_def
             )
@@ -935,7 +915,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   rfl
                 symm
                 have : sh.cache[(⟨(O.low O_root_def).1.root, U.1.root⟩ : Pointer m × Pointer m')]? = some rl := by
-                  apply (hhp.1 _).1
+                  apply (hhp _).1
                   exact hl
                 have := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
                 calc _
@@ -956,13 +936,13 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               | some val =>
                 cases heqq : sl.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? with
                 | none =>
-                  have := ((hhp.1 _).2.2 heqq ⟨val, heq⟩).1
+                  have := ((hhp _).2.2 heqq ⟨val, heq⟩).1
                   simp only [OBdd.high_heap_eq_heap] at this
                   absurd this
                   apply OBdd.not_oedge_reachable
                   exact oedge_of_high
                 | some val =>
-                  have := ((hlp.1 _).2.2 hc ⟨_, heqq⟩).1
+                  have := ((hlp _).2.2 hc ⟨_, heqq⟩).1
                   simp only [OBdd.low_heap_eq_heap] at this
                   absurd this
                   apply OBdd.not_oedge_reachable
@@ -973,32 +953,28 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
           (by rw [O_root_def, U_root_def] at hv; exact hv),
           .trans hsl (.trans hsh hsv),
           by
-            constructor
-            swap
-            · rw [← O_root_def, ← U_root_def]
-              exact hvp.2
             intro k
             constructor
             · intro p hp
-              apply (hvp.1 _).1
-              apply (hhp.1 _).1
-              apply (hlp.1 _).1
+              apply (hvp _).1
+              apply (hhp _).1
+              apply (hlp _).1
               exact hp
             · constructor
               · intro hk
-                apply (hlp.1 _).2.1
-                apply (hhp.1 _).2.1
-                apply (hvp.1 _).2.1
+                apply (hlp _).2.1
+                apply (hhp _).2.1
+                apply (hvp _).2.1
                 exact hk
               · intro hk hkp
                 rw [← O_root_def, ← U_root_def]
                 cases heq : sh.cache[k]? with
                 | none =>
-                  apply (hvp.1 _).2.2 heq hkp
+                  apply (hvp _).2.2 heq hkp
                 | some w =>
                   cases heqq : sl.cache[k]? with
                   | none =>
-                    have := (hhp.1 _).2.2 heqq ⟨_, heq⟩
+                    have := (hhp _).2.2 heqq ⟨_, heq⟩
                     constructor
                     · trans (O.high O_root_def).1.root
                       · apply OBdd.reachable_of_edge
@@ -1006,7 +982,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       · exact this.1
                     · exact this.2
                   | some ww =>
-                    have := (hlp.1 _).2.2 hk ⟨_, heqq⟩
+                    have := (hlp _).2.2 hk ⟨_, heqq⟩
                     constructor
                     · trans (O.low O_root_def).1.root
                       · apply OBdd.reachable_of_edge
@@ -1015,41 +991,41 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                     · exact this.2
         ⟩
       | .node j' =>
-        if hleq : O.1.heap[j].var.1 < U.1.heap[j'].var.1
+        if hlt : O.1.heap[j].var.1 < U.1.heap[j'].var.1
         then
           let ⟨⟨sl, rl⟩, ⟨invl, hl, hsl, hlp⟩⟩ := apply_helper op (O.low O_root_def) U s0 inv
           let ⟨⟨sh, rh⟩, ⟨invh, hh, hsh, hhp⟩⟩ := apply_helper op (O.high O_root_def) U sl invl
           let ⟨r, ⟨invv, hv, hsv, hvp⟩⟩ :=
             heap_push (O := O) (U := U)
               ⟨⟨O.1.heap[j].var.1, by omega⟩, rl, rh⟩ sh invh
-              ⟨_, (hhp.1 _).1 _ hl⟩
+              ⟨_, (hhp _).1 _ hl⟩
               ⟨_, hh⟩
               (by
                 simp only
                 rw [O_root_def, U_root_def]
                 simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', or_true, true_or,
                   inf_of_le_right, inf_of_le_left]
-                exact Eq.symm (min_eq_left_of_lt hleq)
+                exact Eq.symm (min_eq_left_of_lt hlt)
               )
               (by
                 intro j'' hj1
                 simp only [Fin.getElem_fin]
                 intro hj2
-                have := (hhp.1 _).1 _ hl
+                have := (hhp _).1 _ hl
                 simp only at this
                 rw [hj2] at this
                 have that := (invh.2 _ _ this).1 _ hj1 rfl
                 simp only at that
                 rw [that]
-                exact aux_lt3_low O_root_def U_root_def hleq
+                exact aux_lt3_low O_root_def U_root_def hlt
               )
               (by
                 intro j'' hj1
                 simp only [Fin.getElem_fin]
                 intro hj2
-                have := hhp.2 _ hj1 hj2
+                have := (invh.2 _ _ hh).1 _ hj1 hj2
                 rw [this]
-                exact aux_lt3_high O_root_def U_root_def hleq
+                exact aux_lt3_high O_root_def U_root_def hlt
               )
               (by
                 intro h0 h1 I
@@ -1097,7 +1073,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                     rfl
                   symm
                   have : sh.cache[(⟨(O.low O_root_def).1.root, U.1.root⟩ : Pointer m × Pointer m')]? = some rl := by
-                    apply (hhp.1 _).1
+                    apply (hhp _).1
                     exact hl
                   have := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
                   calc _
@@ -1118,13 +1094,13 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                 | some val =>
                   cases heqq : sl.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? with
                   | none =>
-                    have := ((hhp.1 _).2.2 heqq ⟨val, heq⟩).1
+                    have := ((hhp _).2.2 heqq ⟨val, heq⟩).1
                     simp only [OBdd.high_heap_eq_heap] at this
                     absurd this
                     apply OBdd.not_oedge_reachable
                     exact oedge_of_high
                   | some val =>
-                    have := ((hlp.1 _).2.2 hc ⟨_, heqq⟩).1
+                    have := ((hlp _).2.2 hc ⟨_, heqq⟩).1
                     simp only [OBdd.low_heap_eq_heap] at this
                     absurd this
                     apply OBdd.not_oedge_reachable
@@ -1135,32 +1111,28 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             (by rw [O_root_def, U_root_def] at hv; exact hv),
             .trans hsl (.trans hsh hsv),
             by
-              constructor
-              swap
-              · rw [← O_root_def, ← U_root_def]
-                exact hvp.2
               intro k
               constructor
               · intro p hp
-                apply (hvp.1 _).1
-                apply (hhp.1 _).1
-                apply (hlp.1 _).1
+                apply (hvp _).1
+                apply (hhp _).1
+                apply (hlp _).1
                 exact hp
               · constructor
                 · intro hk
-                  apply (hlp.1 _).2.1
-                  apply (hhp.1 _).2.1
-                  apply (hvp.1 _).2.1
+                  apply (hlp _).2.1
+                  apply (hhp _).2.1
+                  apply (hvp _).2.1
                   exact hk
                 · intro hk hkp
                   rw [← O_root_def, ← U_root_def]
                   cases heq : sh.cache[k]? with
                   | none =>
-                    apply (hvp.1 _).2.2 heq hkp
+                    apply (hvp _).2.2 heq hkp
                   | some w =>
                     cases heqq : sl.cache[k]? with
                     | none =>
-                      have := (hhp.1 _).2.2 heqq ⟨_, heq⟩
+                      have := (hhp _).2.2 heqq ⟨_, heq⟩
                       constructor
                       · trans (O.high O_root_def).1.root
                         · apply OBdd.reachable_of_edge
@@ -1168,7 +1140,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                         · exact this.1
                       · exact this.2
                     | some ww =>
-                      have := (hlp.1 _).2.2 hk ⟨_, heqq⟩
+                      have := (hlp _).2.2 hk ⟨_, heqq⟩
                       constructor
                       · trans (O.low O_root_def).1.root
                         · apply OBdd.reachable_of_edge
@@ -1184,7 +1156,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             let ⟨r, ⟨invv, hv, hsv, hvp⟩⟩ :=
               heap_push (O := O) (U := U)
                 ⟨⟨U.1.heap[j'].var.1, by omega⟩, rl, rh⟩ sh invh
-                ⟨_, (hhp.1 _).1 _ hl⟩
+                ⟨_, (hhp _).1 _ hl⟩
                 ⟨_, hh⟩
                 (by
                   simp only
@@ -1197,7 +1169,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   intro j'' hj1
                   simp only [Fin.getElem_fin]
                   intro hj2
-                  have := (hhp.1 _).1 _ hl
+                  have := (hhp _).1 _ hl
                   simp only at this
                   rw [hj2] at this
                   have that := (invh.2 _ _ this).1 _ hj1 rfl
@@ -1209,7 +1181,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   intro j'' hj1
                   simp only [Fin.getElem_fin]
                   intro hj2
-                  have := hhp.2 _ hj1 hj2
+                  have := (invh.2 _ _ hh).1 _ hj1 hj2
                   rw [this]
                   exact aux_lt4_high O_root_def U_root_def hgeq
                 )
@@ -1259,7 +1231,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       rfl
                     symm
                     have : sh.cache[(⟨O.1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
-                      apply (hhp.1 _).1
+                      apply (hhp _).1
                       exact hl
                     have := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
                     calc _
@@ -1280,13 +1252,13 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   | some val =>
                     cases heqq : sl.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? with
                     | none =>
-                      have := ((hhp.1 _).2.2 heqq ⟨val, heq⟩).2
+                      have := ((hhp _).2.2 heqq ⟨val, heq⟩).2
                       simp only [OBdd.high_heap_eq_heap] at this
                       absurd this
                       apply OBdd.not_oedge_reachable
                       exact oedge_of_high
                     | some val =>
-                      have := ((hlp.1 _).2.2 hc ⟨_, heqq⟩).2
+                      have := ((hlp _).2.2 hc ⟨_, heqq⟩).2
                       simp only [OBdd.low_heap_eq_heap] at this
                       absurd this
                       apply OBdd.not_oedge_reachable
@@ -1297,32 +1269,28 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               (by rw [O_root_def, U_root_def] at hv; exact hv),
               .trans hsl (.trans hsh hsv),
               by
-                constructor
-                swap
-                · rw [← O_root_def, ← U_root_def]
-                  exact hvp.2
                 intro k
                 constructor
                 · intro p hp
-                  apply (hvp.1 _).1
-                  apply (hhp.1 _).1
-                  apply (hlp.1 _).1
+                  apply (hvp _).1
+                  apply (hhp _).1
+                  apply (hlp _).1
                   exact hp
                 · constructor
                   · intro hk
-                    apply (hlp.1 _).2.1
-                    apply (hhp.1 _).2.1
-                    apply (hvp.1 _).2.1
+                    apply (hlp _).2.1
+                    apply (hhp _).2.1
+                    apply (hvp _).2.1
                     exact hk
                   · intro hk hkp
                     rw [← O_root_def, ← U_root_def]
                     cases heq : sh.cache[k]? with
                     | none =>
-                      apply (hvp.1 _).2.2 heq hkp
+                      apply (hvp _).2.2 heq hkp
                     | some w =>
                       cases heqq : sl.cache[k]? with
                       | none =>
-                        have := (hhp.1 _).2.2 heqq ⟨_, heq⟩
+                        have := (hhp _).2.2 heqq ⟨_, heq⟩
                         constructor
                         · exact this.1
                         · trans (U.high U_root_def).1.root
@@ -1330,7 +1298,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                             exact oedge_of_high.2
                           · exact this.2
                       | some ww =>
-                        have := (hlp.1 _).2.2 hk ⟨_, heqq⟩
+                        have := (hlp _).2.2 hk ⟨_, heqq⟩
                         constructor
                         · exact this.1
                         · trans (U.low U_root_def).1.root
@@ -1344,7 +1312,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             let ⟨r, ⟨invv, hv, hsv, hvp⟩⟩ :=
               heap_push (O := O) (U := U)
                 ⟨⟨U.1.heap[j'].var.1, by omega⟩, rl, rh⟩ sh invh
-                ⟨_, (hhp.1 _).1 _ hl⟩
+                ⟨_, (hhp _).1 _ hl⟩
                 ⟨_, hh⟩
                 (by
                   simp only
@@ -1360,7 +1328,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   intro j'' hj1
                   simp only [Fin.getElem_fin]
                   intro hj2
-                  have := (hhp.1 _).1 _ hl
+                  have := (hhp _).1 _ hl
                   simp only at this
                   rw [hj2] at this
                   have that := (invh.2 _ _ this).1 _ hj1 rfl
@@ -1372,7 +1340,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   intro j'' hj1
                   simp only [Fin.getElem_fin]
                   intro hj2
-                  have := hhp.2 _ hj1 hj2
+                  have := (invh.2 _ _ hh).1 _ hj1 hj2
                   rw [this]
                   exact aux_lt5_high O_root_def U_root_def (by omega)
                 )
@@ -1441,7 +1409,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       rfl
                     symm
                     have : sh.cache[(⟨(O.low O_root_def).1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
-                      apply (hhp.1 _).1
+                      apply (hhp _).1
                       exact hl
                     have := invh.2 ⟨(O.low O_root_def).1.root, (U.low U_root_def).1.root⟩ rl this
                     calc _
@@ -1462,13 +1430,13 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   | some val =>
                     cases heqq : sl.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? with
                     | none =>
-                      have := ((hhp.1 _).2.2 heqq ⟨val, heq⟩).2
+                      have := ((hhp _).2.2 heqq ⟨val, heq⟩).2
                       simp only [OBdd.high_heap_eq_heap] at this
                       absurd this
                       apply OBdd.not_oedge_reachable
                       exact oedge_of_high
                     | some val =>
-                      have := ((hlp.1 _).2.2 hc ⟨_, heqq⟩).2
+                      have := ((hlp _).2.2 hc ⟨_, heqq⟩).2
                       simp only [OBdd.low_heap_eq_heap] at this
                       absurd this
                       apply OBdd.not_oedge_reachable
@@ -1479,32 +1447,28 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             (by rw [O_root_def, U_root_def] at hv; exact hv),
             .trans hsl (.trans hsh hsv),
             by
-              constructor
-              swap
-              · rw [← O_root_def, ← U_root_def]
-                exact hvp.2
               intro k
               constructor
               · intro p hp
-                apply (hvp.1 _).1
-                apply (hhp.1 _).1
-                apply (hlp.1 _).1
+                apply (hvp _).1
+                apply (hhp _).1
+                apply (hlp _).1
                 exact hp
               · constructor
                 · intro hk
-                  apply (hlp.1 _).2.1
-                  apply (hhp.1 _).2.1
-                  apply (hvp.1 _).2.1
+                  apply (hlp _).2.1
+                  apply (hhp _).2.1
+                  apply (hvp _).2.1
                   exact hk
                 · intro hk hkp
                   rw [← O_root_def, ← U_root_def]
                   cases heq : sh.cache[k]? with
                   | none =>
-                    apply (hvp.1 _).2.2 heq hkp
+                    apply (hvp _).2.2 heq hkp
                   | some w =>
                     cases heqq : sl.cache[k]? with
                     | none =>
-                      have := (hhp.1 _).2.2 heqq ⟨_, heq⟩
+                      have := (hhp _).2.2 heqq ⟨_, heq⟩
                       constructor
                       · trans (O.high O_root_def).1.root
                         · apply OBdd.reachable_of_edge
@@ -1515,7 +1479,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                           exact oedge_of_high.2
                         · exact this.2
                     | some ww =>
-                      have := (hlp.1 _).2.2 hk ⟨_, heqq⟩
+                      have := (hlp _).2.2 hk ⟨_, heqq⟩
                       constructor
                       · trans (O.low O_root_def).1.root
                         · apply OBdd.reachable_of_edge
