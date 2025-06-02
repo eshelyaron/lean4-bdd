@@ -80,7 +80,7 @@ lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
         next => simp_all
         next => split at hxy <;> (refine Subtype.eq ?_; simp_all))
 
-lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
+private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
   cases O_root_def : O.1.root with
   | terminal b => simp [isTerminal_iff_size_eq_zero.mpr ⟨b, O_root_def⟩]
   | node j =>

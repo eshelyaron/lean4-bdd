@@ -509,9 +509,13 @@ lemma find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
   next ht => contradiction
   next hf => injection h with heq; simp [← heq]
 
+
+private def restrict' (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
+  ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b i).2.1).2, Reduce.oreduce_reduced⟩
+
 def restrict (B : BDD) (b : Bool) (i : Nat) : BDD :=
   if h : i < B.nvars
-  then ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b ⟨i, h⟩)).2, Reduce.oreduce_reduced⟩
+  then restrict' B b ⟨i, h⟩
   else B
 
 lemma restrict_geq_eq_self {B : BDD} : i ≥ B.nvars → B.restrict b i = B := by
@@ -521,25 +525,10 @@ lemma restrict_geq_eq_self {B : BDD} : i ≥ B.nvars → B.restrict b i = B := b
   next ht => absurd h; simpa
   next => simp
 
-private lemma restrict_induction {B : BDD} {b : Bool} {i : Nat} {motive : BDD → Prop} :
-    ((ht : i < B.nvars) → motive ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b ⟨i, ht⟩)).2, Reduce.oreduce_reduced⟩) →
-    (¬ i < B.nvars → motive B) →
-    motive (restrict B b i) := by
-  intro h1 h2
-  simp only [restrict]
-  split <;> simp_all
-
 @[simp]
 lemma restrict_nvars {B : BDD} {i} : (B.restrict b i).nvars = B.nvars := by
-  simp only [restrict]
+  simp only [restrict, restrict']
   split <;> simp
-
--- @[simp]
--- private lemma restrict_spec {B : BDD} {i : Fin m} {h1 : _ ≤ m} {h2 : m = B.nvars} :
---     (B.restrict b i).denotation h1 = Nary.restrict (B.denotation (by simp_all)) b i := by
---   subst h2
---   simp only [restrict]
---   simp
 
 @[simp]
 private lemma Vector.cast_set {v : Vector α n} {i : Fin m} :
@@ -548,22 +537,31 @@ private lemma Vector.cast_set {v : Vector α n} {i : Fin m} :
 @[simp]
 lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
     (B.restrict b i).denotation h I = (Nary.restrict (B.denotation (by simp_all)) b ⟨i, by simp_all⟩) I := by
-  refine restrict_induction (i := i) (b := b) (B := B) (motive := fun C ↦ ∀ h', C.denotation h' I = (Nary.restrict (B.denotation (by simp_all)) b ⟨i, by simp_all⟩) I) ?_ ?_ h
-  · intro h1 h2
-    simp only [denotation, lift, Nary.restrict, evaluate, eq_mp_eq_cast, id_eq, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
-    simp only [Vector.take_eq_extract, Reduce.oreduce_evaluate, Restrict.orestrict_evaluate, Nary.restrict]
-    congr 1
-    have :
-        (Vector.cast (show min B.nvars n = B.nvars by simp_all) (I.extract 0 B.nvars)).set i b =
-        (Vector.cast (show _ by simp_all) ((I.extract 0 B.nvars).set i b)) := by
-      rfl
+  simp only [restrict]
+  split
+  next hlt =>
+    simp only [restrict', denotation, lift, evaluate, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
+    simp only [Reduce.oreduce_evaluate]
+    have := (Restrict.orestrict (BDD.obdd B) b ⟨i, hlt⟩).2.2
     rw [this]
+    simp only [Nary.restrict, Vector.take_eq_extract, Lift.olift_evaluate]
+    congr
+    ext j hj
     simp
-    rw [Vector.extract_set]
-    simp_all
-  · intro h1 h2
-    simp_all
-    rw [← denotation_independentOf_of_geq_nvars (h2 := h1) (h1 := h2) (i := ⟨i, hi⟩)]
+    rw [Vector.getElem_set]
+    split
+    next heq =>
+      subst heq
+      have := Vector.getElem_extract (as := I.set i b) (start := 0) (stop := B.nvars) (i := i) (by omega)
+      simp_all
+    next heq =>
+      simp only [restrict_nvars] at h
+      have := Vector.getElem_extract (as := I.set i b) (start := 0) (stop := B.nvars) (i := j) (by omega)
+      have := Vector.getElem_extract (as := I) (start := 0) (stop := B.nvars) (i := j) (by omega)
+      simp_all
+  next hlt =>
+    have := denotation_independentOf_of_geq_nvars (B := B) (h1 := restrict_nvars ▸ h) (h2 := (by simp_all)) (i := ⟨i, hi⟩)
+    rw [Nary.restrict_eq_self_of_independentOf this]
 
 instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := by
   suffices s : Nary.DependsOn B.denotation' = B.obdd.1.usesVar by rw [s]; infer_instance
@@ -673,11 +671,13 @@ end BDD
 --#eval! (Reduce.oreduce (Lift.olift (show (max (BDD.const false).nvars (BDD.var 2).nvars) ≤ (max (BDD.const false).nvars (BDD.var 2).nvars) + 1 by simp) ((Apply.oapply (Bool.and) (BDD.const false).obdd (BDD.var 2).obdd).2))).2
 --#eval! (Reduce.oreduce (Apply.oapply (fun b b' ↦ (! b) || b') (BDD.var 3).obdd (BDD.const false).obdd).2).2
 --#eval! (Apply.oapply (fun b b' ↦ (! b) || b') (BDD.var 3).obdd (BDD.const false).obdd).2
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforalls [⟨1, by simp⟩, ⟨1, by simp⟩]).robdd.1
+--#eval! (Reduce.oreduce (BDD.and ((BDD.and (BDD.var 0) (BDD.var 2)).restrict false 0) ((BDD.and (BDD.var 0) (BDD.var 2)).restrict true 0)).obdd).2
 --#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).robdd.1
 --#eval! (((BDD.or (BDD.var 0) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).bforall ⟨0, by simp⟩).robdd.1
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict true ⟨0, by simp⟩).robdd.1
--- #eval! (BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).robdd.1
+--#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict true 0).obdd
+--#eval! ((BDD.var 1).not).obdd
+--#eval! ((BDD.var 1)).obdd
+--#eval! (BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).obdd
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict true ⟨1, by simp⟩).robdd.1
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict false ⟨1, by simp⟩).robdd.1
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict false ⟨2, by simp⟩).robdd.1

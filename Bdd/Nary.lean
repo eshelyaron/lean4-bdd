@@ -84,4 +84,16 @@ lemma restrict_const : restrict (Function.const _ b) c i = (Function.const _ b) 
 
 lemma restrict_independentOf : IndependentOf (restrict f c i) i := by simp
 
+lemma restrict_eq_self_of_independentOf : IndependentOf f i → (restrict f c i) = f := by
+  intro h
+  ext I
+  symm
+  simp_all only [IndependentOf, restrict]
+  apply h
+
+lemma restrict_if {c : Func n α Bool} :
+    restrict (fun I ↦ if c I then f I else g I) b i = fun I ↦ if (restrict c b i I) then (restrict f b i I) else (restrict g b i I) := by
+  ext I
+  simp only [restrict]
+
 end Nary

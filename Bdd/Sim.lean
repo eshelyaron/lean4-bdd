@@ -5,7 +5,7 @@ import Std.Data.HashMap.Lemmas
 
 namespace Sim
 
-structure State (O : OBdd n m) (U : OBdd n m') where
+private structure State (O : OBdd n m) (U : OBdd n m') where
   lr : Std.HashMap (Fin m) (Fin m')
   rl : Std.HashMap (Fin m') (Fin m)
   hl : ∀ j j',
@@ -21,7 +21,7 @@ structure State (O : OBdd n m) (U : OBdd n m') where
       ∃ hj' : Bdd.Ordered ⟨U.1.heap, .node j'⟩,
         OBdd.HSimilar ⟨⟨O.1.heap, .node j⟩, hj⟩ ⟨⟨U.1.heap, .node j'⟩, hj'⟩
 
-def sim_helper
+private def sim_helper
     (O : OBdd n m) (hO : OBdd.Reduced O)
     (U : OBdd n m') (hU : OBdd.Reduced U)
     (p : Pointer m) (hpr : Pointer.Reachable O.1.heap O.1.root p)

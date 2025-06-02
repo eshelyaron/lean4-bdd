@@ -4,7 +4,7 @@ import Bdd.DecisionTree
 namespace Lift
 
 @[simp]
-def lift (h : n ≤ n') (B : Bdd n m) : Bdd n' m :=
+private def lift (h : n ≤ n') (B : Bdd n m) : Bdd n' m :=
   ⟨ Vector.map
       (fun N ↦ ⟨⟨N.var.1, Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩)
       B.heap,
@@ -92,7 +92,7 @@ private lemma lift_preserves_RelevantEdge {h : n ≤ n'} {B : Bdd n m} {p q : Po
     | low  hl => simp at hl; left ; simpa
     | high hh => simp at hh; right; simpa
 
-lemma lift_ordered {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (lift h B).Ordered := by
+private lemma lift_ordered {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (lift h B).Ordered := by
   rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
   apply lift_preserves_MayPrecede.mpr
   exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
@@ -168,7 +168,7 @@ lemma olift_evaluate {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
   simp only [OBdd.evaluate, Function.comp_apply, olift_preserves_toTree]
   rw [DecisionTree.lift_evaluate]
 
-lemma olift_SimilarRP {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m}
+private lemma olift_SimilarRP {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m}
     {hp : Pointer.Reachable (olift h O).1.heap (olift h O).1.root p}
     {hq : Pointer.Reachable (olift h O).1.heap (olift h O).1.root q} :
     (olift h O).SimilarRP ⟨p, hp⟩ ⟨q, hq⟩ →
