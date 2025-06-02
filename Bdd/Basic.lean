@@ -90,6 +90,7 @@ lemma not_terminal_edge {q} : ¬ Edge w (terminal b) q := by
   intro contra
   contradiction
 
+--FIXME: Maybe use WithTop (Fin n) instead of Fin n.succ
 def Pointer.toVar (M : Vector (Node n m) m) : Pointer m → Fin n.succ
   | terminal _ => Fin.last n
   | node j     => M[j].var

@@ -1,5 +1,4 @@
 import Bdd.Basic
-import Bdd.Lift
 import Std.Data.HashMap.Lemmas
 
 namespace Apply
@@ -67,8 +66,8 @@ private lemma RawNode.cook_equiv : Node.equiv (RawNode.cook N h1) (RawNode.cook 
     · apply RawPointer.cook_equiv <;> assumption
     · apply RawPointer.cook_equiv <;> assumption
 
-private def cook_heap {n c} (heap : Vector (RawNode n) c) (hh : ∀ i : Fin c, RawNode.Bounded i heap[i]) : Vector (Node n c) c :=
-  Vector.ofFn (fun i ↦ heap[i].cook (RawNode.bounded_of_le (hh i) (by omega)))
+private def cook_heap (v : Vector (RawNode n) c) (hh : ∀ i : Fin c, v[i].Bounded i) : Vector (Node n c) c :=
+  Vector.ofFn (fun i ↦ v[i].cook (RawNode.bounded_of_le (hh i) (by omega)))
 
 private structure State (n) (n') (m) (m') where
   size : Nat
