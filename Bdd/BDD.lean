@@ -564,11 +564,9 @@ lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
     have := denotation_independentOf_of_geq_nvars (B := B) (h1 := restrict_nvars ▸ h) (h2 := (by simp_all)) (i := ⟨i, hi⟩)
     rw [Nary.restrict_eq_self_of_independentOf this]
 
-instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := by
-  suffices s : Nary.DependsOn B.denotation' = B.obdd.1.usesVar by rw [s]; infer_instance
-  simp only [denotation, Lift.olift_trivial_eq, Evaluate.evaluate_evaluate, lift]
-  ext i
-  exact Iff.symm (OBdd.usesVar_iff_dependsOn_of_reduced B.hred)
+instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := fun i ↦
+  (show B.denotation' = B.obdd.evaluate by simp [denotation, Evaluate.evaluate_evaluate, lift]) ▸
+  (decidable_of_decidable_of_iff (OBdd.usesVar_iff_dependsOn_of_reduced B.hred))
 
 def bforall (B : BDD) (i : Nat) : BDD := (and (B.restrict false i) (B.restrict true i))
 
@@ -684,6 +682,6 @@ end BDD
 --#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict false ⟨2, by simp⟩).robdd.1
 -- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
 --#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
--- #eval! decide (dependsOn (((BDD.var 2).not.or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
+--#eval! decide (Nary.DependsOn (((BDD.var 2).or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
 
 --#lint

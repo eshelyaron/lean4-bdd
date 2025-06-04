@@ -1729,17 +1729,90 @@ lemma OBdd.evaluate_eq_of_forall_usesVar {O : OBdd n m} {I J : Vector Bool n} :
   rcases hi with ⟨b, v, hbv⟩
   apply usesVar_of_dependsOn hbv
 
--- FIXME: Optimize.
-instance OBdd.instDecidableUsesVar {O : OBdd n m} : DecidablePred O.1.usesVar := by
-  intro i
-  simp [usesVar]
-  infer_instance
-
 lemma Pointer.eq_terminal_of_reachable : Pointer.Reachable w (.terminal b) p → p = (.terminal b) := by
   intro h
   cases Relation.reflTransGen_swap.mp h with
   | refl => rfl
   | tail => contradiction
+
+lemma Bdd.not_usesVar_of_terminal : ¬ Bdd.usesVar ⟨M, .terminal b⟩ i := by
+  simp only [usesVar, not_exists]
+  intro j
+  simp only [Fin.getElem_fin, not_and]
+  intro hr
+  apply eq_terminal_of_reachable at hr
+  contradiction
+
+
+lemma Bdd.not_usesVar_of_var_gt {M : Vector (Node n m) m} {j : Fin m} : Bdd.Ordered ⟨M, .node j⟩ → M[j].var > i → ¬ Bdd.usesVar ⟨M, .node j⟩ i := by
+  intro o h
+  simp only [usesVar, not_exists]
+  intro j'
+  simp only [Fin.getElem_fin, not_and]
+  intro hr
+  have := mayPrecede_of_reachable (B := ⟨M, .node j⟩) (p := .node j') o hr
+  simp_all only [Fin.getElem_fin, gt_iff_lt, Nat.succ_eq_add_one, toVar_node_eq,
+    Fin.coe_eq_castSucc, Fin.castSucc_le_castSucc_iff]
+  omega
+
+private def usesVar_helper
+    (O : OBdd n m) (i : Fin n) (p : Pointer m) (hpr : Pointer.Reachable O.1.heap O.1.root p) :
+  StateM
+    { s : Std.HashSet (Fin m) //
+      ∀ j ∈ s, Pointer.Reachable O.1.heap O.1.root (.node j) ∧ ¬ Bdd.usesVar ⟨O.1.heap, .node j⟩ i }
+    (Decidable (Bdd.usesVar ⟨O.1.heap, p⟩ i)) := do
+  match hp : p with
+  | .terminal b => return isFalse not_usesVar_of_terminal
+  | .node j =>
+    if hgt : O.1.heap[j].var > i
+    then return isFalse (not_usesVar_of_var_gt (Bdd.ordered_of_reachable hpr) hgt)
+    else
+    if hv : O.1.heap[j].var = i
+      then return isTrue ⟨j, .refl, hv⟩
+      else
+        let s ← get
+        if hh : j ∈ s.1
+        then return isFalse (s.2 j hh).2
+        else
+          match ← usesVar_helper O i O.1.heap[j].low (.tail hpr (.low rfl)) with
+          | isTrue ht => return isTrue (by apply usesVar_of_low_usesVar; simp only [Bdd.low]; exact ht; rfl)
+          | isFalse hf =>
+            match ← usesVar_helper O i O.1.heap[j].high (.tail hpr (.high rfl)) with
+            | isTrue htt => return isTrue (by apply usesVar_of_high_usesVar; simp only [Bdd.high]; exact htt; rfl)
+            | isFalse hff =>
+              have : ¬ Bdd.usesVar { heap := O.1.heap, root := node j } i := by
+                intro contra
+                subst hp
+                rw [OBdd.usesVar_iff (O := ⟨⟨O.1.heap, .node j⟩, Bdd.ordered_of_reachable hpr⟩)] at contra
+                rcases contra with ⟨j', hj', c⟩
+                simp only [node.injEq] at hj'
+                subst hj'
+                cases c with
+                | inl c => simp_all only [Fin.getElem_fin, node.injEq, not_true_eq_false]
+                | inr c =>
+                  cases c with
+                  | inl c => simp_all only [Fin.getElem_fin, OBdd.low, low]
+                  | inr c => simp_all only [Fin.getElem_fin, OBdd.high, high]
+              set ( ⟨ s.1.insert j,
+                      by
+                        intro j'
+                        rw [Std.HashSet.mem_insert, beq_iff_eq]
+                        intro hj'
+                        cases hj' with
+                        | inl h =>
+                          subst h
+                          exact ⟨hpr, this⟩
+                        | inr h => exact (s.2 j' h)
+                    ⟩ : { s : Std.HashSet (Fin m) // ∀ j, j ∈ s → Pointer.Reachable O.1.heap O.1.root (.node j) ∧ ¬ Bdd.usesVar ⟨O.1.heap, .node j⟩ i }
+                  )
+              return isFalse this
+termination_by OBdd.size' (⟨⟨O.1.heap, p⟩, Bdd.ordered_of_reachable hpr⟩ : OBdd n m)
+decreasing_by
+  · simp [OBdd.size_node, OBdd.low, Bdd.low]; omega
+  · simp [OBdd.size_node, OBdd.high, Bdd.high]
+
+instance OBdd.instDecidableUsesVar {O : OBdd n m} : DecidablePred O.1.usesVar :=
+  fun i ↦ (usesVar_helper O i O.1.root .refl ⟨Std.HashSet.emptyWithCapacity, by simp⟩).1
 
 lemma Bdd.terminal_of_zero_vars {B : Bdd n m} : n = 0 → ∃ b, B.root = .terminal b := by
   intro h
