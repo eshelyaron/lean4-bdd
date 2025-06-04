@@ -511,9 +511,9 @@ lemma find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
 
 
 private def restrict' (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
-  ⟨_, _, (Reduce.oreduce (Restrict.orestrict B.obdd b i).2.1).2, Reduce.oreduce_reduced⟩
+  ⟨_, _, (Reduce.oreduce (Restrict.orestrict b i B.obdd).2.1).2, Reduce.oreduce_reduced⟩
 
-def restrict (B : BDD) (b : Bool) (i : Nat) : BDD :=
+def restrict (b : Bool) (i : Nat) (B : BDD) : BDD :=
   if h : i < B.nvars
   then restrict' B b ⟨i, h⟩
   else B
@@ -536,13 +536,14 @@ private lemma Vector.cast_set {v : Vector α n} {i : Fin m} :
 
 @[simp]
 lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
-    (B.restrict b i).denotation h I = (Nary.restrict (B.denotation (by simp_all)) b ⟨i, by simp_all⟩) I := by
+    (B.restrict b i).denotation h I =
+    (Nary.restrict (B.denotation (restrict_nvars ▸ h)) b ⟨i, hi⟩) I := by
   simp only [restrict]
   split
   next hlt =>
     simp only [restrict', denotation, lift, evaluate, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
     simp only [Reduce.oreduce_evaluate]
-    have := (Restrict.orestrict (BDD.obdd B) b ⟨i, hlt⟩).2.2
+    have := (Restrict.orestrict b ⟨i, hlt⟩ (BDD.obdd B)).2.2
     rw [this]
     simp only [Nary.restrict, Vector.take_eq_extract, Lift.olift_evaluate]
     congr

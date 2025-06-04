@@ -92,8 +92,8 @@ lemma restrict_eq_self_of_independentOf : IndependentOf f i → (restrict f c i)
   apply h
 
 lemma restrict_if {c : Func n α Bool} :
-    restrict (fun I ↦ if c I then f I else g I) b i = fun I ↦ if (restrict c b i I) then (restrict f b i I) else (restrict g b i I) := by
-  ext I
-  simp only [restrict]
+    restrict (fun I ↦ if c I then f I else g I) b i =
+    fun I ↦ if (restrict c b i I) then (restrict f b i I) else (restrict g b i I) :=
+  funext (fun _ ↦ rfl)
 
 end Nary

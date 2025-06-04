@@ -700,7 +700,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
           ⟩
 termination_by O
 
-def orestrict (O : OBdd n m) (b : Bool) (i : Fin n) : (s : Nat) × { W : OBdd n s // W.evaluate = Nary.restrict O.evaluate b i } :=
+def orestrict (b : Bool) (i : Fin n) (O : OBdd n m) : (s : Nat) × { W : OBdd n s // W.evaluate = Nary.restrict O.evaluate b i } :=
   let ⟨⟨⟨siz, heap, _⟩, root⟩, h1, h2⟩:= restrict_helper O b i initial inv_initial
   ⟨ siz, ⟨⟨cook_heap heap h1.1, root.cook (h1.2 _ root h2.1).2.2.1⟩, (h1.2 _ root h2.1).2.2.2.1⟩, (h1.2 _ root h2.1).2.2.2.2 ⟩
 
