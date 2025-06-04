@@ -52,10 +52,6 @@ theorem OBdd.discover_spec {O : OBdd n m} {j : Fin m} :
     (Reachable O.1.heap O.1.root (node j)) → j ∈ (discover O).get O.1.heap[j].var :=
   (discover_helper_spec O) ∘ Collect.collect_spec
 
-/-- `discover` is correct. -/
-theorem OBdd.discover_spec_reverse {O : OBdd n m} {j : Fin m} :
-    j ∈ (discover O).get i → (Reachable O.1.heap O.1.root (node j)) ∧ O.1.heap[j].var = i := sorry
-
 namespace Reduce
 private structure State (n) (m) where
   out : Vector (Node n m) m

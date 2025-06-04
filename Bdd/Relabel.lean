@@ -90,7 +90,7 @@ private lemma relabel_relevantEdge {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i :
     simp_all [relabel_node]
     assumption
 
-private lemma relabel_preserves_ordered {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
+private lemma relabel_ordered {B : Bdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} :
     (∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') → Bdd.Ordered B → Bdd.Ordered (relabel hf B) := by
   intro hu ho
   rintro _ _ hxy
@@ -101,7 +101,7 @@ private lemma relabel_preserves_ordered {B : Bdd n m} {f : Nat → Nat} {hf : �
 
 def orelabel (O : OBdd n m) {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') : OBdd (f n) m :=
-    ⟨(relabel hf O.1), relabel_preserves_ordered hu O.2⟩
+    ⟨(relabel hf O.1), relabel_ordered hu O.2⟩
 
 private lemma orelabel_low {O : OBdd n m} {h : O.1.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i') :
@@ -133,14 +133,14 @@ private lemma orelabel_high {O : OBdd n m} {h : O.1.root = .node j} {f : Nat →
 
 private lemma brelabel_low {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
-    (OBdd.low ⟨relabel hf B, relabel_preserves_ordered hu o⟩ h) =
-      ⟨relabel hf (OBdd.low ⟨B, o⟩ h).1, relabel_preserves_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi')) (OBdd.low ⟨B, o⟩ h).2⟩ := by
+    (OBdd.low ⟨relabel hf B, relabel_ordered hu o⟩ h) =
+      ⟨relabel hf (OBdd.low ⟨B, o⟩ h).1, relabel_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_low_usesVar hi) (OBdd.usesVar_of_low_usesVar hi')) (OBdd.low ⟨B, o⟩ h).2⟩ := by
   exact orelabel_low (O := ⟨B, o⟩) hf hu
 
 private lemma brelabel_high {B : Bdd n m} {o : Bdd.Ordered B} {h : B.root = .node j} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
-    (OBdd.high ⟨relabel hf B, relabel_preserves_ordered hu o⟩ h) =
-      ⟨relabel hf (OBdd.high ⟨B, o⟩ h).1, relabel_preserves_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi')) (OBdd.high ⟨B, o⟩ h).2⟩ := by
+    (OBdd.high ⟨relabel hf B, relabel_ordered hu o⟩ h) =
+      ⟨relabel hf (OBdd.high ⟨B, o⟩ h).1, relabel_ordered (fun i i' hii' hi hi' ↦ hu i i' hii' (OBdd.usesVar_of_high_usesVar hi) (OBdd.usesVar_of_high_usesVar hi')) (OBdd.high ⟨B, o⟩ h).2⟩ := by
   exact orelabel_high (O := ⟨B, o⟩) hf hu
 
 @[simp]
@@ -157,7 +157,7 @@ theorem orelabel_evaluate (O : OBdd n m) {f : Nat → Nat} {hf : ∀ i : Fin n, 
     simp
   | node j =>
     rw [OBdd.evaluate_node'' O_root_def]
-    have that : (⟨(relabel hf O.1), relabel_preserves_ordered hu O.2⟩ : OBdd _ _).1.root = Pointer.node j := O_root_def
+    have that : (⟨(relabel hf O.1), relabel_ordered hu O.2⟩ : OBdd _ _).1.root = Pointer.node j := O_root_def
     rw [OBdd.evaluate_node'' that]
     simp only
     congr 1
@@ -229,7 +229,7 @@ termination_by O
 
 private lemma relabel_toTree_relabel' {B : Bdd n m} {o : B.Ordered} {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n)
     (hu : ∀ i i' : Fin n, i < i' → B.usesVar i → B.usesVar i' → f i < f i') :
-    OBdd.toTree ⟨relabel hf B, relabel_preserves_ordered hu o⟩ = DecisionTree.relabel hf (OBdd.toTree ⟨B, o⟩) := relabel_toTree_relabel ⟨B, o⟩ hf hu
+    OBdd.toTree ⟨relabel hf B, relabel_ordered hu o⟩ = DecisionTree.relabel hf (OBdd.toTree ⟨B, o⟩) := relabel_toTree_relabel ⟨B, o⟩ hf hu
 
 private lemma orelabel_preserves_similarRP {O : OBdd n m} {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n}
     {hu : ∀ i i' : Fin n, i < i' → O.1.usesVar i → O.1.usesVar i' → f i < f i'}
