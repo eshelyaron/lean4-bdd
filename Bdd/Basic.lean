@@ -1,9 +1,8 @@
-import Mathlib.Data.Vector.Basic
 import Mathlib.Data.Fintype.Basic
 import Init.Data.ToString.Basic
 import Mathlib.Tactic.DeriveFintype
-import Mathlib.Tactic.Linarith
 import Mathlib.Data.Fintype.Vector
+import Mathlib.Tactic.Linarith
 import Bdd.Nary
 import Bdd.DecisionTree
 
@@ -322,7 +321,7 @@ instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Si
   fun O U ↦ decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
 
 -- FIXME: Use the instance from Sim.lean instead.
-private instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
+instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
   decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
 
 def OBdd.SimilarRP (O : OBdd n m) (p q : O.1.RelevantPointer) :=
@@ -910,10 +909,10 @@ theorem OBdd.Canonicity {O : OBdd n m} {U : OBdd n m'} (ho : O.Reduced) (hu : U.
         · apply OBdd.Canonicity (high_reduced ho) (high_reduced hu) (evaluate_high_eq_of_evaluate_eq_and_var_eq' h same_var)
 termination_by O.size' + U.size'
 decreasing_by
-  simp [size_node U_root_def]; linarith
-  simp [size_node O_root_def]; linarith
+  simp [size_node U_root_def]; omega
+  simp [size_node O_root_def]; omega
   all_goals
-    simp [size_node O_root_def, size_node U_root_def]; linarith
+    simp [size_node O_root_def, size_node U_root_def]; omega
 
 /-- The only reduced BDD that denotes a constant function is the terminal BDD. -/
 theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
@@ -2256,3 +2255,14 @@ lemma push_evaluate {v : Vector _ _} {h0} {h1} {ho : Bdd.Ordered _} {hu : Bdd.Or
   · exact RawPointer.cook_equiv (h2 := hp)
 
 end RawBdd
+
+-- def example_bdd : OBdd 3 4 :=
+--   ⟨ { heap := ⟨#[{var := 0, low := node 1,         high := node 2},
+--                  {var := 1, low := terminal false, high := node 3},
+--                  {var := 1, low := node 3,         high := terminal true},
+--                  {var := 2, low := terminal false, high := terminal true}], rfl⟩
+--       root := node 0 },
+--     by sorry
+--   ⟩
+
+-- #eval! example_bdd.evaluate ⟨#[true, false, true], rfl⟩

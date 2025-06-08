@@ -1,5 +1,4 @@
 import Bdd.Basic
-import Bdd.DecisionTree
 
 namespace Relabel
 

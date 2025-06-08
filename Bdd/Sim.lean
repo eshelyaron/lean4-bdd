@@ -1,7 +1,5 @@
-import Bdd.Basic
 import Bdd.Lift
 import Std.Data.HashMap.Lemmas
-
 
 namespace Sim
 

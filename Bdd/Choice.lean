@@ -109,7 +109,7 @@ private def choice_helper_spec {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = 
 termination_by O
 
 @[simp]
-def choice_evaluate {O : OBdd n m} (hr : O.Reduced) (ht : ∃ I, O.evaluate I) : O.evaluate (choice O ht) := by
+def choice_evaluate {O : OBdd n m} (hr : O.Reduced) (ht : ∃ I, O.evaluate I) : O.evaluate (choice O ht) = true := by
   simp only [choice]
   split
   next O_root_def => rw [evaluate_terminal' O_root_def]; simp

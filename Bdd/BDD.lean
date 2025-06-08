@@ -1,11 +1,8 @@
-import Bdd.Basic
 import Bdd.Reduce
 import Bdd.Apply
 import Bdd.Relabel
-import Bdd.Nary
 import Bdd.Choice
 import Bdd.Restrict
-import Bdd.Lift
 import Bdd.Evaluate
 import Bdd.Sim
 import Bdd.Size
@@ -66,9 +63,8 @@ lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 
 def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
   B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
 
-private def SyntacticEquiv (B : BDD) (B' : BDD) :=
+private def Similar (B : BDD) (B' : BDD) :=
   (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) B'.obdd)
-
 
 lemma denotation_take {B : BDD} {hn : B.nvars ≤ n} {hm1 : B.nvars ≤ m} {hm2 : m ≤ n}:
     B.denotation hn I = B.denotation (by simp_all) (I.take m) := by
@@ -135,14 +131,14 @@ theorem SemanticEquiv.equivalence : Equivalence SemanticEquiv :=
       · exact denotation_eq_of_denotation_eq .refl (by omega) hCD
   }
 
-private instance instDecidableSyntacticEquiv : DecidableRel SyntacticEquiv
+private instance instDecidableSimilar : DecidableRel Similar
   | B, C =>
     Sim.instDecidableRobddHSimilar
       (Lift.olift (Nat.le_max_left  ..) B.obdd) (Lift.olift_reduced B.hred)
       (Lift.olift (Nat.le_max_right ..) C.obdd) (Lift.olift_reduced C.hred)
 
-private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
-    B.SemanticEquiv C ↔ B.SyntacticEquiv C := ⟨l_to_r, r_to_l⟩ where
+private theorem SemanticEquiv_iff_Similar {B C : BDD} :
+    B.SemanticEquiv C ↔ B.Similar C := ⟨l_to_r, r_to_l⟩ where
   l_to_r h := by
     simp [Evaluate.evaluate_evaluate, SemanticEquiv, denotation] at h
     exact OBdd.Canonicity (Lift.olift_reduced B.hred) (Lift.olift_reduced C.hred) h
@@ -151,19 +147,7 @@ private theorem SemanticEquiv_iff_SyntacticEquiv {B C : BDD} :
     exact OBdd.Canonicity_reverse h
 
 instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
-  | _, _ => decidable_of_iff' _ SemanticEquiv_iff_SyntacticEquiv
-
--- private theorem SemanticEquiv_eq_SyntacticEquiv : SemanticEquiv = SyntacticEquiv := by
---   ext B C
---   exact SemanticEquiv_iff_SyntacticEquiv
-
--- private def equivalence_of_syntacticEquiv : Equivalence SyntacticEquiv := Eq.subst SemanticEquiv_eq_SyntacticEquiv equivalence_of_semanticEquiv
-
--- instance instSetoid : Setoid BDD where
---   r := SemanticEquiv
---   iseqv := equivalence_of_semanticEquiv
-
--- instance instDecidableEquiv (A B : BDD) : Decidable (A ≈ B) := instDecidableSemacticEquiv A B
+  | _, _ => decidable_of_iff' _ SemanticEquiv_iff_Similar
 
 def size : BDD → Nat
   | B => Size.size B.obdd
@@ -413,20 +397,20 @@ private def relabel'' (B : BDD) (f : Nat → Nat)
     BDD :=
   relabel' B f h1 (fun i i' hii' hi hi' ↦ h2 ⟨i, hi⟩ ⟨i', hi'⟩ hii')
 
-private def relabel_helper (m n : Nat) (f : Fin m → Fin n) : Nat → Nat :=
+private def relabel_wrap (m n : Nat) (f : Fin m → Fin n) : Nat → Nat :=
   fun i ↦ if h : i < m then f ⟨i, h⟩ else n
 
 @[simp]
-private lemma relabel_helper_aux : relabel_helper m n f m = n := by
-  simp [relabel_helper]
+private lemma relabel_helper_aux : relabel_wrap m n f m = n := by
+  simp [relabel_wrap]
 
 @[simp]
-private lemma relabel_helper_aux' {i : Fin m} : relabel_helper m n f i.1 = f i := by
-  simp [relabel_helper]
+private lemma relabel_helper_aux' {i : Fin m} : relabel_wrap m n f i.1 = f i := by
+  simp [relabel_wrap]
 
 def relabel (B : BDD) (f : Fin B.nvars → Fin n)
     (h : ∀ i i' : (Nary.Dependency B.denotation'), i.1 < i'.1 → f i.1 < f i'.1) :
-  BDD := relabel'' B (relabel_helper B.nvars n f) (by simp) (fun i i' h' ↦ by simp [h i i' h'])
+  BDD := relabel'' B (relabel_wrap B.nvars n f) (by simp) (fun i i' h' ↦ by simp [h i i' h'])
 
 @[simp]
 lemma relabel_nvars {B : BDD} {f : _ → Fin n} {h} : (relabel B f h).nvars = n := by
@@ -460,7 +444,7 @@ def choice {B : BDD} (s : ∃ I, B.denotation' I) : Vector Bool B.nvars :=
 lemma choice_denotation {B : BDD} {s : ∃ I, B.denotation' I} : B.denotation' (B.choice s) = true := by
   simp [choice, denotation, lift, Evaluate.evaluate_evaluate, Choice.choice_evaluate B.hred (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])]
 
-private lemma find_aux {B : BDD} :
+private lemma find_aux' {B : BDD} :
     ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool (max B.nvars 0)), B.denotation (by simp) I := by
   intro h
   contrapose h
@@ -469,17 +453,17 @@ private lemma find_aux {B : BDD} :
   simp only [Function.const_apply]
   apply h
 
-private lemma find_aux' {B : BDD} :
-    ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool B.nvars), B.denotation (by simp) I := by
+private lemma find_aux {B : BDD} :
+    ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool B.nvars), B.denotation' I := by
   intro h
-  rcases find_aux h with ⟨I, hI⟩
+  rcases find_aux' h with ⟨I, hI⟩
   use ((show (max B.nvars 0) = B.nvars by simp) ▸ I)
   rw [← hI]
   clear hI
   congr! <;> simp
 
 def find {B : BDD} : Option (Vector Bool B.nvars) :=
-  if h : B.SemanticEquiv (const false) then none else some (choice (find_aux' h))
+  if h : B.SemanticEquiv (const false) then none else some (choice (find_aux h))
 
 -- def find_none' {B : BDD} : B.find.isNone → B.SemanticEquiv (const false) := by
 --   intro h
@@ -566,7 +550,7 @@ lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
 
 instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.denotation') := fun i ↦
   (show B.denotation' = B.obdd.evaluate by simp [denotation, Evaluate.evaluate_evaluate, lift]) ▸
-  (decidable_of_decidable_of_iff (OBdd.usesVar_iff_dependsOn_of_reduced B.hred))
+  (decidable_of_iff _ (OBdd.usesVar_iff_dependsOn_of_reduced B.hred))
 
 def bforall (B : BDD) (i : Nat) : BDD := (and (B.restrict false i) (B.restrict true i))
 
@@ -648,8 +632,8 @@ lemma bexists_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
     congr 1
     rw [Bool.or_comm]
 
--- abbrev majority3 :=
---     (or (or (and (var 0) (var 1)) (and (var 0) (var 2))) (and (var 1) (var 2)))
+abbrev majority3 :=
+    (or (or (and (var 0) (var 1)) (and (var 0) (var 2))) (and (var 1) (var 2)))
 
 -- abbrev majority3' :=
 --     (and (imp (var 0) (or (var 1) (var 2))) (imp (var 0).not (and (var 1) (var 2))))
@@ -659,7 +643,7 @@ lemma bexists_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
 
 -- example : ∀ b, ¬ Nary.DependsOn ((majority3.restrict b 1).denotation') ⟨1, by simp⟩ := by
 --     decide +native
-
+example : ¬ majority3.SemanticEquiv (const true) := by decide +native
 end BDD
 
 --#eval! BDD.majority3.find.bind (fun I ↦ some I.toList)

@@ -1,4 +1,3 @@
-import Bdd.Basic
 import Bdd.Collect
 import Bdd.Trim
 

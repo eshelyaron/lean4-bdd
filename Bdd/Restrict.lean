@@ -1,5 +1,4 @@
 import Bdd.Basic
-import Bdd.Nary
 import Std.Data.HashMap.Lemmas
 
 namespace Restrict
