@@ -30,4 +30,4 @@ def main (args : List String) : IO Unit := do
       else IO.println "SAT"
     catch e =>
       IO.println s!"Error reading file {fs}: {e}"
-  | _ => IO.println "Usage: sat <n> <filename>"
+  | _ => IO.println "Usage: ./SatSolver <number-of-variables> <input-file>"
