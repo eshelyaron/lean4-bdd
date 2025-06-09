@@ -1,6 +1,6 @@
 BDD_LEAN_FILES := $(wildcard Bdd/*.lean)
 
-BASE = https://eshelyaron.com/man/lean4/Bdd/
+BASE = https://eshelyaron.com/man/lean4-bdd/Bdd/
 
 dependencies.svg: dependencies.dot
 	dot -Tsvg dependencies.dot > $@

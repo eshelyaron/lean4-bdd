@@ -11,7 +11,7 @@
 <!-- Apply -->
 <g id="node1" class="node">
 <title>Apply</title>
-<g id="a_node1"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Apply.html" xlink:title="Apply">
+<g id="a_node1"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Apply.html" xlink:title="Apply">
 <ellipse fill="none" stroke="green" cx="33.95" cy="-162" rx="33.95" ry="18"/>
 <text text-anchor="middle" x="33.95" y="-156.95" font-family="Times,serif" font-size="14.00">Apply</text>
 </a>
@@ -20,7 +20,7 @@
 <!-- BDD -->
 <g id="node3" class="node">
 <title>BDD</title>
-<g id="a_node3"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/BDD.html" xlink:title="BDD">
+<g id="a_node3"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/BDD.html" xlink:title="BDD">
 <ellipse fill="none" stroke="green" cx="338.95" cy="-90" rx="30.37" ry="18"/>
 <text text-anchor="middle" x="338.95" y="-84.95" font-family="Times,serif" font-size="14.00">BDD</text>
 </a>
@@ -35,8 +35,8 @@
 <!-- Basic -->
 <g id="node2" class="node">
 <title>Basic</title>
-<g id="a_node2"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Basic.html" xlink:title="Basic">
-<ellipse fill="none" stroke="green" cx="318.95" cy="-306" rx="31.39" ry="18"/>
+<g id="a_node2"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Basic.html" xlink:title="Basic">
+<ellipse fill="none" stroke="red" cx="318.95" cy="-306" rx="31.39" ry="18"/>
 <text text-anchor="middle" x="318.95" y="-300.95" font-family="Times,serif" font-size="14.00">Basic</text>
 </a>
 </g>
@@ -50,7 +50,7 @@
 <!-- Choice -->
 <g id="node4" class="node">
 <title>Choice</title>
-<g id="a_node4"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Choice.html" xlink:title="Choice">
+<g id="a_node4"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Choice.html" xlink:title="Choice">
 <ellipse fill="none" stroke="green" cx="122.95" cy="-162" rx="37.02" ry="18"/>
 <text text-anchor="middle" x="122.95" y="-156.95" font-family="Times,serif" font-size="14.00">Choice</text>
 </a>
@@ -65,7 +65,7 @@
 <!-- Collect -->
 <g id="node5" class="node">
 <title>Collect</title>
-<g id="a_node5"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Collect.html" xlink:title="Collect">
+<g id="a_node5"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Collect.html" xlink:title="Collect">
 <ellipse fill="none" stroke="green" cx="204.95" cy="-234" rx="37.53" ry="18"/>
 <text text-anchor="middle" x="204.95" y="-228.95" font-family="Times,serif" font-size="14.00">Collect</text>
 </a>
@@ -80,7 +80,7 @@
 <!-- Evaluate -->
 <g id="node7" class="node">
 <title>Evaluate</title>
-<g id="a_node7"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Evaluate.html" xlink:title="Evaluate">
+<g id="a_node7"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Evaluate.html" xlink:title="Evaluate">
 <ellipse fill="none" stroke="green" cx="388.95" cy="-162" rx="43.16" ry="18"/>
 <text text-anchor="middle" x="388.95" y="-156.95" font-family="Times,serif" font-size="14.00">Evaluate</text>
 </a>
@@ -95,7 +95,7 @@
 <!-- Lift -->
 <g id="node8" class="node">
 <title>Lift</title>
-<g id="a_node8"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Lift.html" xlink:title="Lift">
+<g id="a_node8"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Lift.html" xlink:title="Lift">
 <ellipse fill="none" stroke="green" cx="402.95" cy="-234" rx="27" ry="18"/>
 <text text-anchor="middle" x="402.95" y="-228.95" font-family="Times,serif" font-size="14.00">Lift</text>
 </a>
@@ -110,7 +110,7 @@
 <!-- Relabel -->
 <g id="node11" class="node">
 <title>Relabel</title>
-<g id="a_node11"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Relabel.html" xlink:title="Relabel">
+<g id="a_node11"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Relabel.html" xlink:title="Relabel">
 <ellipse fill="none" stroke="green" cx="486.95" cy="-234" rx="39.07" ry="18"/>
 <text text-anchor="middle" x="486.95" y="-228.95" font-family="Times,serif" font-size="14.00">Relabel</text>
 </a>
@@ -125,7 +125,7 @@
 <!-- Restrict -->
 <g id="node12" class="node">
 <title>Restrict</title>
-<g id="a_node12"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Restrict.html" xlink:title="Restrict">
+<g id="a_node12"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Restrict.html" xlink:title="Restrict">
 <ellipse fill="none" stroke="green" cx="583.95" cy="-234" rx="39.58" ry="18"/>
 <text text-anchor="middle" x="583.95" y="-228.95" font-family="Times,serif" font-size="14.00">Restrict</text>
 </a>
@@ -140,7 +140,7 @@
 <!-- Trim -->
 <g id="node16" class="node">
 <title>Trim</title>
-<g id="a_node16"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Trim.html" xlink:title="Trim">
+<g id="a_node16"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Trim.html" xlink:title="Trim">
 <ellipse fill="none" stroke="green" cx="289.95" cy="-234" rx="29.86" ry="18"/>
 <text text-anchor="middle" x="289.95" y="-228.95" font-family="Times,serif" font-size="14.00">Trim</text>
 </a>
@@ -155,7 +155,7 @@
 <!-- Sat -->
 <g id="node13" class="node">
 <title>Sat</title>
-<g id="a_node13"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Sat.html" xlink:title="Sat">
+<g id="a_node13"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Sat.html" xlink:title="Sat">
 <ellipse fill="none" stroke="green" cx="338.95" cy="-18" rx="27" ry="18"/>
 <text text-anchor="middle" x="338.95" y="-12.95" font-family="Times,serif" font-size="14.00">Sat</text>
 </a>
@@ -176,7 +176,7 @@
 <!-- Reduce -->
 <g id="node10" class="node">
 <title>Reduce</title>
-<g id="a_node10"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Reduce.html" xlink:title="Reduce">
+<g id="a_node10"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Reduce.html" xlink:title="Reduce">
 <ellipse fill="none" stroke="red" cx="288.95" cy="-162" rx="38.56" ry="18"/>
 <text text-anchor="middle" x="288.95" y="-156.95" font-family="Times,serif" font-size="14.00">Reduce</text>
 </a>
@@ -191,7 +191,7 @@
 <!-- Size -->
 <g id="node15" class="node">
 <title>Size</title>
-<g id="a_node15"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Size.html" xlink:title="Size">
+<g id="a_node15"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Size.html" xlink:title="Size">
 <ellipse fill="none" stroke="green" cx="204.95" cy="-162" rx="27" ry="18"/>
 <text text-anchor="middle" x="204.95" y="-156.95" font-family="Times,serif" font-size="14.00">Size</text>
 </a>
@@ -206,7 +206,7 @@
 <!-- DecisionTree -->
 <g id="node6" class="node">
 <title>DecisionTree</title>
-<g id="a_node6"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/DecisionTree.html" xlink:title="DecisionTree">
+<g id="a_node6"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/DecisionTree.html" xlink:title="DecisionTree">
 <ellipse fill="none" stroke="green" cx="264.95" cy="-378" rx="60.56" ry="18"/>
 <text text-anchor="middle" x="264.95" y="-372.95" font-family="Times,serif" font-size="14.00">DecisionTree</text>
 </a>
@@ -227,7 +227,7 @@
 <!-- Sim -->
 <g id="node14" class="node">
 <title>Sim</title>
-<g id="a_node14"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Sim.html" xlink:title="Sim">
+<g id="a_node14"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Sim.html" xlink:title="Sim">
 <ellipse fill="none" stroke="green" cx="476.95" cy="-162" rx="27" ry="18"/>
 <text text-anchor="middle" x="476.95" y="-156.95" font-family="Times,serif" font-size="14.00">Sim</text>
 </a>
@@ -242,7 +242,7 @@
 <!-- Nary -->
 <g id="node9" class="node">
 <title>Nary</title>
-<g id="a_node9"><a xlink:href="https://eshelyaron.com/man/lean4/Bdd/Nary.html" xlink:title="Nary">
+<g id="a_node9"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Nary.html" xlink:title="Nary">
 <ellipse fill="none" stroke="green" cx="372.95" cy="-378" rx="29.34" ry="18"/>
 <text text-anchor="middle" x="372.95" y="-372.95" font-family="Times,serif" font-size="14.00">Nary</text>
 </a>

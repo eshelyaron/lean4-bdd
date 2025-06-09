@@ -41,6 +41,8 @@ To check whether two BDD denote the same function, use
 depends on a given input variable, use `BDD.instDecidableDependsOn`.
 To find solutions, use `BDD.choice` or `BDD.find`.
 
+Online documentation is available at: https://eshelyaron.com/man/lean4-bdd/Bdd/BDD.html
+
 ## Example Application - SAT Solver
 
 The file `SatSolver.lean` in the repository implements a BDD-based SAT
