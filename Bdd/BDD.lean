@@ -17,7 +17,6 @@ structure BDD where
 
 namespace BDD
 
-
 @[simp]
 private abbrev evaluate (B : BDD) : Vector Bool B.nvars → Bool := Evaluate.evaluate B.obdd
 
@@ -49,7 +48,7 @@ lemma denotation_cast {B : BDD} {hn : B.nvars ≤ n} {hm : B.nvars ≤ m} (h : n
   subst h
   simp
 
-/-- The `denotation` of a `BDD` is independent of indices that exceed its input size. -/
+/-- The `denotation` of a `BDD` is independent of indices greater or equal to its input size. -/
 lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 : B.nvars ≤ n} {h2 : B.nvars ≤ i} :
     Nary.IndependentOf (B.denotation h1) i := by
   rintro b I
@@ -111,6 +110,7 @@ private lemma denotation_eq_of_denotation_eq_geq (B C : BDD) (hn : max B.nvars C
   rw [denotation_append (hm := hnm) (J := Vector.replicate _ false)]
   rw [h]
 
+/-- If two `BDD` have the same `denotation` with respect to some input size `n`, then they have the same `denotation` with respect to any other input size `m` as well. -/
 lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : B.nvars ⊔ C.nvars ≤ n) (hm : B.nvars ⊔ C.nvars ≤ m) :
     B.denotation (n := n) (by omega) = C.denotation (n := n) (by omega) →
     B.denotation (n := m) (by omega) = C.denotation (n := m) (by omega) := fun h ↦
@@ -118,6 +118,7 @@ lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : B.nvars ⊔ C.nvars ≤ n
   then denotation_eq_of_denotation_eq_leq B C hn hm hleq h
   else denotation_eq_of_denotation_eq_geq _ _ hm hn (le_of_not_le hleq) h
 
+/-- `SemanticEquiv` is an equivalence relation on `BDD`. -/
 theorem SemanticEquiv.equivalence : Equivalence SemanticEquiv :=
   { refl := fun _ ↦ rfl,
     symm := fun h ↦ Eq.symm (denotation_eq_of_denotation_eq (by omega) (by omega) h),
@@ -146,6 +147,9 @@ private theorem SemanticEquiv_iff_Similar {B C : BDD} :
     simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
     exact OBdd.Canonicity_reverse h
 
+/-- `SemanticEquiv` is `Decidable`.
+
+Use this instance to decide whether two `BDD`s are equivalent. -/
 instance instDecidableSemanticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_Similar
 
@@ -163,6 +167,9 @@ private lemma zero_vars_to_bool_spec {B : BDD} (h : B.nvars = 0) : B.obdd.1.root
   next => assumption
   next => contradiction
 
+/-- Return a `BDD` denoting the constantly-`b` function.
+
+See also `const_denotation`. -/
 def const (b : Bool) : BDD :=
   { nvars := 0,
     nheap := 0,
@@ -275,6 +282,9 @@ private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
             apply Pointer.eq_terminal_of_reachable at hhh
             rw [hh, hhh]
 
+/-- Return a `BDD` denoting the `n`th projection function.
+
+See also `var_denotation`. -/
 def var (n : Nat) : BDD :=
   { nvars := n + 1,
     nheap := 1,
@@ -282,6 +292,9 @@ def var (n : Nat) : BDD :=
     hred  := var_reduced
   }
 
+/-- Apply a binary Boolean operator to two `BDD`s.
+
+See also `apply_denotation`. -/
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
   ⟨_, _, (Reduce.oreduce (Apply.oapply op B.obdd C.obdd).2.1).2, Reduce.oreduce_reduced⟩
 
@@ -289,10 +302,22 @@ def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
 lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars := by
   simp only [apply]
 
+/-- Return a `BDD` denoting the conjuction of the denotations of two given `BDD`s.
+
+See also `and_denotation`. -/
 def and : BDD → BDD → BDD := apply Bool.and
+
+/-- Return a `BDD` denoting the disjunction of the denotations of two given `BDD`s.
+
+See also `or_denotation`. -/
 def or  : BDD → BDD → BDD := apply Bool.or
+
 def xor : BDD → BDD → BDD := apply Bool.xor
 def imp : BDD → BDD → BDD := apply (! · || ·)
+
+/-- Return a `BDD` denoting the negation of the denotation of a given `BDD`.
+
+See also `not_denotation`. -/
 def not : BDD → BDD       := fun B ↦ imp B (const false)
 
 @[simp]
@@ -408,6 +433,9 @@ private lemma relabel_helper_aux : relabel_wrap m n f m = n := by
 private lemma relabel_helper_aux' {i : Fin m} : relabel_wrap m n f i.1 = f i := by
   simp [relabel_wrap]
 
+/-- Relabel the variables in a `BDD` according to a relabeling function `f`.
+
+See also `relabel_denotation`. -/
 def relabel (B : BDD) (f : Fin B.nvars → Fin n)
     (h : ∀ i i' : (Nary.Dependency B.denotation'), i.1 < i'.1 → f i.1 < f i'.1) :
   BDD := relabel'' B (relabel_wrap B.nvars n f) (by simp) (fun i i' h' ↦ by simp [h i i' h'])
@@ -437,6 +465,9 @@ lemma relabel_denotation {B : BDD} {f} {hf} {I : Vector Bool n} {h} :
     (relabel B f hf).denotation h I = B.denotation' (Vector.ofFn (fun i ↦ I[f i])) := by
   simp [relabel]
 
+/-- Return an input vector that satisfies the denotation of a given `BDD`, under the assumption that its denotation is satisfiable.
+
+See also `choice_denotation`. -/
 def choice {B : BDD} (s : ∃ I, B.denotation' I) : Vector Bool B.nvars :=
   Choice.choice B.obdd (by simp_all [denotation, Evaluate.evaluate_evaluate, lift])
 
@@ -462,6 +493,9 @@ private lemma find_aux {B : BDD} :
   clear hI
   congr! <;> simp
 
+/-- Return `some` input vector that satisfies the denotation of a given `BDD`, or `none` if none exists.
+
+See also `choice`, `find_none` and `find_some`. -/
 def find {B : BDD} : Option (Vector Bool B.nvars) :=
   if h : B.SemanticEquiv (const false) then none else some (choice (find_aux h))
 
@@ -486,10 +520,12 @@ lemma find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
   next ht => contradiction
   next hf => injection h with heq; simp [← heq]
 
-
 private def restrict' (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
   ⟨_, _, (Reduce.oreduce (Restrict.orestrict b i B.obdd).2.1).2, Reduce.oreduce_reduced⟩
 
+/-- Return a `BDD` denoting the restriction of a given `BDD` at an index `i` to a Boolean `b`.
+
+See also `restrict_denotation`. -/
 def restrict (b : Bool) (i : Nat) (B : BDD) : BDD :=
   if h : i < B.nvars
   then restrict' B b ⟨i, h⟩
@@ -545,8 +581,12 @@ instance instDecidableDependsOn (B : BDD) : DecidablePred (Nary.DependsOn B.deno
   (show B.denotation' = B.obdd.evaluate by simp [denotation, Evaluate.evaluate_evaluate, lift]) ▸
   (decidable_of_iff _ (OBdd.usesVar_iff_dependsOn_of_reduced B.hred))
 
+/-- Universal quantification over input at index `i`.
+
+See also `bforall_denotation`. -/
 def bforall (B : BDD) (i : Nat) : BDD := (and (B.restrict false i) (B.restrict true i))
 
+/-- Universal quantification over a list of input indices `l`. -/
 def bforalls (B : BDD) (l : List Nat) := List.foldl bforall B l
 
 @[simp]
@@ -585,8 +625,12 @@ lemma bforall_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
     congr 1
     rw [Bool.and_comm]
 
+/-- Existential quantification over input at index `i`.
+
+See also `bexists_denotation`. -/
 def bexists (B : BDD) (i : Nat) : BDD := (or (B.restrict false i) (B.restrict true i))
 
+/-- Existential quantification over a list of input indices `l`. -/
 def bexistss (B : BDD) (l : List Nat) := List.foldl bexists B l
 
 @[simp]
