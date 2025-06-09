@@ -146,7 +146,7 @@ private theorem SemanticEquiv_iff_Similar {B C : BDD} :
     simp [SemanticEquiv, denotation, Evaluate.evaluate_evaluate]
     exact OBdd.Canonicity_reverse h
 
-instance instDecidableSemacticEquiv : DecidableRel SemanticEquiv
+instance instDecidableSemanticEquiv : DecidableRel SemanticEquiv
   | _, _ => decidable_of_iff' _ SemanticEquiv_iff_Similar
 
 def size : BDD → Nat
@@ -465,13 +465,6 @@ private lemma find_aux {B : BDD} :
 def find {B : BDD} : Option (Vector Bool B.nvars) :=
   if h : B.SemanticEquiv (const false) then none else some (choice (find_aux h))
 
--- def find_none' {B : BDD} : B.find.isNone → B.SemanticEquiv (const false) := by
---   intro h
---   simp only [find] at h
---   split at h
---   next ht _ => exact ht
---   next hf _ => contradiction
-
 lemma find_none {B : BDD} : B.find.isNone → B.denotation' = Function.const _ false := by
   intro h
   ext I
@@ -632,40 +625,4 @@ lemma bexists_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
     congr 1
     rw [Bool.or_comm]
 
-abbrev majority3 :=
-    (or (or (and (var 0) (var 1)) (and (var 0) (var 2))) (and (var 1) (var 2)))
-
--- abbrev majority3' :=
---     (and (imp (var 0) (or (var 1) (var 2))) (imp (var 0).not (and (var 1) (var 2))))
-
--- example : Nary.DependsOn (majority3.denotation') ⟨1, by simp⟩ := by
---   decide +native
-
--- example : ∀ b, ¬ Nary.DependsOn ((majority3.restrict b 1).denotation') ⟨1, by simp⟩ := by
---     decide +native
-example : ¬ majority3.SemanticEquiv (const true) := by decide +native
 end BDD
-
---#eval! BDD.majority3.find.bind (fun I ↦ some I.toList)
---#eval! BDD.instDecidableSemacticEquiv BDD.majority3 BDD.majority3'
--- #eval (BDD.const true).robdd.1
---#eval! (BDD.var 3).not.obdd
---#eval! (BDD.apply    (fun b b' ↦ (! b) || b') (BDD.var 3)      (BDD.const false)     ).obdd
---#eval! (Reduce.oreduce (Lift.olift (show (max (BDD.const false).nvars (BDD.var 2).nvars) ≤ (max (BDD.const false).nvars (BDD.var 2).nvars) + 1 by simp) ((Apply.oapply (Bool.and) (BDD.const false).obdd (BDD.var 2).obdd).2))).2
---#eval! (Reduce.oreduce (Apply.oapply (fun b b' ↦ (! b) || b') (BDD.var 3).obdd (BDD.const false).obdd).2).2
---#eval! (Apply.oapply (fun b b' ↦ (! b) || b') (BDD.var 3).obdd (BDD.const false).obdd).2
---#eval! (Reduce.oreduce (BDD.and ((BDD.and (BDD.var 0) (BDD.var 2)).restrict false 0) ((BDD.and (BDD.var 0) (BDD.var 2)).restrict true 0)).obdd).2
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).robdd.1
---#eval! (((BDD.or (BDD.var 0) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).bforall ⟨1, by simp⟩).bforall ⟨0, by simp⟩).robdd.1
---#eval! ((BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).restrict true 0).obdd
---#eval! ((BDD.var 1).not).obdd
---#eval! ((BDD.var 1)).obdd
---#eval! (BDD.or (BDD.and (BDD.var 0) (BDD.var 1)) (BDD.or (BDD.and (BDD.var 0) (BDD.var 2)) (BDD.and (BDD.var 1) (BDD.var 2)))).obdd
---#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict true ⟨1, by simp⟩).robdd.1
---#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict false ⟨1, by simp⟩).robdd.1
---#eval! ((BDD.and (BDD.and (BDD.var 1) (BDD.var 2).not) (BDD.and (BDD.var 3) (BDD.var 4).not)).restrict false ⟨2, by simp⟩).robdd.1
--- #eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) ((BDD.var 5).imp (BDD.var 5))
---#eval! BDD.instDecidableSemacticEquiv ((BDD.var 2).or (BDD.var 2).not) (BDD.const true)
---#eval! decide (Nary.DependsOn (((BDD.var 2).or (BDD.var 2).not).denotation (le_refl ..)) ⟨2, by simp⟩)
-
---#lint
