@@ -2255,14 +2255,3 @@ lemma push_evaluate {v : Vector _ _} {h0} {h1} {ho : Bdd.Ordered _} {hu : Bdd.Or
   · exact RawPointer.cook_equiv (h2 := hp)
 
 end RawBdd
-
--- def example_bdd : OBdd 3 4 :=
---   ⟨ { heap := ⟨#[{var := 0, low := node 1,         high := node 2},
---                  {var := 1, low := terminal false, high := node 3},
---                  {var := 1, low := node 3,         high := terminal true},
---                  {var := 2, low := terminal false, high := terminal true}], rfl⟩
---       root := node 0 },
---     by sorry
---   ⟩
-
--- #eval! example_bdd.evaluate ⟨#[true, false, true], rfl⟩

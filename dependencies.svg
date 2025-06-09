@@ -36,7 +36,7 @@
 <g id="node2" class="node">
 <title>Basic</title>
 <g id="a_node2"><a xlink:href="https://eshelyaron.com/man/lean4-bdd/Bdd/Basic.html" xlink:title="Basic">
-<ellipse fill="none" stroke="red" cx="318.95" cy="-306" rx="31.39" ry="18"/>
+<ellipse fill="none" stroke="green" cx="318.95" cy="-306" rx="31.39" ry="18"/>
 <text text-anchor="middle" x="318.95" y="-300.95" font-family="Times,serif" font-size="14.00">Basic</text>
 </a>
 </g>
