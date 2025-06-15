@@ -6,6 +6,7 @@ import Bdd.Restrict
 import Bdd.Evaluate
 import Bdd.Sim
 import Bdd.Size
+import Bdd.Count
 
 /-- Abstract BDD type. -/
 structure BDD where
@@ -668,5 +669,13 @@ lemma bexists_comm {B : BDD} {i j : Fin B.nvars} {I : Vector Bool n} {h} :
       rw [Bool.or_assoc]
     congr 1
     rw [Bool.or_comm]
+
+/-- Return the number of different input vectors for which the `denotation` of a given `BDD` returns `true`.
+
+See also `count_eq_card`. -/
+def count (B : BDD) : Nat := Count.count B.obdd
+
+lemma count_eq_card {B : BDD} : B.count = Fintype.card { I // B.denotation' I = true } := by
+  simp [count, denotation', denotation, lift, Evaluate.evaluate_evaluate, Count.count_corrent, Count.numSolutions, Count.Solution]
 
 end BDD
