@@ -8,7 +8,11 @@ def parseDimacs (n : Nat) [NeZero n] (lines : List String) : Std.Sat.CNF (Fin n)
          |>.filterMap (fun s =>
            match s.toInt? with
            | some 0 => none
-           | some i => some (if i > 0 then ⟨i.natAbs, true⟩ else ⟨i.natAbs, false⟩)
+           | some i => some (
+              if i > 0
+              then ⟨⟨i.natAbs % n, by refine Nat.mod_lt i.natAbs ?_; simp only [gt_iff_lt]; exact Nat.pos_of_neZero n⟩, true⟩
+              else ⟨⟨i.natAbs % n, by refine Nat.mod_lt i.natAbs ?_; simp only [gt_iff_lt]; exact Nat.pos_of_neZero n⟩, false⟩
+            )
            | none   => none)
        )
 

@@ -117,7 +117,7 @@ lemma denotation_eq_of_denotation_eq {B C : BDD} (hn : B.nvars ⊔ C.nvars ≤ n
     B.denotation (n := m) (by omega) = C.denotation (n := m) (by omega) := fun h ↦
   if hleq : n ≤ m
   then denotation_eq_of_denotation_eq_leq B C hn hm hleq h
-  else denotation_eq_of_denotation_eq_geq _ _ hm hn (le_of_not_le hleq) h
+  else denotation_eq_of_denotation_eq_geq _ _ hm hn (le_of_not_ge hleq) h
 
 /-- `SemanticEquiv` is an equivalence relation on `BDD`. -/
 theorem SemanticEquiv.equivalence : Equivalence SemanticEquiv :=
@@ -178,7 +178,7 @@ def const (b : Bool) : BDD :=
     hred  := Bdd.reduced_of_terminal
   }
 
-private abbrev var_raw (n : Nat) : Bdd (n+1) 1 := ⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩
+private abbrev var_raw (n : Nat) : Bdd (n+1) 1 := ⟨Vector.singleton ⟨⟨n, Nat.lt_add_one n⟩, .terminal false, .terminal true⟩, .node 0⟩
 
 private lemma var_ordered : Bdd.Ordered (var_raw n) := by
   apply Bdd.ordered_of_low_high_ordered rfl
@@ -193,7 +193,7 @@ private lemma var_ordered : Bdd.Ordered (var_raw n) := by
     apply Fin.lt_def.mpr
     simp only [Fin.val_natCast]
     refine Nat.lt_succ_of_le ?_
-    exact Nat.mod_le n (n + 1 + 1)
+    simp [Pointer.toVar]
   · simp only [Bdd.high]
     conv =>
       congr
@@ -205,7 +205,7 @@ private lemma var_ordered : Bdd.Ordered (var_raw n) := by
     apply Fin.lt_def.mpr
     simp only [Fin.val_natCast]
     refine Nat.lt_succ_of_le ?_
-    exact Nat.mod_le n (n + 1 + 1)
+    simp [Pointer.toVar]
 
 private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
   constructor
@@ -289,7 +289,7 @@ See also `var_denotation`. -/
 def var (n : Nat) : BDD :=
   { nvars := n + 1,
     nheap := 1,
-    obdd  := ⟨⟨Vector.singleton ⟨n, .terminal false, .terminal true⟩, .node 0⟩, var_ordered⟩,
+    obdd  := ⟨⟨Vector.singleton ⟨⟨n, Nat.lt_add_one n⟩, .terminal false, .terminal true⟩, .node 0⟩, var_ordered⟩,
     hred  := var_reduced
   }
 

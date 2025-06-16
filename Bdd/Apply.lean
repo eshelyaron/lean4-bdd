@@ -117,15 +117,20 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           rw [← cook_low]
           simp_rw [heq]
           simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
-            Fin.natCast_eq_last, Fin.castSucc_lt_last]
-          apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+            Fin.natCast_eq_last, Fin.castSucc_lt_last, Pointer.toVar]
+          simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
+            Fin.lt_iff_val_lt_val, Fin.val_last, lt_sup_iff]
+          omega
+          apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
+          simp
         | inr val =>
           have hvs : val < s.size := by
             apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
           rw [← cook_low]
           simp_rw [heq]
           simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
-            Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff]
+            Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff, Pointer.toVar]
+          simp only [Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
           rw [Vector.getElem_push_lt]
           have hvs : val < s.size := by
             apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
@@ -147,8 +152,12 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           rw [← cook_high]
           simp_rw [heq]
           simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
-            Fin.natCast_eq_last, Fin.castSucc_lt_last]
-          apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+            Fin.natCast_eq_last, Fin.castSucc_lt_last, Pointer.toVar]
+          simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
+            Fin.lt_iff_val_lt_val, Fin.val_last, lt_sup_iff]
+          omega
+          apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1
+          simp
         | inr val =>
           have hvs : val < s.size := by
             apply RawPointer.bounded_of_le (inv.2 _ _ hkh).2.2.2.1 .refl heq
@@ -156,6 +165,8 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           simp_rw [heq]
           simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
             Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff]
+          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
+            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
           rw [Vector.getElem_push_lt]
           exact hxh _ hvs heq
           apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]

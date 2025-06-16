@@ -16,7 +16,7 @@ private def Invariant (b : Bool) (i : Fin n) (O : OBdd n m) (s : State n m) :=
   ∃ hh : (∀ i : Fin s.size, RawNode.Bounded i s.heap[i]),
     ∀ (k : (Pointer m)) (p : RawPointer),
       s.cache[k]? = some p →
-      (∀ j h, p = .inr j → (if (Pointer.toVar O.1.heap k) = i then (s.heap[j]'h).va.1 > (Pointer.toVar O.1.heap k) else (s.heap[j]'h).va.1 = (Pointer.toVar O.1.heap k))) ∧
+      (∀ j h, p = .inr j → (if (Pointer.toVar O.1.heap k).1 = i.1 then (s.heap[j]'h).va.1 > (Pointer.toVar O.1.heap k) else (s.heap[j]'h).va.1 = (Pointer.toVar O.1.heap k))) ∧
       ∃ hk1 : Bdd.Ordered ⟨O.1.heap, k⟩,
           ∃ hp : p.Bounded s.size,
             ∃ o : Bdd.Ordered ⟨cook_heap s.heap hh, p.cook hp⟩,
@@ -32,7 +32,7 @@ private lemma inv_initial {b} {i} {O : OBdd n m} : Invariant b i O initial := by
 private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
     (hNl : ∃ k : Pointer m, s.cache[k]? = some N.lo)
     (hNh : ∃ k : Pointer m, s.cache[k]? = some N.hi)
-    (hNv : (if O.1.root.toVar O.1.heap = i then N.va.1 > (O.1.root.toVar O.1.heap).1 else N.va.1 = (O.1.root.toVar O.1.heap).1))
+    (hNv : (if (O.1.root.toVar O.1.heap).1 = i.1 then N.va.1 > (O.1.root.toVar O.1.heap).1 else N.va.1 = (O.1.root.toVar O.1.heap).1))
     (hxl : ∀ j h (_ : N.lo = .inr j), N.va.1 < (s.heap[j]'h).va.1)
     (hxh : ∀ j h (_ : N.hi = .inr j), N.va.1 < (s.heap[j]'h).va.1)
     (hh : ∀ h0 (h1 : Bdd.Ordered _),
@@ -114,6 +114,8 @@ private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
           simp_rw [heq]
           simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
             Fin.natCast_eq_last, Fin.castSucc_lt_last]
+          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
+            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.is_lt]
           apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
         | inr val =>
           have hvs : val < s.size := by
@@ -122,6 +124,8 @@ private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
           simp_rw [heq]
           simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
             Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff]
+          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
+            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
           rw [Vector.getElem_push_lt]
           have hvs : val < s.size := by
             apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.1 .refl heq
@@ -144,6 +148,8 @@ private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
           simp_rw [heq]
           simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
             Fin.natCast_eq_last, Fin.castSucc_lt_last]
+          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
+            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.is_lt]
           apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
         | inr val =>
           have hvs : val < s.size := by
@@ -152,6 +158,8 @@ private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
           simp_rw [heq]
           simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
             Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff]
+          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
+            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
           rw [Vector.getElem_push_lt]
           exact hxh _ hvs heq
           apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
@@ -191,7 +199,7 @@ private lemma heap_push_aux (s : State n m) (inv : Invariant b i O s)
 private def heap_push (N : RawNode n) (s : (State n m)) (inv : Invariant b i O s)
     (hNl : ∃ k : Pointer m, s.cache[k]? = some N.lo)
     (hNh : ∃ k : Pointer m, s.cache[k]? = some N.hi)
-    (hNv : (if O.1.root.toVar O.1.heap = i then N.va.1 > (O.1.root.toVar O.1.heap).1 else N.va.1 = (O.1.root.toVar O.1.heap).1))
+    (hNv : (if (O.1.root.toVar O.1.heap).1 = i.1 then N.va.1 > (O.1.root.toVar O.1.heap).1 else N.va.1 = (O.1.root.toVar O.1.heap).1))
     (hxl : ∀ j h (_ : N.lo = .inr j), N.va.1 < (s.heap[j]'h).va.1)
     (hxh : ∀ j h (_ : N.hi = .inr j), N.va.1 < (s.heap[j]'h).va.1)
     (hh : ∀ h0 (h1 : Bdd.Ordered _),
@@ -339,7 +347,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     constructor
                     · intro j' hj1 hrj
                       subst hrj
-                      have that : O.1.heap[j].var < (Pointer.toVar O.1.heap (O.high O_root_def).1.root) := by
+                      have that : O.1.heap[j].var.1 < (Pointer.toVar O.1.heap (O.high O_root_def).1.root).1 := by
                         have := OBdd.var_lt_high_var (O := O) (h := O_root_def)
                         simp only [OBdd.var, Nat.succ_eq_add_one, Bdd.var, OBdd.high_heap_eq_heap,
                           Fin.val_fin_lt] at this
@@ -432,7 +440,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     constructor
                     · intro j' hj1 hrj
                       subst hrj
-                      have that : O.1.heap[j].var < (Pointer.toVar O.1.heap (O.low O_root_def).1.root) := by
+                      have that : O.1.heap[j].var.1 < (Pointer.toVar O.1.heap (O.low O_root_def).1.root).1 := by
                         have := OBdd.var_lt_low_var (O := O) (h := O_root_def)
                         simp only [OBdd.var, Nat.succ_eq_add_one, Bdd.var, OBdd.low_heap_eq_heap,
                           Fin.val_fin_lt] at this
@@ -453,7 +461,6 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                           Fin.getElem_fin, OBdd.low_heap_eq_heap, forall_exists_index,
                           Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Pointer.toVar_node_eq,
                           Fin.coe_castSucc, gt_iff_lt, ite_true]
-                        exact that
                     · use O.2
                       have := (invl.2 _ _ hl).2.2
                       use this.1
@@ -544,9 +551,8 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     Fin.val_fin_lt] at this
                   rw [O_root_def] at this
                   nth_rw 1 [Pointer.toVar] at this
-                  rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
+                  simp_rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
                   convert this using 1
-                  simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc]
                 split at that
                 next =>
                   trans (Pointer.toVar O.1.heap (O.low O_root_def).1.root).1
@@ -567,9 +573,8 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     Fin.val_fin_lt] at this
                   rw [O_root_def] at this
                   nth_rw 1 [Pointer.toVar] at this
-                  rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
+                  simp_rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
                   convert this using 1
-                  simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc]
                 split at that
                 next =>
                   trans (Pointer.toVar O.1.heap (O.high O_root_def).1.root).1

@@ -37,10 +37,10 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
       next hh =>
         have : i = n := by omega
         simp_all only [DependsOn, IndependentOf, not_forall, Fin.getElem_fin, forall_exists_index, lt_self_iff_false, not_false_eq_true]
-    by_cases hf : DependsOn f n
-    · have h1 := h ⟨n, hf⟩
+    by_cases hf : DependsOn f ⟨n, Nat.lt_add_one n⟩
+    · have h1 := h ⟨⟨n, Nat.lt_add_one n⟩, hf⟩
       rw [h2 I rfl]
-      rw [h2 J (by convert h1 <;> simp only [Fin.natCast_eq_last, Fin.getElem_fin, Fin.val_last])]
+      rw [h2 J (by convert h1)]
       apply ih
       rintro ⟨x, hx⟩
       simp only [g] at hx
@@ -58,7 +58,7 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
     · simp only [DependsOn, not_not, IndependentOf] at hf
       rw [hf I[n] J]
       rw [h2 I rfl]
-      rw [h2 (J.set (n : Fin (n + 1)) I[n]) (by simp only [Fin.natCast_eq_last, Fin.val_last, Vector.getElem_set_self, g])]
+      rw [h2 (J.set (⟨n, Nat.lt_add_one n⟩ : Fin (n + 1)) I[n]) (by simp only [Fin.natCast_eq_last, Fin.val_last, Vector.getElem_set_self, g])]
       apply ih
       rintro ⟨x, hx⟩
       simp only [g] at hx

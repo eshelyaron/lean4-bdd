@@ -269,10 +269,13 @@ lemma trim_ordered {B : Bdd n m} (o : B.Ordered) {h1 : k ≤ m} {h2} : (trim B h
         simp only [Vector.take_eq_extract, Vector.map_extract, Nat.succ_eq_add_one,
           Pointer.toVar_node_eq, Fin.getElem_fin, Vector.getElem_cast, Fin.coe_eq_castSucc,
           untrim_pointer, Fin.castSucc_inj]
+        simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_cast,
+          Fin.mk.injEq]
+        rw [Fin.val_eq_val]
         calc _
           _ = (Vector.map (Trim.trim_node (k := l)) B.heap)[j.1].var := by
             congr 1
-            apply aux <;> omega
+            apply aux <;> simp_all
           _ = (Trim.trim_node (k := l + 1) B.heap[j.1]).var := by simp; rfl
     · cases heq : y with
       | terminal => simp [Trim.untrim_pointer]
@@ -282,6 +285,8 @@ lemma trim_ordered {B : Bdd n m} (o : B.Ordered) {h1 : k ≤ m} {h2} : (trim B h
         simp only [Vector.take_eq_extract, Vector.map_extract, Nat.succ_eq_add_one,
           Pointer.toVar_node_eq, Fin.getElem_fin, Vector.getElem_cast, Fin.coe_eq_castSucc,
           untrim_pointer, Fin.castSucc_inj]
+        simp [Pointer.toVar]
+        rw [Fin.val_eq_val]
         calc _
           _ = (Vector.map (Trim.trim_node (k := l)) B.heap)[j.1].var := by
             congr 1
