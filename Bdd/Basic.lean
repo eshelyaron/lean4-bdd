@@ -111,7 +111,7 @@ lemma Pointer.toVar_heap_set : i ≠ j → (toVar (M.set i N) (node j)).1 = (toV
 
 lemma Pointer.toVar_heap_set' : i ≠ j → (toVar (M.set i N) (node j)) = (toVar M (node j)) := by
   intro neq
-  simp only [Nat.succ_eq_add_one, toVar_node_eq]
+  simp only [Nat.succ_eq_add_one]
   apply Fin.eq_of_val_eq
   exact toVar_heap_set neq
 
@@ -195,9 +195,9 @@ theorem OEdge.wellFounded {n m} : @WellFounded (OBdd n m) OEdge := by
   have h3 : RelevantEdge x xs ys := h2
   apply hx at h3
   simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
-  simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt, xs, ys]
+  simp only [InvImage, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, Fin.val_fin_lt, gt_iff_lt]
   rcases hp : x.root
-  case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, Fin.natCast_eq_last, var, Fin.val_last, ys, xs]
+  case terminal => simp_all only [Ordered, MayPrecede, Nat.succ_eq_add_one, toVar_terminal_eq, var]
   case node j => rcases hq : y.root <;> simp_all
 
 /-- The `OEdge` relation between Ordered BDDs is converse well-founded. -/
@@ -211,7 +211,7 @@ theorem OEdge.flip_wellFounded {n m} : @WellFounded (OBdd n m) (flip OEdge) := b
   have h3 : RelevantEdge y ys xs := h2
   apply hy at h3
   simp only [RelevantMayPrecede, Bdd.toRelevantPointer, xs, ys] at h3
-  simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one, Nat.lt_eq, gt_iff_lt, xs, ys]
+  simp only [InvImage, OBdd.rav, OBdd.var, Nat.succ_eq_add_one]
   cases hp : y.root with
   | terminal => rw [hp] at h2; contradiction
   | node j => cases _ : x.root <;> refine Nat.sub_lt_sub_left ?_ ?_ <;> simp_all [toVar]
@@ -253,7 +253,7 @@ lemma Bdd.ordered_of_relevant' {B : Bdd n m} {h : B.heap = v} {r : B.root = q} :
   intro o r_q_p
   simp_all only [Ordered]
   rintro ⟨x, hx⟩ ⟨y, hy⟩ e
-  simp_all only [Ordered, RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
+  simp_all only [RelevantEdge, RelevantMayPrecede, MayPrecede, Nat.succ_eq_add_one]
   simp at hx
   simp at hy
   have : RelevantEdge B ⟨x, (by trans p <;> aesop)⟩
@@ -330,7 +330,7 @@ instance OBdd.instDecidableSimilar {n m} : DecidableRel (β := OBdd n m) OBdd.Si
 
 -- FIXME: Use the instance from Sim.lean instead.
 instance OBdd.instDecidableHSimilar (O : OBdd n m) (U : OBdd n m') : Decidable (OBdd.HSimilar O U) :=
-  decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [Similar, HSimilar])
+  decidable_of_decidable_of_iff (show O.toTree = U.toTree ↔ _ by simp [HSimilar])
 
 def OBdd.SimilarRP (O : OBdd n m) (p q : O.1.RelevantPointer) :=
   Similar ⟨{heap := O.1.heap, root := p.1}, ordered_of_reachable p.2⟩
@@ -342,7 +342,7 @@ instance OBdd.instDecidableSimilarRP : Decidable (OBdd.SimilarRP O l r) := by
 /-- Isomorphism of `Ordered` BDDs is an equivalence relation. -/
 def OBdd.Similar.instEquivalence {n m} : Equivalence (α := OBdd n m) OBdd.Similar := by
   apply InvImage.equivalence
-  constructor <;> simp_all [Similar, HSimilar]
+  constructor <;> simp_all [HSimilar]
 
 -- instance OBdd.Similar.instReflexive : Reflexive (α := OBdd n m) OBdd.Similar := instEquivalence.refl
 
@@ -457,7 +457,7 @@ instance OBdd.instDecidableReflTransGen {n m} (O : OBdd n m) (p : O.1.RelevantPo
           apply isTrue
           use high
           constructor
-          · simp only [Ordered, low, high, Edge.high rfl]
+          · simp only [Ordered, high, Edge.high rfl]
           · apply hth
       case isTrue hth =>
         apply isTrue
@@ -600,7 +600,7 @@ lemma OBdd.reduced_of_relevant {O : OBdd n m} (S : O.1.RelevantPointer):
       have : SimilarRP ⟨{ heap := O.1.heap, root := node j }, o⟩
               ⟨q.1, Relation.transitive_reflTransGen S.2 q.2⟩
               ⟨p.1, Relation.transitive_reflTransGen S.2 p.2⟩ := by
-        simp_all only [SimilarRP, Similar, InvImage]
+        simp_all only [SimilarRP, Similar]
       apply R.2 this
 
 lemma OBdd.reachable_of_edge : Edge w p q → Reachable w p q := Relation.ReflTransGen.tail Relation.ReflTransGen.refl
@@ -662,7 +662,7 @@ lemma OBdd.toTree_terminal {n m} {v : Vector (Node n m) m} {h} : OBdd.toTree ⟨
 lemma OBdd.toTree_terminal' {n m} {O : OBdd n m} : O.1.root = terminal b → O.toTree = .leaf b := by
   intro h
   rcases O with ⟨⟨heap, root⟩, ho⟩
-  simp_all [toTree]
+  simp_all
 
 lemma OBdd.HSimilar_of_terminal {n m m' : Nat} {b : Bool} {O : OBdd n m} {U : OBdd n m'} :
     O.1.root = terminal b → U.1.root = terminal b → O.HSimilar U := by
@@ -752,7 +752,7 @@ lemma OBdd.evaluate_high_eq_evaluate_low_of_independentOf_root {n m} {O : OBdd n
     exact (independentOf_lt_root (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩) true I
   · rw [i false I]
     rw [evaluate_node'' h]
-    simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte]
+    simp only [Fin.getElem_fin, Vector.getElem_set_self]
     symm
     exact (independentOf_lt_root (O := O.low h) ⟨O.1.heap[j].var, (by convert var_lt_low_var  (O := O); simp; rw [h]; simp)⟩) false I
 
@@ -766,7 +766,7 @@ lemma OBdd.evaluate_high_eq_evaluate_set_true {n m} {O : OBdd n m} {j : Fin m} {
   have := var_lt_high_var (h := h)
   simp [var] at this
   rw [h] at this
-  simp only [toVar, toVar_node_eq, Nat.succ_eq_add_one, Fin.getElem_fin, Fin.coe_eq_castSucc] at this
+  simp only [toVar, Nat.succ_eq_add_one, Fin.getElem_fin] at this
   apply independentOf_lt_root (O.high h) ⟨O.1.heap[j].var, (by convert var_lt_high_var (O := O); simp; rw [h]; simp)⟩
 
 lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {h : O.1.root = node j} :
@@ -775,7 +775,7 @@ lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {
   simp only [Function.comp_apply]
   nth_rw 2 [evaluate_node'' (j := j)]
   beta_reduce
-  simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte]
+  simp only [Fin.getElem_fin, Vector.getElem_set_self]
   simp only [Bool.false_eq_true, ↓reduceIte]
   have := var_lt_high_var (h := h)
   simp [var] at this
@@ -840,7 +840,7 @@ theorem OBdd.Canonicity {O : OBdd n m} {U : OBdd n m'} (ho : O.Reduced) (hu : U.
   | terminal b =>
     cases U_root_def : U.1.root with
     | terminal c =>
-      simp only [Similar, HSimilar, InvImage]
+      simp only [HSimilar]
       rcases O with ⟨⟨heap, root⟩, o⟩
       rcases U with ⟨⟨ueap, uoot⟩, u⟩
       simp_all
@@ -875,7 +875,7 @@ theorem OBdd.Canonicity {O : OBdd n m} {U : OBdd n m'} (ho : O.Reduced) (hu : U.
       apply not_reduced_of_sim_high_low O_root_def
       apply OBdd.Canonicity (high_reduced ho) (low_reduced ho) this
     | node i =>
-      simp only [Similar, HSimilar, InvImage]
+      simp only [HSimilar]
       rw [toTree_node O_root_def, toTree_node U_root_def]
       simp only [Ordered, DecisionTree.branch.injEq]
       have same_var : O.1.heap[j].var = U.1.heap[i].var := by
@@ -930,7 +930,7 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
   case terminal b' =>
     rcases O with ⟨⟨heap, root⟩, o⟩
     subst O_root_def
-    simp only [OBdd.evaluate, Ordered, Function.comp_apply, DecisionTree.evaluate] at h
+    simp only [OBdd.evaluate, Ordered, Function.comp_apply] at h
     unfold toTree at h
     simp only [DecisionTree.evaluate] at h
     apply eq_of_constant_eq (α := Vector Bool n) at h
@@ -947,7 +947,7 @@ theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
 
 theorem OBdd.Canonicity_reverse {O : OBdd n m} {U : OBdd n m'}:
     O.HSimilar U → O.evaluate = U.evaluate := by
-  simp_all [evaluate, Function.comp_apply, Similar, HSimilar]
+  simp_all [evaluate, Function.comp_apply, HSimilar]
 
 /-- An acyclicity lemma: an edge from `O` to `U` implies that `O` is not reachable from `U`.  -/
 lemma OBdd.not_oedge_reachable {n m} {O U : OBdd n m}: OEdge O U → ¬ Reachable O.1.heap U.1.root O.1.root := by
@@ -1282,7 +1282,7 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
         rfl
       · exact contra
     · simp only [Nat.succ_eq_add_one, var, low]
-      simp only [low, Fin.getElem_fin]
+      simp only [Fin.getElem_fin]
       simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
       rw [toVar_heap_set' this]
       have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].low := by
@@ -1294,7 +1294,7 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
       | terminal bl => simp
       | node jl =>
         simp only [toVar]
-        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        simp only [Nat.succ_eq_add_one, Ordered]
         simp only [Fin.getElem_fin]
         simp only [Fin.mk.injEq]
         rw [Vector.getElem_set_ne i.2 jl.2]
@@ -1322,7 +1322,7 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
         rfl
       · exact contra
     · simp only [Nat.succ_eq_add_one, var, high]
-      simp only [high, Fin.getElem_fin]
+      simp only [Fin.getElem_fin]
       simp only [Vector.getElem_set_ne i.2 j.2 (by simp_all [Fin.val_ne_of_ne this])]
       rw [toVar_heap_set' this]
       have that : toVar O.1.heap (node j) < toVar O.1.heap O.1.heap[j].high := by
@@ -1334,7 +1334,7 @@ lemma Bdd.ordered_of_ordered_heap_not_reachable_set (O : OBdd n m) :
       | terminal bh => simp
       | node bh =>
         simp only [toVar]
-        simp only [Nat.succ_eq_add_one, Ordered, Fin.coe_eq_castSucc, Fin.castSucc_inj]
+        simp only [Nat.succ_eq_add_one, Ordered]
         simp only [Fin.getElem_fin]
         simp only [Fin.mk.injEq]
         rw [Vector.getElem_set_ne i.2 bh.2]
@@ -1368,7 +1368,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
   intro hr hp
   cases O_root_def : O.1.root with
   | terminal _ =>
-    simp only [Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Bdd.var, Bdd.Ordered.eq_1, O_root_def, Pointer.toVar_terminal_eq, Fin.natCast_eq_last]
+    simp only [Nat.succ_eq_add_one, Bdd.var, Bdd.Ordered.eq_1, O_root_def, Pointer.toVar_terminal_eq]
     exact Fin.le_last p.castSucc
   | node j =>
     by_contra c
@@ -1381,7 +1381,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       apply OBdd.Canonicity (OBdd.high_reduced hr) (OBdd.low_reduced hr) s
     ext I
     trans O.evaluate I
-    · simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc, Fin.eta] at this
+    · simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Fin.eta] at this
       have := this true I
       rw [this]
       rw [OBdd.evaluate_node'' O_root_def]
@@ -1392,7 +1392,7 @@ lemma OBdd.reduced_var_dependent {O : OBdd n m} {p : Fin n} :
       convert OBdd.var_lt_high_var
       simp [O_root_def]
     · symm
-      simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Nat.succ_eq_add_one, Fin.coe_eq_castSucc, Fin.coe_castSucc, Fin.eta] at this
+      simp only [Bdd.Ordered.eq_1, Bdd.var, O_root_def, Pointer.toVar_node_eq, Fin.eta] at this
       have := this false I
       rw [this]
       rw [OBdd.evaluate_node'' O_root_def]
@@ -1468,7 +1468,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
     rw [← O_def]
     rw [evaluate_node'' (by rw [O_def])]
     rw [show O.1.heap = heap by rw [O_def], hi]
-    simp only [Fin.getElem_fin, Vector.getElem_set_self, Bool.false_eq_true, ↓reduceIte, ne_eq]
+    simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte, ne_eq]
     rw [← not_forall]
     intro contra
     apply not_reduced_of_sim_high_low (show O.1.root = node j by rw [O_def])
@@ -1505,13 +1505,13 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
       cases e with
       | low  he =>
         rw [show heap = O.1.heap by rw [O_def]] at hj
-        have := OBdd.dependsOn_of_usesVar_of_reduced (low_reduced (h := by rw [O_def]) hr') (by simp_all [low_heap_eq_heap, low, Bdd.low]; exact r) (i := i) (by rw [low_heap_eq_heap, O_def]; exact hi)
+        have := OBdd.dependsOn_of_usesVar_of_reduced (low_reduced (h := by rw [O_def]) hr') (by simp_all [low, Bdd.low]; exact r) (i := i) (by rw [low_heap_eq_heap, O_def]; exact hi)
         rcases this with ⟨v, hv⟩
         rw [← O_def]
         use v.set heap[jr].var false
         contrapose hv
         simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
-        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not]
+        simp only [ne_eq, Decidable.not_not]
         calc _
           _ = O.evaluate (v.set (heap[jr.1].var.1) false) := by
             rw [evaluate_low_eq_evaluate_set_false]
@@ -1522,7 +1522,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
             apply ne_of_lt
             have := var_lt_low_var (O := O) (h := (by rw [O_def]))
             simp only [var, Nat.succ_eq_add_one, Bdd.var, Ordered, O_def, toVar_node_eq,
-              Fin.coe_eq_castSucc, Fin.coe_castSucc, low, Bdd.low] at this
+              low, Bdd.low] at this
             rw [he] at this
             simp only [Fin.getElem_fin] at this
             apply lt_of_lt_of_le this
@@ -1543,13 +1543,13 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
             simp [O_def]
       | high he =>
         rw [show heap = O.1.heap by rw [O_def]] at hj
-        have := OBdd.dependsOn_of_usesVar_of_reduced (high_reduced (h := by rw [O_def]) hr') (by simp_all [high_heap_eq_heap, high, Bdd.high]; exact r) (i := i) (by rw [high_heap_eq_heap, O_def]; exact hi)
+        have := OBdd.dependsOn_of_usesVar_of_reduced (high_reduced (h := by rw [O_def]) hr') (by simp_all [high, Bdd.high]; exact r) (i := i) (by rw [high_heap_eq_heap, O_def]; exact hi)
         rcases this with ⟨v, hv⟩
         rw [← O_def]
         use v.set heap[jr].var true
         contrapose hv
         simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
-        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not]
+        simp only [ne_eq, Decidable.not_not]
         calc _
           _ = O.evaluate (v.set (heap[jr.1].var.1) true) := by
             rw [evaluate_high_eq_evaluate_set_true]
@@ -1560,7 +1560,7 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
             apply ne_of_lt
             have := var_lt_high_var (O := O) (h := (by rw [O_def]))
             simp only [var, Nat.succ_eq_add_one, Bdd.var, Ordered, O_def, toVar_node_eq,
-              Fin.coe_eq_castSucc, Fin.coe_castSucc, high, Bdd.high] at this
+              high, Bdd.high] at this
             rw [he] at this
             simp only [Fin.getElem_fin] at this
             apply lt_of_lt_of_le this
@@ -1655,7 +1655,7 @@ lemma OBdd.usesVar_iff (i : Fin n) (O : OBdd n m) : O.1.usesVar i ↔ (∃ j, �
           left
           use j
           simp only [Fin.getElem_fin] at hl
-          simp only [low_heap_eq_heap, Fin.getElem_fin, low, Bdd.low, hl]
+          simp only [Fin.getElem_fin, low, Bdd.low, hl]
           constructor
           · exact Relation.ReflTransGen.swap r
           · exact hi
@@ -1664,7 +1664,7 @@ lemma OBdd.usesVar_iff (i : Fin n) (O : OBdd n m) : O.1.usesVar i ↔ (∃ j, �
           right
           use j
           simp only [Fin.getElem_fin] at hh
-          simp only [high_heap_eq_heap, Fin.getElem_fin, high, Bdd.high, hh]
+          simp only [Fin.getElem_fin, high, Bdd.high, hh]
           constructor
           · exact Relation.ReflTransGen.swap r
           · exact hi
@@ -1760,8 +1760,7 @@ lemma Bdd.not_usesVar_of_var_gt {M : Vector (Node n m) m} {j : Fin m} : Bdd.Orde
   simp only [Fin.getElem_fin, not_and]
   intro hr
   have := mayPrecede_of_reachable (B := ⟨M, .node j⟩) (p := .node j') o hr
-  simp_all only [Fin.getElem_fin, gt_iff_lt, Nat.succ_eq_add_one, toVar_node_eq,
-    Fin.coe_eq_castSucc, Fin.castSucc_le_castSucc_iff]
+  simp_all only [Fin.getElem_fin, gt_iff_lt, Nat.succ_eq_add_one]
   simp_all only [toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Fin.mk_le_mk, Fin.val_fin_le]
   omega
 
@@ -1798,7 +1797,7 @@ private def usesVar_helper
                 simp only [node.injEq] at hj'
                 subst hj'
                 cases c with
-                | inl c => simp_all only [Fin.getElem_fin, node.injEq, not_true_eq_false]
+                | inl c => simp_all only [Fin.getElem_fin]
                 | inr c =>
                   cases c with
                   | inl c => simp_all only [Fin.getElem_fin, OBdd.low, low]
@@ -1885,7 +1884,7 @@ lemma Pointer.equiv_symm {p : Pointer m} : p.equiv q → q.equiv p := by
       | terminal b =>
         cases b with
         | true => rfl
-        | false => rw [h1 rfl] at hq; simp_all only [terminal.injEq, Bool.true_eq_false]
+        | false => rw [h1 rfl] at hq; simp_all only [terminal.injEq]
       | node _ =>
         rcases (h3 _ rfl) with ⟨_, hc⟩
         rw [hc.1] at hq; contradiction
@@ -1954,7 +1953,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
       have := OBdd.var_lt_low_var (O := O) (h := hj2')
       simp_all [OBdd.var, Bdd.var, OBdd.low, Bdd.low]
       apply Fin.lt_iff_val_lt_val.mpr
-      simp only [toVar, Fin.coe_castSucc]
+      simp only [toVar]
       have that : (toVar B.heap B.heap[j.1].low).1 = (toVar O.1.heap O.1.heap[j.1].low).1 := by
         rcases Pointer.equiv_symm hj3 with ⟨hj31, hj32⟩
         cases hl : B.heap[↑j].low with
@@ -1963,8 +1962,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
         | node jl =>
           rcases hj32 jl hl with ⟨jl', hjl1', hjl2'⟩
           rw [hjl1']
-          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin, Fin.coe_eq_castSucc,
-            Fin.coe_castSucc]
+          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin]
           simp_rw [← hjl2']
           rcases h1 jl (by rw [← hl]; exact reachable_of_edge (.low rfl)) with ⟨hs1, hs2, _, _⟩
           exact symm hs2
@@ -1994,7 +1992,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
       have := OBdd.var_lt_high_var (O := O) (h := hj2')
       simp_all [OBdd.var, Bdd.var, OBdd.high, Bdd.high]
       apply Fin.lt_iff_val_lt_val.mpr
-      simp only [toVar, Fin.coe_castSucc]
+      simp only [toVar]
       have that : (toVar B.heap B.heap[j.1].high).1 = (toVar O.1.heap O.1.heap[j.1].high).1 := by
         rcases Pointer.equiv_symm hj4 with ⟨hj41, hj42⟩
         cases hl : B.heap[↑j].high with
@@ -2003,8 +2001,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
         | node jl =>
           rcases hj42 jl hl with ⟨jl', hjl1', hjl2'⟩
           rw [hjl1']
-          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin, Fin.coe_eq_castSucc,
-            Fin.coe_castSucc]
+          simp only [Nat.succ_eq_add_one, toVar_node_eq, Fin.getElem_fin]
           simp_rw [← hjl2']
           rcases h1 jl (by rw [← hl]; exact reachable_of_edge (.high rfl)) with ⟨hs1, hs2, _, _⟩
           exact symm hs2
@@ -2032,7 +2029,7 @@ lemma OBdd.toTree_eq_toTree_of_ordered_heap_all_reachable_eq (O : OBdd n m) (U :
     have := h1 j (by simp [U_root_def]; left)
     rcases this with ⟨hj, hev, hel, heh⟩
     congr 1
-    · simp_all [hjj']; apply Fin.eq_of_val_eq; exact hev
+    · simp_all; apply Fin.eq_of_val_eq; exact hev
     · apply toTree_eq_toTree_of_ordered_heap_all_reachable_eq
       · intro jj hrjj
         simp only [low_heap_eq_heap]
@@ -2204,7 +2201,7 @@ private lemma push_ordered_aux {v : Vector (RawNode n) m} {h0} {h2} :
         left
         left
         simp [cook_heap, RawNode.cook]
-        simp [cook_heap, RawNode.cook] at heq
+        simp [RawNode.cook] at heq
         exact cook_aux heq
     | high heq =>
       rename_i jb
@@ -2234,7 +2231,7 @@ private lemma push_ordered_aux {v : Vector (RawNode n) m} {h0} {h2} :
         left
         right
         simp [cook_heap, RawNode.cook]
-        simp [cook_heap, RawNode.cook] at heq
+        simp [RawNode.cook] at heq
         exact cook_aux heq
 
 lemma push_ordered : Bdd.Ordered ⟨cook_heap v h0, RawPointer.cook p h1⟩ → Bdd.Ordered ⟨cook_heap (v.push N) h2, RawPointer.cook p h3⟩ := by

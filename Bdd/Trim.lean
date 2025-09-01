@@ -267,8 +267,7 @@ lemma trim_ordered {B : Bdd n m} (o : B.Ordered) {h1 : k ≤ m} {h2} : (trim B h
         have := trim_reachable_and_edge (h1 := h1) (h2 := h2) hx
         rw [heq] at this
         simp only [Vector.take_eq_extract, Vector.map_extract, Nat.succ_eq_add_one,
-          Pointer.toVar_node_eq, Fin.getElem_fin, Vector.getElem_cast, Fin.coe_eq_castSucc,
-          untrim_pointer, Fin.castSucc_inj]
+          untrim_pointer]
         simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_cast,
           Fin.mk.injEq]
         rw [Fin.val_eq_val]
@@ -283,8 +282,7 @@ lemma trim_ordered {B : Bdd n m} (o : B.Ordered) {h1 : k ≤ m} {h2} : (trim B h
         have := trim_reachable_and_edge (h1 := h1) (h2 := h2) hy
         rw [heq] at this
         simp only [Vector.take_eq_extract, Vector.map_extract, Nat.succ_eq_add_one,
-          Pointer.toVar_node_eq, Fin.getElem_fin, Vector.getElem_cast, Fin.coe_eq_castSucc,
-          untrim_pointer, Fin.castSucc_inj]
+          untrim_pointer]
         simp [Pointer.toVar]
         rw [Fin.val_eq_val]
         calc _

@@ -78,7 +78,7 @@ lemma denotation_take' {B : BDD} {hn : B.nvars ≤ n} :
 
 private lemma Vector.append_take (v : Vector α n) (u : Vector α m) : (v ++ u).take n = (Vector.cast (by simp) v) := by
   ext i hi
-  simp only [Nat.sub_zero, Vector.getElem_cast, Vector.getElem_take hi]
+  simp only [Vector.getElem_cast, Vector.getElem_take hi]
   exact Vector.getElem_append_left (by omega)
 
 private lemma denotation_append {B : BDD} {hn : B.nvars ≤ n} {hm : n ≤ m} {J : Vector Bool (m - n)} :
@@ -189,9 +189,8 @@ private lemma var_ordered : Bdd.Ordered (var_raw n) := by
       rw [Vector.singleton_def]
       simp [Vector.getElem_singleton (show 0 < 1 by omega)]
     apply Bdd.Ordered_of_terminal
-  · simp [Bdd.low, Fin.last]
+  · simp [Bdd.low]
     apply Fin.lt_def.mpr
-    simp only [Fin.val_natCast]
     refine Nat.lt_succ_of_le ?_
     simp [Pointer.toVar]
   · simp only [Bdd.high]
@@ -201,17 +200,15 @@ private lemma var_ordered : Bdd.Ordered (var_raw n) := by
       rw [Vector.singleton_def]
       simp [Vector.getElem_singleton (show 0 < 1 by omega)]
     apply Bdd.Ordered_of_terminal
-  · simp [Bdd.high, Fin.last]
+  · simp [Bdd.high]
     apply Fin.lt_def.mpr
-    simp only [Fin.val_natCast]
     refine Nat.lt_succ_of_le ?_
     simp [Pointer.toVar]
 
 private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
   constructor
   · rintro ⟨p, hp⟩
-    simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue] at hp
-    simp only [Nat.succ_eq_add_one, Fin.natCast_eq_last, Fin.isValue]
+    simp only [Fin.isValue] at hp
     rintro ⟨contra⟩
     simp_all
   · rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
@@ -234,7 +231,7 @@ private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
         rcases hhh with hhh | hhh <;>
         apply Pointer.eq_terminal_of_reachable at hhh <;>
         simp_rw [← hh, hhh] at hxy <;>
-        simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
+        simp only [OBdd.Similar, OBdd.HSimilar] at hxy <;>
         unfold OBdd.toTree at hxy <;>
         simp at hxy
     | inr hh =>
@@ -249,7 +246,7 @@ private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
         rcases hh with hh | hh <;>
         apply Pointer.eq_terminal_of_reachable at hh <;>
         simp_rw [hh, ← hhh] at hxy <;>
-        simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy <;>
+        simp only [OBdd.Similar, OBdd.HSimilar] at hxy <;>
         unfold OBdd.toTree at hxy <;>
         simp at hxy
       | inr hhh =>
@@ -275,7 +272,7 @@ private lemma var_reduced : OBdd.Reduced ⟨(var_raw n), var_ordered⟩ := by
             apply Pointer.eq_terminal_of_reachable at hh
             apply Pointer.eq_terminal_of_reachable at hhh
             simp_rw [hh, hhh] at hxy
-            simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at hxy
+            simp only [OBdd.Similar, OBdd.HSimilar] at hxy
             unfold OBdd.toTree at hxy
             simp at hxy
           | inr hhh =>
@@ -458,7 +455,7 @@ private lemma relabel''_denotation {B : BDD} {f : Nat → Nat} {hf} {hu} {I : Ve
   simp only [denotation']
   congr
   ext i
-  simp only [relabel_nvars, Vector.getElem_cast]
+  simp only [Vector.getElem_cast]
   apply Vector.getElem_take
 
 @[simp]

@@ -55,7 +55,7 @@ private lemma lift_preserves_MayPrecede {h : n ≤ n'} {B : Bdd n m} {p q : Poin
       | node j' =>
         simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, Pointer.toVar, lift, Fin.getElem_fin,
           Vector.getElem_map, Fin.mk_lt_mk, Fin.val_fin_lt] at hm
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, Pointer.toVar_node_eq, Fin.getElem_fin]
+        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one]
         aesop
   · intro hm
     cases p with
@@ -67,9 +67,9 @@ private lemma lift_preserves_MayPrecede {h : n ≤ n'} {B : Bdd n m} {p q : Poin
       | terminal _ =>
         apply Pointer.MayPrecede_node_terminal
       | node j' =>
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, Pointer.toVar_node_eq, Fin.getElem_fin] at hm
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, lift, Pointer.toVar_node_eq, Fin.getElem_fin]
-        simp_all [Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff, Vector.getElem_map, Pointer.toVar]
+        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one] at hm
+        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, lift]
+        simp_all [Vector.getElem_map, Pointer.toVar]
 
 private lemma lift_preserves_RelevantEdge {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
     ( ∃ (hp : Pointer.Reachable (lift h B).heap (lift h B).root p)
@@ -105,7 +105,7 @@ lemma olift_trivial_eq {h : n = n'} {O : OBdd n m} : (olift (n' := n') (by rw [h
   · subst h
     simp only
     rcases M with ⟨V, l⟩
-    simp [Vector.map, List.map_id_fun', id_eq]
+    simp [Vector.map, id_eq]
   · subst h
     simp
 

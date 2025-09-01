@@ -33,10 +33,10 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
       ext i hi
       rw [Vector.getElem_push]
       split
-      next hh => simp only [Vector.getElem_pop', g]
+      next hh => simp only [Vector.getElem_pop']
       next hh =>
         have : i = n := by omega
-        simp_all only [DependsOn, IndependentOf, not_forall, Fin.getElem_fin, forall_exists_index, lt_self_iff_false, not_false_eq_true]
+        simp_all only [DependsOn, IndependentOf, Fin.getElem_fin, lt_self_iff_false, not_false_eq_true]
     by_cases hf : DependsOn f ⟨n, Nat.lt_add_one n⟩
     · have h1 := h ⟨⟨n, Nat.lt_add_one n⟩, hf⟩
       rw [h2 I rfl]
@@ -45,36 +45,33 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
       rintro ⟨x, hx⟩
       simp only [g] at hx
       have : DependsOn f x.castSucc := by
-        simp only [DependsOn, IndependentOf, not_forall, g] at hx
+        simp only [DependsOn, IndependentOf, not_forall] at hx
         rcases hx with ⟨a, V, hav⟩
-        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp only [Vector.set_push, Fin.is_lt, ↓reduceDIte, g]] at hav
-        simp only [DependsOn, IndependentOf, not_forall, g]
+        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp only [Vector.set_push, Fin.is_lt, ↓reduceDIte]] at hav
+        simp only [DependsOn, IndependentOf, not_forall]
         use a, V.push I[n]
         exact hav
       have := h ⟨x.castSucc, this⟩
-      simp_all only [DependsOn, IndependentOf, not_forall, Fin.getElem_fin, forall_exists_index,
-        Fin.natCast_eq_last, Fin.val_last, Vector.getElem_push_eq, Vector.pop_push,
+      simp_all only [DependsOn, IndependentOf, Fin.getElem_fin,
         Fin.coe_castSucc, Vector.getElem_pop', g]
     · simp only [DependsOn, not_not, IndependentOf] at hf
       rw [hf I[n] J]
       rw [h2 I rfl]
-      rw [h2 (J.set (⟨n, Nat.lt_add_one n⟩ : Fin (n + 1)) I[n]) (by simp only [Fin.natCast_eq_last, Fin.val_last, Vector.getElem_set_self, g])]
+      rw [h2 (J.set (⟨n, Nat.lt_add_one n⟩ : Fin (n + 1)) I[n]) (by simp only [Vector.getElem_set_self])]
       apply ih
       rintro ⟨x, hx⟩
       simp only [g] at hx
       have : DependsOn f x.castSucc := by
-        simp only [DependsOn, IndependentOf, not_forall, g] at hx
+        simp only [DependsOn, IndependentOf, not_forall] at hx
         rcases hx with ⟨a, V, hav⟩
-        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp only [Vector.set_push, Fin.is_lt, ↓reduceDIte, g]] at hav
-        simp only [DependsOn, IndependentOf, not_forall, g]
+        rw [show (V.set x a).push I[n] = (V.push I[n]).set x a by simp [Vector.set_push]] at hav
+        simp only [DependsOn, IndependentOf, not_forall]
         use a, V.push I[n]
         exact hav
       have := h ⟨x.castSucc, this⟩
-      simp only [Fin.getElem_fin, Vector.getElem_pop', Fin.natCast_eq_last, Fin.val_last, g]
+      simp only [Fin.getElem_fin, Vector.getElem_pop']
       rw [Vector.getElem_set_ne _ _ (by omega)]
-      simp_all only [DependsOn, IndependentOf, not_forall, Fin.getElem_fin, forall_exists_index,
-        Fin.natCast_eq_last, Fin.val_last, Vector.getElem_push_eq, Vector.pop_push,
-        Fin.coe_castSucc]
+      simp_all only [DependsOn, IndependentOf, Fin.getElem_fin, Fin.coe_castSucc]
 
 @[simp]
 def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦ f (I.set i a)

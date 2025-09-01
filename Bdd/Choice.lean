@@ -36,7 +36,7 @@ private def choice_helper_spec' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root =
   split
   next jl hl =>
     have := var_lt_low_var (h := hj)
-    simp only [var, Nat.succ_eq_add_one, Bdd.var, hj, toVar_node_eq, Fin.coe_eq_castSucc, Fin.coe_castSucc, low, Bdd.low, hl, toVar] at this
+    simp only [var, Nat.succ_eq_add_one, Bdd.var, hj, low, Bdd.low, hl, toVar] at this
     apply choice_helper_spec' (low_reduced hr)
     simp_all
     omega
@@ -52,7 +52,7 @@ private def choice_helper_spec' {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root =
         exact hi
     next jh hh =>
       have := var_lt_high_var (h := hj)
-      simp only [var, Nat.succ_eq_add_one, Bdd.var, hj, toVar_node_eq, Fin.coe_eq_castSucc, Fin.coe_castSucc, high, Bdd.high, hh, toVar] at this
+      simp only [var, Nat.succ_eq_add_one, Bdd.var, hj, high, Bdd.high, hh, toVar] at this
       rw [Vector.get_set_ne]
       apply choice_helper_spec' (high_reduced hr)
       · simp_all
@@ -78,7 +78,7 @@ private def choice_helper_spec {O : OBdd n m} (hr : O.Reduced) (hj : O.1.root = 
       apply choice_helper_spec (low_reduced hr)
     rw [choice_helper_spec'' (low_reduced hr) hl]
     have := var_lt_low_var (h := hj)
-    simp only [var, Nat.succ_eq_add_one, Bdd.var, toVar, hj, hl, Fin.coe_eq_castSucc, Fin.coe_castSucc, low, Bdd.low] at this
+    simp only [var, Nat.succ_eq_add_one, Bdd.var, toVar, hj, hl, low, Bdd.low] at this
     simp_all
   next hl =>
     rw [evaluate_node'' hj]

@@ -77,7 +77,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
   simp only
   intro hp
   rw [Std.HashMap.getElem?_insert] at hp
-  simp only [beq_iff_eq, Vector.take_eq_extract] at hp
+  simp only [beq_iff_eq] at hp
   split at hp
   next heq =>
     subst heq
@@ -111,32 +111,32 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
         · exact this
         · exact that.2.1
       ·
-        simp [Nat.succ_eq_add_one, Bdd.var, gt_iff_lt, cook_heap, Bdd.low, RawPointer.cook]
+        simp [Nat.succ_eq_add_one, Bdd.var, cook_heap, Bdd.low, RawPointer.cook]
         cases heq : N.lo with
         | inl val =>
           rw [← cook_low]
           simp_rw [heq]
-          simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
-            Fin.natCast_eq_last, Fin.castSucc_lt_last, Pointer.toVar]
-          simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
-            Fin.lt_iff_val_lt_val, Fin.val_last, lt_sup_iff]
-          omega
-          apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
-          simp
+          · simp only [RawPointer.cook, Nat.succ_eq_add_one, Pointer.toVar, RawNode.cook,
+            Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq, Fin.lt_iff_val_lt_val,
+            Fin.val_last, lt_sup_iff]
+            omega
+          · apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
+            simp
         | inr val =>
           have hvs : val < s.size := by
             apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
           rw [← cook_low]
           simp_rw [heq]
-          simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
-            Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff, Pointer.toVar]
-          simp only [Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
-          rw [Vector.getElem_push_lt]
-          have hvs : val < s.size := by
-            apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
-          exact hxl _ hvs heq
-          exact hvs
-          apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+          · simp only [RawNode.cook, RawPointer.cook, Nat.succ_eq_add_one,
+              Fin.getElem_fin, Vector.getElem_ofFn, Pointer.toVar]
+            simp only [Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
+            rw [Vector.getElem_push_lt]
+            · have hvs : val < s.size := by
+                apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
+              exact hxl _ hvs heq
+            · exact hvs
+          · apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
+            simp only [le_add_iff_nonneg_right, zero_le]
       · simp only [Bdd.high, cook_heap]
         simp only [Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq]
         rw [← cook_high]
@@ -146,13 +146,13 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
         · exact this
         · exact that.2.1
       ·
-        simp [Nat.succ_eq_add_one, Bdd.var, gt_iff_lt, cook_heap, Bdd.high, RawPointer.cook]
+        simp [Nat.succ_eq_add_one, Bdd.var, cook_heap, Bdd.high, RawPointer.cook]
         cases heq : N.hi with
         | inl val =>
           rw [← cook_high]
           simp_rw [heq]
-          simp only [RawPointer.cook, Pointer.toVar_terminal_eq, Nat.succ_eq_add_one,
-            Fin.natCast_eq_last, Fin.castSucc_lt_last, Pointer.toVar]
+          simp only [RawPointer.cook, Nat.succ_eq_add_one,
+            Pointer.toVar]
           simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
             Fin.lt_iff_val_lt_val, Fin.val_last, lt_sup_iff]
           omega
@@ -163,8 +163,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
             apply RawPointer.bounded_of_le (inv.2 _ _ hkh).2.2.2.1 .refl heq
           rw [← cook_high]
           simp_rw [heq]
-          simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_node_eq, Nat.succ_eq_add_one,
-            Fin.getElem_fin, Vector.getElem_ofFn, Fin.coe_eq_castSucc, Fin.castSucc_lt_castSucc_iff]
+          simp only [RawNode.cook, RawPointer.cook]
           simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
             Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
           rw [Vector.getElem_push_lt]
@@ -224,7 +223,6 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
         (s.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2))
     } :=
   ⟨⟨⟨s.size + 1, s.heap.push N, s.cache.insert ⟨O.1.root, U.1.root⟩ (.inr s.size)⟩, .inr s.size⟩, by
-    simp only [Prod.exists]
     constructor
     · exact heap_push_aux s inv hNl hNh hNv hxl hxh hh
     · constructor
@@ -244,7 +242,7 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
             · simp only [getElem?_eq_none_iff, Std.HashMap.mem_insert, beq_iff_eq, not_or,
                 and_imp, imp_self, implies_true]
             · rintro hk ⟨q, hq⟩
-              simp only [Std.HashMap.getElem?_insert, beq_iff_eq, ite_eq_right_iff] at hq
+              simp only [Std.HashMap.getElem?_insert, beq_iff_eq] at hq
               split at hq
               next heqq => subst heqq; constructor <;> left
               next heqq => rw [hk] at hq; contradiction
@@ -384,7 +382,7 @@ private lemma aux_lt5_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root
   have h3 := OBdd.var_lt_low_var (h := U_root_def)
   have h4 := OBdd.var_lt_high_var (h := U_root_def)
   have h5 : U.1.heap[↑j'].var.1 < n + 1 := by omega
-  simp_all [OBdd.var, toVar_or, heeq]
+  simp_all [OBdd.var, toVar_or]
   split
   next heq =>
     split
@@ -409,7 +407,7 @@ private lemma aux_lt5_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.roo
   have h3 := OBdd.var_lt_low_var (h := U_root_def)
   have h4 := OBdd.var_lt_high_var (h := U_root_def)
   have h5 : U.1.heap[↑j'].var.1 < n + 1 := by omega
-  simp_all [OBdd.var, toVar_or, heeq]
+  simp_all [OBdd.var, toVar_or]
   split
   next heq =>
     split
@@ -458,7 +456,6 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
       match U_root_def : U.1.root with
       | .terminal b' =>
         ⟨⟨⟨s0.size, s0.heap, s0.cache.insert ⟨O.1.root, U.1.root⟩ (.inl (op b b'))⟩, .inl (op b b')⟩, by
-          simp only [Prod.exists]
           constructor
           · exact insert_terminal_invariant s0 inv O_root_def U_root_def
           · constructor
@@ -662,8 +659,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
             (by
               simp only
               rw [O_root_def, U_root_def]
-              simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', or_true, true_or,
-                inf_of_le_right, inf_of_le_left]
+              simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', true_or, inf_of_le_left]
             )
             (by
               intro j hj1
@@ -819,8 +815,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
               (by
                 simp only
                 rw [O_root_def, U_root_def]
-                simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', or_true, true_or,
-                  inf_of_le_right, inf_of_le_left]
+                simp only [Fin.getElem_fin, toVar_or]
                 exact Eq.symm (min_eq_left_of_lt hlt)
               )
               (by
@@ -977,8 +972,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                 (by
                   simp only
                   rw [O_root_def, U_root_def]
-                  simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', or_true, true_or,
-                    inf_of_le_right, inf_of_le_left]
+                  simp only [Fin.getElem_fin, toVar_or]
                   exact Eq.symm (min_eq_right_of_lt hgeq)
                 )
                 (by
@@ -1133,8 +1127,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                 (by
                   simp only
                   rw [O_root_def, U_root_def]
-                  simp only [Fin.getElem_fin, toVar_or, le_sup_iff, Fin.is_le', or_true, true_or,
-                    inf_of_le_right, inf_of_le_left]
+                  simp only [Fin.getElem_fin, toVar_or]
                   have heeq : O.1.heap[j].var.1 = U.1.heap[j'].var.1 := by omega
                   simp only [Fin.getElem_fin] at heeq
                   rw [heeq]

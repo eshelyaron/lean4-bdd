@@ -90,14 +90,14 @@ private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1
         have := size_le_helper (O := O.high O_root_def)
         omega
       _ ≤ 1 + (2 ^ (n - (O.1.var.1 + 1)) - 1) + (2 ^ (n - (O.high O_root_def).1.var.1) - 1) := by
-        simp only [Nat.succ_eq_add_one, OBdd.low_heap_eq_heap, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
         apply pow_le_pow_right' (by simp)
         have := OBdd.var_lt_low_var (h := O_root_def)
         simp only [OBdd.var] at this
         omega
       _ ≤ 1 + (2 ^ (n - (O.1.var.1 + 1)) - 1) + (2 ^ (n - (O.1.var.1 + 1)) - 1) := by
-        simp only [Nat.succ_eq_add_one, OBdd.low_heap_eq_heap, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, add_le_add_iff_left, tsub_le_iff_right]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
         apply pow_le_pow_right' (by simp)
         have := OBdd.var_lt_high_var (h := O_root_def)
@@ -109,7 +109,7 @@ private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1
         apply pow_le_pow_right' (by simp)
         omega
       _ ≤ 1 + (2 ^ ((n - O.1.var.1) - 1) - 1) + (2 ^ ((n - O.1.var.1) - 1) - 1) := by
-        simp only [Nat.succ_eq_add_one, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, add_le_add_iff_left, tsub_le_iff_right]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
         apply pow_le_pow_right' (by simp)
         omega

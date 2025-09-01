@@ -440,7 +440,7 @@ private theorem collect_helper_nodup {I : Vector Bool m × List (Fin m)} {O : OB
     next heq =>
       apply collect_helper_nodup
       apply collect_helper_nodup
-      simp only [List.mem_cons, forall_eq_or_imp, true_and]
+      simp only [List.mem_cons, forall_eq_or_imp]
       constructor
       · constructor
         · simp
