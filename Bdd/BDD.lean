@@ -60,8 +60,7 @@ lemma denotation_independentOf_of_geq_nvars {n : Nat} {i : Fin n} {B : BDD} {h1 
   rw [Vector.getElem_set_ne _ _ (by omega)]
 
 /-- `BDD`s are semantically equivalent when their `denotation`s coincide. -/
-def SemanticEquiv : BDD → BDD → Prop := fun B C ↦
-  B.denotation (Nat.le_max_left  ..) = C.denotation (Nat.le_max_right ..)
+def SemanticEquiv (B C : BDD) := B.denotation (le_max_left ..) = C.denotation (le_max_right ..)
 
 private def Similar (B : BDD) (B' : BDD) :=
   (Lift.olift (Nat.le_max_left ..) B.obdd).HSimilar (Lift.olift (Nat.le_max_right ..) B'.obdd)

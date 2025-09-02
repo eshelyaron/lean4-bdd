@@ -1316,10 +1316,10 @@ def oapply (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' m') :
     (s : Nat) ×
     { OU : OBdd (n ⊔ n') s //
       ∀ I,
-        OBdd.evaluate OU I =
+        OU.evaluate I =
         (op
-          (OBdd.evaluate O (Vector.cast (by simp) (I.take n)))
-          (OBdd.evaluate U (Vector.cast (by simp) (I.take n'))))
+          (O.evaluate (Vector.cast (by simp) (I.take n)))
+          (U.evaluate (Vector.cast (by simp) (I.take n'))))
     } :=
   let ⟨⟨state, root⟩, inv, ps⟩ := apply_helper op O U initial inv_initial
   ⟨ state.size,

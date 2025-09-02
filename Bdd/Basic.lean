@@ -923,7 +923,7 @@ decreasing_by
     simp [size_node O_root_def, size_node U_root_def]; omega
 
 /-- The only reduced BDD that denotes a constant function is the terminal BDD. -/
-theorem OBdd.terminal_of_constant {n m} (O : OBdd n m) :
+theorem OBdd.terminal_of_constant (O : OBdd n m) :
     O.Reduced → O.evaluate = (fun _ ↦ b) → O.1.root = terminal b := by
   intro R h
   cases O_root_def : O.1.root
@@ -1848,10 +1848,6 @@ lemma Pointer.toVar_lt_of_trans_edge_of_ordered :
     have := h1 (relevantEdge_of_edge_of_reachable e (Relation.TransGen.to_reflTransGen r))
     simp_all only [Nat.succ_eq_add_one, RelevantMayPrecede, MayPrecede, gt_iff_lt]
     omega
-
-lemma baz (op : Bool → Bool → Bool) (c bt bt' bf bf' : Bool) :
-    op (if c then bt else bf) (if c then bt' else bf') = (if c then (op bt bt') else (op bf bf')) := by
-  cases c <;> simp
 
 def Pointer.equiv (p : Pointer m) (p' : Pointer m') :=
   (∀ b, p = .terminal b → p' = .terminal b) ∧ (∀ j, p = .node j → ∃ (j' : Fin m'), p' = .node j' ∧ j.1 = j'.1)
