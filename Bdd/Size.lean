@@ -71,13 +71,13 @@ lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
     simp only [OBdd.low_heap_eq_heap, OBdd.high_heap_eq_heap] at hxy
     split at hxy
     next =>
-      split at hxy <;> (refine Subtype.eq ?_; simp_all)
+      split at hxy <;> (refine Subtype.ext ?_; simp_all)
     next =>
       split at hxy <;>
       (next =>
         split at hxy
         next => simp_all
-        next => split at hxy <;> (refine Subtype.eq ?_; simp_all))
+        next => split at hxy <;> (refine Subtype.ext ?_; simp_all))
 
 private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
   cases O_root_def : O.1.root with

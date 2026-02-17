@@ -53,7 +53,7 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
         exact hav
       have := h ⟨x.castSucc, this⟩
       simp_all only [DependsOn, IndependentOf, Fin.getElem_fin,
-        Fin.coe_castSucc, Vector.getElem_pop', g]
+        Fin.val_castSucc, Vector.getElem_pop', g]
     · simp only [DependsOn, not_not, IndependentOf] at hf
       rw [hf I[n] J]
       rw [h2 I rfl]
@@ -71,7 +71,7 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
       have := h ⟨x.castSucc, this⟩
       simp only [Fin.getElem_fin, Vector.getElem_pop']
       rw [Vector.getElem_set_ne _ _ (by omega)]
-      simp_all only [DependsOn, IndependentOf, Fin.getElem_fin, Fin.coe_castSucc]
+      simp_all only [DependsOn, IndependentOf, Fin.getElem_fin, Fin.val_castSucc]
 
 @[simp]
 def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦ f (I.set i a)

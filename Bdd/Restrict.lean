@@ -539,7 +539,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     Fin.val_fin_lt] at this
                   rw [O_root_def] at this
                   nth_rw 1 [Pointer.toVar] at this
-                  simp_rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
+                  simp_rw [Fin.lt_def, Fin.getElem_fin] at this
                   convert this using 1
                 split at that
                 next =>
@@ -561,7 +561,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     Fin.val_fin_lt] at this
                   rw [O_root_def] at this
                   nth_rw 1 [Pointer.toVar] at this
-                  simp_rw [Fin.lt_iff_val_lt_val, Fin.getElem_fin] at this
+                  simp_rw [Fin.lt_def, Fin.getElem_fin] at this
                   convert this using 1
                 split at that
                 next =>

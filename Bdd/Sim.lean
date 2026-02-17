@@ -54,7 +54,9 @@ private def sim_helper
               U.1.heap[j'].low (.tail hqr (.low rfl))
             match hll with
             | isTrue ht =>
-              let hhh ← sim_helper O hO U hU
+              -- TODO : why is type declaration needed? Note that only `←` does not work, for some reason `:= ←` is needed
+              let hhh : Decidable (OBdd.HSimilar ⟨Bdd.mk O.val.heap O.val.heap[j].high, _⟩ ⟨Bdd.mk U.val.heap U.val.heap[j'].high, _⟩) :=
+                ← sim_helper O hO U hU
                 O.1.heap[j].high (.tail hpr (.high rfl))
                 U.1.heap[j'].high (.tail hqr (.high rfl))
               match hhh with
