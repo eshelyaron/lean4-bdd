@@ -476,7 +476,7 @@ private lemma find_aux' {B : BDD} :
     ¬ B.SemanticEquiv (const false) → ∃ (I : Vector Bool (max B.nvars 0)), B.denotation (by simp) I := by
   intro h
   contrapose h
-  simp_all only [not_exists, Bool.not_eq_true, SemanticEquiv, const_nvars, const_denotation, not_not]
+  simp_all only [not_exists, Bool.not_eq_true, SemanticEquiv, const_nvars, const_denotation]
   ext x
   simp only [Function.const_apply]
   apply h

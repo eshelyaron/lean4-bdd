@@ -303,8 +303,8 @@ private lemma otrim_noRedundancy {O : OBdd n m} {h1 : k ≤ m} {h2} (hr : O.1.No
     constructor
     simp only [otrim, Fin.getElem_fin] at hj
     simp only [Fin.getElem_fin]
-    rw [← untrim_point_trim_heap_low (hj := (trim_reachable_and_edge hx).1)]
-    rw [← untrim_point_trim_heap_high (hj := (trim_reachable_and_edge hx).1)]
+    rw [← untrim_point_trim_heap_low (h1 := h1) (h2 := h2) (hj := (trim_reachable_and_edge hx).1)]
+    rw [← untrim_point_trim_heap_high (h1 := h1) (h2 := h2) (hj := (trim_reachable_and_edge hx).1)]
     congr
 
 private lemma trim_root {B : Bdd n m} {h1 : l + 1 ≤ m} {h2} : (trim B h1 h2).root = trim_pointer B.root := by

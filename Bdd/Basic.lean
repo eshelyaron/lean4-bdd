@@ -1,4 +1,5 @@
-import Mathlib.Data.Fintype.Basic
+--import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.Fintype.Sum
 import Init.Data.ToString.Basic
 import Mathlib.Tactic.DeriveFintype
 import Mathlib.Data.Fintype.Vector
@@ -100,7 +101,7 @@ lemma Pointer.toVar_terminal_eq {n m} (w : Vector (Node n m) m) : toVar w (termi
 @[simp]
 lemma Pointer.toVar_node_eq {n m} (w : Vector (Node n m) m) {j} : (toVar w (node j)).1 = w[j].var.1 := rfl
 
-lemma Pointer.toVar_heap_set : i ≠ j → (toVar (M.set i N) (node j)).1 = (toVar M (node j)).1 := by
+lemma Pointer.toVar_heap_set {i j : Fin n} : i ≠ j → (toVar (M.set i N) (node j)).1 = (toVar M (node j)).1 := by
   intro neq
   simp only [Nat.succ_eq_add_one, toVar_node_eq]
   congr 2
@@ -109,7 +110,7 @@ lemma Pointer.toVar_heap_set : i ≠ j → (toVar (M.set i N) (node j)).1 = (toV
   rcases j with ⟨j, _⟩
   simp_all
 
-lemma Pointer.toVar_heap_set' : i ≠ j → (toVar (M.set i N) (node j)) = (toVar M (node j)) := by
+lemma Pointer.toVar_heap_set' {i j : Fin n} : i ≠ j → (toVar (M.set i N) (node j)) = (toVar M (node j)) := by
   intro neq
   simp only [Nat.succ_eq_add_one]
   apply Fin.eq_of_val_eq
@@ -139,7 +140,7 @@ theorem Pointer.Reachable.trans (hab : Reachable v a b) (hbc : Reachable v b c) 
 abbrev Bdd.RelevantPointer {n m} (B : Bdd n m) := { q // Reachable B.heap B.root q}
 
 instance Bdd.instDecidableEqRelevantPointer : DecidableEq (Bdd.RelevantPointer B) :=
-  fun _ _ ↦ decidable_of_iff _ (symm Subtype.eq_iff)
+  fun _ _ ↦ decidable_of_iff _ (symm Subtype.ext_iff)
 
 def Bdd.toRelevantPointer {n m} (B : Bdd n m) : B.RelevantPointer :=
   ⟨B.root, Relation.ReflTransGen.refl⟩
@@ -534,10 +535,10 @@ theorem OBdd.init_inductionOn t {motive : OBdd n m → Prop}
             motive ⟨{heap := t.1.heap, root := node j}, h⟩)
     : motive t := by
   rcases (terminal_or_node t.1) with ⟨b, h1, h2⟩ | ⟨j, h1, h2⟩
-  case inl => convert base b; apply Subtype.eq_iff.mpr; assumption
+  case inl => convert base b; apply Subtype.ext_iff.mpr; assumption
   case inr =>
     convert step j _ _ _ _ _
-    · apply Subtype.eq_iff.mpr; assumption; exact ordered_of_relevant t ⟨node j, by simp only [Reachable]; rw [← h1]⟩
+    · apply Subtype.ext_iff.mpr; assumption; exact ordered_of_relevant t ⟨node j, by simp only [Reachable]; rw [← h1]⟩
     · exact ordered_of_relevant t ⟨t.1.heap[j].low, by rw [h1]; exact Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.low rfl)⟩
     · exact OBdd.init_inductionOn _ base step
     · exact ordered_of_relevant t ⟨t.1.heap[j].high, by rw [h1]; exact Relation.ReflTransGen.tail Relation.ReflTransGen.refl (Edge.high rfl)⟩
@@ -610,12 +611,12 @@ lemma OBdd.ordered_of_edge {O : OBdd n m} {h : O.1.heap = v} {r : O.1.root = q} 
   intro e
   exact ordered_of_relevant O ⟨p, reachable_of_edge e⟩
 
-lemma OBdd.ordered_of_low_edge : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].low} := by
+lemma OBdd.ordered_of_low_edge {j : Fin n} : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].low} := by
   intro o x y h
   apply ordered_of_relevant ⟨{ heap := v, root := node j }, o⟩ ⟨v[j].low, (reachable_of_edge (Edge.low rfl))⟩
   simpa
 
-lemma OBdd.ordered_of_high_edge : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].high} := by
+lemma OBdd.ordered_of_high_edge {j : Fin n} : Bdd.Ordered {heap := v, root := node j} → Bdd.Ordered {heap := v, root := v[j].high} := by
   intro o x y h
   apply ordered_of_relevant ⟨{ heap := v, root := node j }, o⟩ ⟨v[j].high, (reachable_of_edge (Edge.high rfl))⟩
   simpa
@@ -760,7 +761,7 @@ lemma OBdd.evaluate_high_eq_evaluate_set_true {n m} {O : OBdd n m} {j : Fin m} {
     (O.high h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var true := by
   ext I
   simp only [Function.comp_apply]
-  nth_rw 2 [evaluate_node'' (j := j)]
+  rw [evaluate_node'' h (j := j)]
   beta_reduce
   simp only [Fin.getElem_fin, Vector.getElem_set_self, ↓reduceIte]
   have := var_lt_high_var (h := h)
@@ -773,7 +774,7 @@ lemma OBdd.evaluate_low_eq_evaluate_set_false {n m} {O : OBdd n m} {j : Fin m} {
     (O.low h).evaluate = O.evaluate ∘ fun I ↦ I.set O.1.heap[j].var false := by
   ext I
   simp only [Function.comp_apply]
-  nth_rw 2 [evaluate_node'' (j := j)]
+  rw [evaluate_node'' h (j := j)]
   beta_reduce
   simp only [Fin.getElem_fin, Vector.getElem_set_self]
   simp only [Bool.false_eq_true, ↓reduceIte]
@@ -1057,7 +1058,7 @@ lemma OBdd.card_relevantPointer_eq_one_of_isTerminal {O : OBdd n m} : O.isTermin
   rcases h with ⟨b, hb⟩
   use ⟨terminal b, by rw [hb]; left⟩
   intro y
-  apply Subtype.eq_iff.mpr
+  apply Subtype.ext_iff.mpr
   apply (terminal_relevant_iff hb y).mp
   rfl
 
@@ -1510,8 +1511,6 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
         rw [← O_def]
         use v.set heap[jr].var false
         contrapose hv
-        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
-        simp only [ne_eq, Decidable.not_not]
         calc _
           _ = O.evaluate (v.set (heap[jr.1].var.1) false) := by
             rw [evaluate_low_eq_evaluate_set_false]
@@ -1548,8 +1547,6 @@ lemma OBdd.dependsOn_of_usesVar_of_reduced {O : OBdd n m} :
         rw [← O_def]
         use v.set heap[jr].var true
         contrapose hv
-        simp only [Fin.getElem_fin, ne_eq, Decidable.not_not] at hv
-        simp only [ne_eq, Decidable.not_not]
         calc _
           _ = O.evaluate (v.set (heap[jr.1].var.1) true) := by
             rw [evaluate_high_eq_evaluate_set_true]
@@ -1786,7 +1783,9 @@ private def usesVar_helper
           match ← usesVar_helper O i O.1.heap[j].low (.tail hpr (.low rfl)) with
           | isTrue ht => return isTrue (by apply usesVar_of_low_usesVar; simp only [Bdd.low]; exact ht; rfl)
           | isFalse hf =>
-            match ← usesVar_helper O i O.1.heap[j].high (.tail hpr (.high rfl)) with
+          -- TODO : why is the type annotation needed here? Note that only `←` does not work, for some reason `:= ←` is needed
+          let h : Decidable (Bdd.usesVar ⟨O.val.heap, O.val.heap[j].high⟩ i) := ← usesVar_helper O i O.1.heap[j].high (.tail hpr (.high rfl))
+            match h with
             | isTrue htt => return isTrue (by apply usesVar_of_high_usesVar; simp only [Bdd.high]; exact htt; rfl)
             | isFalse hff =>
               have : ¬ Bdd.usesVar { heap := O.1.heap, root := node j } i := by
@@ -1948,7 +1947,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
     · rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
       have := OBdd.var_lt_low_var (O := O) (h := hj2')
       simp_all [OBdd.var, Bdd.var, OBdd.low, Bdd.low]
-      apply Fin.lt_iff_val_lt_val.mpr
+      apply Fin.lt_def.mpr
       simp only [toVar]
       have that : (toVar B.heap B.heap[j.1].low).1 = (toVar O.1.heap O.1.heap[j.1].low).1 := by
         rcases Pointer.equiv_symm hj3 with ⟨hj31, hj32⟩
@@ -1987,7 +1986,7 @@ lemma Bdd.ordered_of_ordered_heap_all_reachable_eq (O : OBdd n m) (B : Bdd n m')
     · rcases h1 j (by rw [← B_root_def]; left) with ⟨hj1, hj2, hj3, hj4⟩
       have := OBdd.var_lt_high_var (O := O) (h := hj2')
       simp_all [OBdd.var, Bdd.var, OBdd.high, Bdd.high]
-      apply Fin.lt_iff_val_lt_val.mpr
+      apply Fin.lt_def.mpr
       simp only [toVar]
       have that : (toVar B.heap B.heap[j.1].high).1 = (toVar O.1.heap O.1.heap[j.1].high).1 := by
         rcases Pointer.equiv_symm hj4 with ⟨hj41, hj42⟩

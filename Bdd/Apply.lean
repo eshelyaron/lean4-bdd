@@ -117,7 +117,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           rw [← cook_low]
           simp_rw [heq]
           · simp only [RawPointer.cook, Nat.succ_eq_add_one, Pointer.toVar, RawNode.cook,
-            Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq, Fin.lt_iff_val_lt_val,
+            Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq, Fin.lt_def,
             Fin.val_last, lt_sup_iff]
             omega
           · apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
@@ -154,7 +154,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           simp only [RawPointer.cook, Nat.succ_eq_add_one,
             Pointer.toVar]
           simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
-            Fin.lt_iff_val_lt_val, Fin.val_last, lt_sup_iff]
+            Fin.lt_def, Fin.val_last, lt_sup_iff]
           omega
           apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1
           simp
