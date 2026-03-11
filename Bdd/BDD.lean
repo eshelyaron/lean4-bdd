@@ -7,6 +7,7 @@ import Bdd.Evaluate
 import Bdd.Sim
 import Bdd.Size
 import Bdd.Count
+import Bdd.OrderedDecide
 
 /-- Abstract BDD type. -/
 structure BDD where
