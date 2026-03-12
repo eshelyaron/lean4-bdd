@@ -2147,7 +2147,7 @@ lemma cook_aux {p : RawPointer} {h1} {h2} : p.cook h1 = .node j → p.cook h2 = 
     rw [Fin.eq_mk_iff_val_eq] at h
     exact h
 
-private lemma push_ordered_aux {v : Vector (RawNode n) m} {h0} {h2} :
+lemma push_ordered_aux {v : Vector (RawNode n) m} {h0} {h2} :
     Pointer.Reachable (cook_heap (v.push N) h2) (RawPointer.cook p h3) q →
     ∀ j, q = .node j →
     ∃ hj : j.1 < m, Pointer.Reachable (cook_heap v h0) (p.cook h1) (.node ⟨j.1, hj⟩) := by
