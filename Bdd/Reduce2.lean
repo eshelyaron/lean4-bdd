@@ -153,15 +153,15 @@ lemma Invariant.ids_isSome {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
 
 /-- For each node j in l: if lid = hid (redundant), set ids[j] := lid;
 otherwise add to accumulator. -/
-private def populate_queue {n m : Nat} (O : OBdd (n + 1) m)
-    (i : Fin (n + 1))
+private def populate_queue {n m : Nat} (O : OBdd n m)
+    (i : Fin n)
     (acc : List ((RawPointer × RawPointer) × Fin m)) :
     (l : List (Fin m)) →
-    (ps : ProvedState (n + 1) m) →
+    (ps : ProvedState n m) →
     Invariant O ps i.1 →
     (∀ j ∈ l, O.1.heap[j].var.1 = i.1) →
     (∀ j ∈ l, Reachable O.1.heap O.1.root (.node j)) →
-    { p : ProvedState (n + 1) m × List ((RawPointer × RawPointer) × Fin m) //
+    { p : ProvedState n m × List ((RawPointer × RawPointer) × Fin m) //
         Invariant O p.1 i.1 ∧
         p.1.state.size = ps.state.size ∧
         ∀ j ∈ l, (∃ key, (key, j) ∈ p.2) ∨ (p.1.state.ids[j]).isSome }
@@ -171,12 +171,12 @@ private def populate_queue {n m : Nat} (O : OBdd (n + 1) m)
       sorry
 
 /-- Process one entry from the sorted queue. -/
-private def process_record {n m : Nat} {i : Nat} (O : OBdd (n + 1) m)
+private def process_record {n m : Nat} {i : Nat} (O : OBdd n m)
     (curkey : RawPointer × RawPointer) (curptr : RawPointer)
     (entry  : (RawPointer × RawPointer) × Fin m)
-    (ps : ProvedState (n + 1) m)
+    (ps : ProvedState n m)
     (inv : Invariant O ps i) :
-    { p : ProvedState (n + 1) m × (RawPointer × RawPointer) × RawPointer //
+    { p : ProvedState n m × (RawPointer × RawPointer) × RawPointer //
         Invariant O p.1 i ∧
         (p.1.state.ids[entry.2]).isSome } :=
   let ⟨key, j⟩ := entry
@@ -192,12 +192,12 @@ private def process_record {n m : Nat} {i : Nat} (O : OBdd (n + 1) m)
     ⟨⟨ps'', key, ptr⟩, by sorry, by sorry⟩
 
 /-- Thread `process_record` through the entire sorted queue. -/
-private def process_queue {n m : Nat} {i : Nat} (O : OBdd (n + 1) m)
+private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
     (curkey : RawPointer × RawPointer) (curptr : RawPointer) :
     (Q : List ((RawPointer × RawPointer) × Fin m)) →
-    (ps : ProvedState (n + 1) m) →
+    (ps : ProvedState n m) →
     Invariant O ps i →
-    { ps' : ProvedState (n + 1) m //
+    { ps' : ProvedState n m //
         Invariant O ps' i ∧
         ∀ entry ∈ Q, (ps'.state.ids[entry.2]).isSome }
   | [], ps, inv =>
@@ -215,10 +215,10 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd (n + 1) m)
         | tail _ h => exact htail entry h⟩
 
 /-- Process all input nodes at variable level `i`. -/
-private def step {n m : Nat} (O : OBdd (n + 1) m)
-    (vlist : Vector (List (Fin m)) (n + 1)) (i : Fin (n + 1))
-    (ps : ProvedState (n + 1) m) (inv : Invariant O ps i.1) :
-    { ps' : ProvedState (n + 1) m //
+private def step {n m : Nat} (O : OBdd n m)
+    (vlist : Vector (List (Fin m)) n) (i : Fin n)
+    (ps : ProvedState n m) (inv : Invariant O ps i.1) :
+    { ps' : ProvedState n m //
         Invariant O ps' i.1 ∧
         ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } := by
   sorry
@@ -246,16 +246,16 @@ private lemma invariant_step_down {n m : Nat} {O : OBdd n m} {ps : ProvedState n
 /-- Process levels from `i` down to `O.1.heap[r].var`, returning a final state
 in which `r`'s id is set and the correctness invariant holds for the root.
 `h_le` witnesses that `O.1.heap[r].var.1 ≤ i.1`, maintained by the recursion. -/
-private def loop_helper {n m : Nat} (O : OBdd (n + 1) m) (r : Fin m)
+private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
     (hr    : O.1.root = .node r)
-    (vlist : Vector (List (Fin m)) (n + 1))
+    (vlist : Vector (List (Fin m)) n)
     (hdiscover : ∀ (j : Fin m),
         Reachable O.1.heap O.1.root (.node j) →
         j ∈ vlist[O.1.heap[j].var])
-    (i    : Fin (n + 1))
+    (i    : Fin n)
     (h_le : O.1.heap[r].var.1 ≤ i.1)
-    (ps : ProvedState (n + 1) m) (inv : Invariant O ps i.1) :
-    { ps' : ProvedState (n + 1) m //
+    (ps : ProvedState n m) (inv : Invariant O ps i.1) :
+    { ps' : ProvedState n m //
         (ps'.state.ids[r]).isSome ∧
         ∀ (ptr : RawPointer), ps'.state.ids[r] = some ptr →
           ∃ hptr : ptr.Bounded ps'.state.size,
@@ -274,7 +274,7 @@ private def loop_helper {n m : Nat} (O : OBdd (n + 1) m) (r : Fin m)
       hset₁ r hr_in (by rw [← hr]; exact .refl)
     ⟨ps₁, hrisSome, by sorry⟩
   | Nat.succ j =>
-    have hlt    : j + O.1.heap[r].var.1 < n + 1 := by
+    have hlt    : j + O.1.heap[r].var.1 < n := by
       have := i.isLt; simp only [Nat.succ_eq_add_one] at h; omega
     have hi_pos : 0 < i.1 := by omega
     have inv₁' : Invariant O ps₁ (j + O.1.heap[r].var.1) := by
