@@ -256,11 +256,67 @@ private lemma push_reduced {n s : Nat} {v : Vector (RawNode n) s} {N : RawNode n
     (hred : OBdd.Reduced ⟨⟨cook_heap v hh, p.cook hp⟩, ho⟩) :
     OBdd.Reduced ⟨⟨cook_heap (v.push N) hh', p.cook hp'⟩, ho'⟩ := by
   -- Key: every reachable .node j in new heap has j.1 < s, and j is reachable in old.
-  -- This is the content of push_ordered_aux (private in Basic.lean).
+  -- Proof by induction on the Reachable path:
+  --   base: root p.cook hp' = .node j, so p = .inr k with k = j.1 < s (from hp).
+  --   step: edge from .node k to .node j; by IH k.1 < s; by hh' j.1 < k.1 < s;
+  --         same edge exists in old heap since k.1 < s means (v.push N)[k] = v[k].
   have back : ∀ j : Fin (s + 1),
       Pointer.Reachable (cook_heap (v.push N) hh') (p.cook hp') (.node j) →
       ∃ hj : j.1 < s, Pointer.Reachable (cook_heap v hh) (p.cook hp) (.node ⟨j.1, hj⟩) := by
-    intro j hreach; exact by sorry
+    -- Generalise the end-point so that the induction hypothesis is strong enough.
+    suffices h : ∀ q : Pointer (s + 1),
+        Pointer.Reachable (cook_heap (v.push N) hh') (p.cook hp') q →
+        ∀ j : Fin (s + 1), q = .node j →
+        ∃ hj : j.1 < s,
+          Pointer.Reachable (cook_heap v hh) (p.cook hp) (.node ⟨j.1, hj⟩) from
+      fun j hreach => h _ hreach j rfl
+    intro q hq
+    -- Helper: (.inr jj.1).cook h = .node jj  for any jj : Fin (s+1).
+    have cook_inr_node : ∀ (jj : Fin (s+1)) (bnd : RawPointer.Bounded (s+1) (.inr jj.1)),
+        RawPointer.cook (.inr jj.1) bnd = .node jj := fun jj _ => by
+      simp only [RawPointer.cook, Fin.eta]
+    induction hq with
+    | refl =>
+      intro j hj
+      -- p.cook hp' = .node j. Extract p = .inr j.1 via cook_inj, then hp gives j.1 < s.
+      have hp_eq : p = .inr j.1 :=
+        cook_inj (hj.trans (cook_inr_node j (fun h => by injection h; omega)).symm)
+      have hj_lt : j.1 < s := hp hp_eq
+      have hcook : p.cook hp = .node ⟨j.1, hj_lt⟩ := by
+        subst hp_eq; simp [RawPointer.cook]
+      exact ⟨hj_lt, hcook ▸ .refl⟩
+    | tail hprev edge ih =>
+      intro j hj; subst hj
+      -- edge : Edge (cook_heap (v.push N) hh') b (.node j)
+      cases edge with
+      | low h =>
+        rename_i k
+        simp only [cook_heap, Fin.getElem_fin, Vector.getElem_ofFn, RawNode.cook] at h
+        -- h : (v.push N)[↑k].lo.cook _ = .node j
+        have hlo : (v.push N)[k.1].lo = .inr j.1 :=
+          cook_inj (h.trans (cook_inr_node j (fun h => by injection h; omega)).symm)
+        have hj_lt_k : j.1 < k.1 :=
+          (hh' k).1 (show (v.push N)[k].lo = .inr j.1 by simp [Fin.getElem_fin, hlo])
+        obtain ⟨hk_lt, hk_reach⟩ := ih k rfl
+        have hj_lt : j.1 < s := Nat.lt_trans hj_lt_k hk_lt
+        refine ⟨hj_lt, .tail hk_reach (Edge.low ?_)⟩
+        -- simp_rw rewrites (v.push N)[↑k] → v[↑k] inside h (handles dependent bound).
+        simp_rw [Vector.getElem_push_lt hk_lt] at h
+        simp only [cook_heap, Fin.getElem_fin, Vector.getElem_ofFn, RawNode.cook]
+        exact cook_aux h (hj := hj_lt)
+      | high h =>
+        rename_i k
+        simp only [cook_heap, Fin.getElem_fin, Vector.getElem_ofFn, RawNode.cook] at h
+        have hhi : (v.push N)[k.1].hi = .inr j.1 :=
+          cook_inj (h.trans (cook_inr_node j (fun h => by injection h; omega)).symm)
+        have hj_lt_k : j.1 < k.1 :=
+          (hh' k).2 (show (v.push N)[k].hi = .inr j.1 by simp [Fin.getElem_fin, hhi])
+        obtain ⟨hk_lt, hk_reach⟩ := ih k rfl
+        have hj_lt : j.1 < s := Nat.lt_trans hj_lt_k hk_lt
+        refine ⟨hj_lt, .tail hk_reach (Edge.high ?_)⟩
+        simp_rw [Vector.getElem_push_lt hk_lt] at h
+        simp only [cook_heap, Fin.getElem_fin, Vector.getElem_ofFn, RawNode.cook]
+        exact cook_aux h (hj := hj_lt)
   -- For any node j reachable from any reachable pointer q in new heap,
   -- j.1 < s and nodes are equiv.
   have sub_back : ∀ (q : Pointer (s + 1)),
