@@ -1,4 +1,5 @@
-import Bdd.Reduce
+import Bdd.Collect
+import Bdd.Trim
 
 open Pointer
 open Bdd
@@ -21,6 +22,84 @@ The high-level structure follows Bryant (1986):
 Key innovation: `ProvedState` bundles `State n m` with a direct proof `hh` that
 every heap entry is self-bounded, avoiding the need for `Classical.choose` later.
 -/
+
+-- ---------------------------------------------------------------------------
+-- Discover: group reachable nodes by variable level
+-- (Moved from the now-obsolete Reduce.lean)
+-- ---------------------------------------------------------------------------
+
+private def OBdd.discover_helper : List (Fin m) → Vector (Node n m) m → Vector (List (Fin m)) n → Vector (List (Fin m)) n
+  | [], _, I => I
+  | head :: tail, v, I => OBdd.discover_helper tail v (I.set v[head].var (head :: I[v[head].var]))
+
+private lemma OBdd.discover_helper_retains_found {I : Vector (List (Fin m)) n} {i : Fin n} : j ∈ I[i] → j ∈ (OBdd.discover_helper l v I)[i] := by
+  induction l generalizing I with
+  | nil => exact id
+  | cons head tail ih =>
+    intro h
+    unfold OBdd.discover_helper
+    apply ih
+    rcases eq_or_ne (v[head].var) i with heq | hne
+    · have hkey : (I.set (v[head].var) (head :: I[v[head].var]))[i] = head :: I[i] := by
+        subst heq; simp [Vector.getElem_set_self]
+      simp only [hkey]; exact List.mem_cons_of_mem _ h
+    · have hkey : (I.set (v[head].var) (head :: I[v[head].var]))[i] = I[i] :=
+        Vector.getElem_set_ne _ _ (Fin.val_ne_of_ne hne)
+      simp only [hkey]; exact h
+
+private lemma OBdd.discover_helper_spec (O : OBdd n m) {I : Vector (List (Fin m)) n} :
+    j ∈ l → j ∈ (OBdd.discover_helper l v I)[v[j].var] := by
+  intro h
+  cases h with
+  | head as =>
+    unfold OBdd.discover_helper
+    apply OBdd.discover_helper_retains_found
+    simp [Vector.getElem_set_self]
+  | tail b ih =>
+    unfold OBdd.discover_helper
+    exact OBdd.discover_helper_spec O ih
+
+/-- Return a vector whose `v`th entry is a list of node indices with variable index `v`. -/
+def OBdd.discover (O : OBdd n m) : Vector (List (Fin m)) n :=
+  OBdd.discover_helper (Collect.collect O) O.1.heap (Vector.replicate n [])
+
+/-- `discover` is correct (forward direction). -/
+theorem OBdd.discover_spec {O : OBdd n m} {j : Fin m} :
+    (Reachable O.1.heap O.1.root (node j)) → j ∈ (OBdd.discover O)[O.1.heap[j].var] :=
+  (OBdd.discover_helper_spec O) ∘ Collect.collect_spec
+
+private lemma OBdd.discover_helper_mem_var {l : List (Fin m)} {v : Vector (Node n m) m}
+    {I : Vector (List (Fin m)) n} {i : Fin n} {j : Fin m} :
+    j ∈ (OBdd.discover_helper l v I)[i] → j ∈ I[i] ∨ (j ∈ l ∧ v[j].var = i) := by
+  induction l generalizing I with
+  | nil => exact .inl
+  | cons head tail ih =>
+    simp only [OBdd.discover_helper]
+    intro h
+    rcases ih h with h | ⟨hmem, hvar⟩
+    · rcases eq_or_ne (v[head].var) i with heq | hne
+      · have hkey : (I.set (v[head].var) (head :: I[v[head].var]))[i] = head :: I[i] := by
+          subst heq; simp [Vector.getElem_set_self]
+        rw [hkey] at h
+        simp only [List.mem_cons] at h
+        rcases h with rfl | h
+        · exact .inr ⟨.head _, heq⟩
+        · exact .inl h
+      · have hkey : (I.set (v[head].var) (head :: I[v[head].var]))[i] = I[i] :=
+          Vector.getElem_set_ne _ _ (Fin.val_ne_of_ne hne)
+        rw [hkey] at h
+        exact .inl h
+    · exact .inr ⟨.tail _ hmem, hvar⟩
+
+/-- `discover` is correct (backward direction): membership implies var = i and reachability. -/
+theorem OBdd.discover_spec_inv {O : OBdd n m} {j : Fin m} {i : Fin n} :
+    j ∈ (OBdd.discover O)[i] →
+    O.1.heap[j].var.1 = i.1 ∧ Reachable O.1.heap O.1.root (.node j) := by
+  simp only [OBdd.discover, Fin.getElem_fin]
+  intro h
+  rcases OBdd.discover_helper_mem_var h with h | ⟨hmem, hvar⟩
+  · simp [Vector.getElem_replicate] at h
+  · exact ⟨congrArg Fin.val hvar, Collect.collect_spec_reverse hmem⟩
 
 namespace Reduce2
 
@@ -676,7 +755,9 @@ private def leKeyPair (a b : RawPointer × RawPointer) : Bool :=
 /-- Process all input nodes at variable level `i`. -/
 private def step {n m : Nat} (O : OBdd n m)
     (vlist : Vector (List (Fin m)) n) (i : Fin n)
-    (ps : ProvedState n m) (inv : Invariant O ps i.1) :
+    (ps : ProvedState n m) (inv : Invariant O ps i.1)
+    (hdiscover_inv : ∀ j ∈ vlist[i],
+        O.1.heap[j].var.1 = i.1 ∧ Reachable O.1.heap O.1.root (.node j)) :
     { ps' : ProvedState n m //
         Invariant O ps' i.1 ∧
         ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } :=
@@ -684,8 +765,8 @@ private def step {n m : Nat} (O : OBdd n m)
   -- non-redundant nodes are collected in `queue` as ((lid, hid), j) entries.
   let ⟨⟨ps₁, queue⟩, inv₁, _, _, hmono₁, hpost₁⟩ :=
     populate_queue O i [] vlist[i] ps inv
-      (fun j _ => by sorry)  -- hvar : var[j].1 = i.1 for j ∈ vlist[i]
-      (fun j _ => by sorry)  -- hreach : Reachable for j ∈ vlist[i]
+      (fun j hj => (hdiscover_inv j hj).1)
+      (fun j hj => (hdiscover_inv j hj).2)
   -- Sort the queue so that equal-key entries are adjacent (enables iso-merging).
   -- Sentinel (⟨.inl false, .inl false⟩, .inl false): all real entries have key.1 ≠ key.2
   -- (populate_queue only enqueues non-redundant nodes), so the sentinel never matches
@@ -740,6 +821,9 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
     (hdiscover : ∀ (j : Fin m),
         Reachable O.1.heap O.1.root (.node j) →
         j ∈ vlist[O.1.heap[j].var])
+    (hdiscover_inv : ∀ (j : Fin m) (ii : Fin n),
+        j ∈ vlist[ii] →
+        O.1.heap[j].var.1 = ii.1 ∧ Reachable O.1.heap O.1.root (.node j))
     (i    : Fin n)
     (h_le : O.1.heap[r].var.1 ≤ i.1)
     (ps : ProvedState n m) (inv : Invariant O ps i.1) :
@@ -751,7 +835,7 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
               OBdd.Reduced ⟨⟨cook_heap ps'.state.heap ps'.hh, ptr.cook hptr⟩, ho⟩ ∧
               ∀ I, OBdd.evaluate ⟨⟨cook_heap ps'.state.heap ps'.hh, ptr.cook hptr⟩, ho⟩ I =
                    O.evaluate I } :=
-  let ⟨ps₁, inv₁, hset₁⟩ := step O vlist i ps inv
+  let ⟨ps₁, inv₁, hset₁⟩ := step O vlist i ps inv (fun j hj => hdiscover_inv j i hj)
   match h : i.1 - O.1.heap[r].var.1 with
   | Nat.zero =>
     have hi_eq  : O.1.heap[r].var = i :=
@@ -776,7 +860,7 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
         hi_pos
       simp only [Nat.succ_eq_add_one] at h
       convert hbase using 1; omega
-    loop_helper O r hr vlist hdiscover
+    loop_helper O r hr vlist hdiscover hdiscover_inv
       ⟨j + O.1.heap[r].var.1, hlt⟩ (Nat.le_add_left _ _) ps₁ inv₁'
 termination_by i.1 - O.1.heap[r].var.1
 decreasing_by simp_all
@@ -810,6 +894,7 @@ def oreduce2 (O : OBdd n m) :
       let ⟨ps, hrisSome, hcorr⟩ :=
         loop_helper O r hroot (OBdd.discover O)
           (fun j hj => OBdd.discover_spec hj)
+          (fun j ii hj => OBdd.discover_spec_inv hj)
           ⟨nn, Nat.lt_add_one nn⟩ (Nat.lt_succ_iff.mp O.1.heap[r].var.isLt)
           (provedStateInitial (nn + 1) m)
           (inv_initial (fun j => Nat.lt_succ_iff.mp O.1.heap[j].var.isLt))

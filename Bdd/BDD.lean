@@ -1,4 +1,3 @@
-import Bdd.Reduce
 import Bdd.Reduce2
 import Bdd.Apply
 import Bdd.Relabel
