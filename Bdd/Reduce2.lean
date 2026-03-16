@@ -190,6 +190,104 @@ private def push_node {n m : Nat} (ps : ProvedState n m) (N : RawNode n)
   ⟨⟨{ size := ps.state.size + 1, heap := ps.state.heap.push N, ids := ps.state.ids }, hh'⟩,
    .inr ps.state.size⟩
 
+/-- In a structurally canonical heap (no two positions have the same raw node),
+    any ordered BDD is reduced. -/
+private lemma structural_canonical_reduced {n s : Nat}
+    {v : Vector (RawNode n) s} {hh : ∀ k : Fin s, v[k].Bounded k}
+    (hsc : ∀ k1 k2 : Fin s, v[k1] = v[k2] → k1 = k2)
+    {root : Pointer s}
+    (hord : Bdd.Ordered ⟨cook_heap v hh, root⟩)
+    (hnored : Bdd.NoRedundancy ⟨cook_heap v hh, root⟩) :
+    OBdd.Reduced ⟨⟨cook_heap v hh, root⟩, hord⟩ := by
+  let O : OBdd n s := ⟨⟨cook_heap v hh, root⟩, hord⟩
+  -- Helper: cook_heap nodes relate back to raw nodes
+  have cook_heap_eq : ∀ k : Fin s, (cook_heap v hh)[k] = v[k].cook (RawNode.bounded_of_le (hh k) (by omega)) := by
+    intro k
+    simp [cook_heap, Fin.getElem_fin, Vector.getElem_ofFn]
+  -- Helper: if cooked nodes at kp and kq are equal, then kp = kq
+  have node_inj : ∀ (kp kq : Fin s),
+      (cook_heap v hh)[kp].var  = (cook_heap v hh)[kq].var →
+      (cook_heap v hh)[kp].low  = (cook_heap v hh)[kq].low →
+      (cook_heap v hh)[kp].high = (cook_heap v hh)[kq].high →
+      kp = kq := by
+    intro kp kq hvar hlow hhigh
+    apply hsc
+    rw [cook_heap_eq kp, cook_heap_eq kq] at hvar hlow hhigh
+    simp only [RawNode.cook] at hvar hlow hhigh
+    have hlo : v[kp].lo = v[kq].lo := cook_inj hlow
+    have hhi : v[kp].hi = v[kq].hi := cook_inj hhigh
+    rcases hkp : v[kp] with ⟨vap, lop, hip⟩
+    rcases hkq : v[kq] with ⟨vaq, loq, hiq⟩
+    simp only [hkp] at hvar hlo hhi
+    simp only [hkq] at hvar hlo hhi
+    subst hvar; subst hlo; subst hhi
+    rfl
+  -- Main helper: for any sub-BDD P of O, if Q is another sub-BDD of O with same toTree, then P.root = Q.root
+  -- We prove this by init_inductionOn on P.
+  let M := cook_heap v hh
+  -- Main key lemma: toTree-injectivity on pointer for a fixed heap M
+  have key : ∀ (P Q : OBdd n s), P.1.heap = M → Q.1.heap = M →
+      OBdd.toTree P = OBdd.toTree Q → P.1.root = Q.1.root := by
+    intro P
+    induction P using OBdd.init_inductionOn with
+    | base b =>
+      intro Q hP_heap hQ_heap htree_eq
+      simp [OBdd.toTree_terminal] at htree_eq
+      cases hQ : Q.1.root with
+      | terminal bq =>
+        rw [OBdd.toTree_terminal' hQ] at htree_eq
+        injection htree_eq with htree_eq
+        exact congrArg _ htree_eq
+      | node jq =>
+        rw [OBdd.toTree_node hQ] at htree_eq
+        exact absurd htree_eq (by simp)
+    | step jp hl_ord ih_lo hh_ord ih_hi hj_ord =>
+      intro Q hP_heap hQ_heap htree_eq
+      cases hQ : Q.1.root with
+      | terminal bq =>
+        rw [OBdd.toTree_node (O := ⟨_, hj_ord⟩) rfl, OBdd.toTree_terminal' hQ] at htree_eq
+        exact absurd htree_eq (by simp)
+      | node jq =>
+        -- Obtain ordered proof for Q at node jq
+        have hQ_ord : Bdd.Ordered ⟨Q.1.heap, Pointer.node jq⟩ := by
+          rcases Q with ⟨⟨qheap, qroot⟩, qord⟩; simp only at hQ; subst hQ; exact qord
+        rw [OBdd.toTree_node (O := ⟨_, hj_ord⟩) rfl,
+            OBdd.toTree_node (O := Q) hQ] at htree_eq
+        injection htree_eq with hvar hlo_tree hhi_tree
+        have hlo_eq_root := ih_lo
+          ⟨⟨Q.1.heap, Q.1.heap[jq].low⟩, OBdd.ordered_of_low_edge hQ_ord⟩
+          hP_heap hQ_heap hlo_tree
+        have hhi_eq_root := ih_hi
+          ⟨⟨Q.1.heap, Q.1.heap[jq].high⟩, OBdd.ordered_of_high_edge hQ_ord⟩
+          hP_heap hQ_heap hhi_tree
+        -- hlo_eq_root : P.1.heap[jp].low = Q.1.heap[jq].low
+        -- hP_heap : P.1.heap = M; hQ_heap : Q.1.heap = M
+        -- Goal: node jp = node jq
+        -- Convert everything to cook_heap v hh using hP_heap and hQ_heap
+        have hlo_eq : (cook_heap v hh)[jp].low = (cook_heap v hh)[jq].low := by
+          have h1 : P.1.heap[jp].low = Q.1.heap[jq].low := hlo_eq_root
+          rw [hP_heap] at h1; rw [hQ_heap] at h1; exact h1
+        have hhi_eq : (cook_heap v hh)[jp].high = (cook_heap v hh)[jq].high := by
+          have h1 : P.1.heap[jp].high = Q.1.heap[jq].high := hhi_eq_root
+          rw [hP_heap] at h1; rw [hQ_heap] at h1; exact h1
+        have hvar_eq : (cook_heap v hh)[jp].var = (cook_heap v hh)[jq].var := by
+          have h1 : P.1.heap[jp].var = Q.1.heap[jq].var :=
+            Fin.ext (congrArg Fin.val hvar)
+          rw [hP_heap] at h1; rw [hQ_heap] at h1; exact h1
+        exact congrArg _ (node_inj jp jq hvar_eq hlo_eq hhi_eq)
+  -- Now prove Reduced
+  constructor
+  · exact hnored
+  · intro ⟨p, hp_reach⟩ ⟨q, hq_reach⟩ hsim
+    -- hsim : SimilarRP O ⟨p, hp_reach⟩ ⟨q, hq_reach⟩
+    -- = toTree of sub-BDD at p = toTree of sub-BDD at q
+    show p = q
+    have hop : Bdd.Ordered ⟨M, p⟩ :=
+      Bdd.ordered_of_reachable (O := O) hp_reach
+    have hoq : Bdd.Ordered ⟨M, q⟩ :=
+      Bdd.ordered_of_reachable (O := O) hq_reach
+    exact key ⟨⟨M, p⟩, hop⟩ ⟨⟨M, q⟩, hoq⟩ rfl rfl hsim
+
 -- ---------------------------------------------------------------------------
 -- Invariant
 -- ---------------------------------------------------------------------------
@@ -258,6 +356,8 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
     (∀ j ∈ l, O.1.heap[j].var.1 = i.1) →
     (∀ j ∈ l, Reachable O.1.heap O.1.root (.node j)) →
     (∀ entry ∈ acc, entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
+    -- Non-redundancy of accumulator entries.
+    (∀ entry ∈ acc, entry.1.1 ≠ entry.1.2) →
     { p : ProvedState n m × List ((RawPointer × RawPointer) × Fin m) //
         Invariant O p.1 i.1 ∧
         p.1.state.size = ps.state.size ∧
@@ -267,14 +367,17 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
         (∀ k : Fin m, (ps.state.ids[k]).isSome → (p.1.state.ids[k]).isSome) ∧
         (∀ j ∈ l, (∃ key, (key, j) ∈ p.2) ∨ (p.1.state.ids[j]).isSome) ∧
         -- All queue entries have key pointers bounded by the output state's heap size.
-        ∀ entry ∈ p.2, entry.1.1.Bounded p.1.state.size ∧ entry.1.2.Bounded p.1.state.size }
-  | [], ps, inv, _, _, hbounds_acc =>
+        (∀ entry ∈ p.2, entry.1.1.Bounded p.1.state.size ∧ entry.1.2.Bounded p.1.state.size) ∧
+        -- All queue entries are non-redundant: key.1 ≠ key.2.
+        (∀ entry ∈ p.2, entry.1.1 ≠ entry.1.2) }
+  | [], ps, inv, _, _, hbounds_acc, hnonred_acc =>
       ⟨⟨ps, acc⟩, inv, rfl,
        fun _ he => he,
        fun _ hk => hk,
        fun _ hj => by simp at hj,
-       hbounds_acc⟩
-  | j :: tail, ps, inv, hvar, hreach, hbounds_acc => by
+       hbounds_acc,
+       hnonred_acc⟩
+  | j :: tail, ps, inv, hvar, hreach, hbounds_acc, hnonred_acc => by
       have hvar_j   : O.1.heap[j].var.1 = i.1 := hvar   j (.head _)
       have hreach_j : Reachable O.1.heap O.1.root (.node j) := hreach j (.head _)
       -- For any child k of j (via some edge), ids[k] is already set.
@@ -387,12 +490,13 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                     symm; rw [OBdd.evaluate_node]
             · rw [ids_set_ne k hkj] at hkptr
               exact inv.2 k ptr hkptr
-        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f⟩ :=
+        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f⟩ :=
           populate_queue O i acc tail (set_id ps j lid) hinv'
             (fun k hk => hvar   k (.tail _ hk))
             (fun k hk => hreach k (.tail _ hk))
             -- accumulator bounds unchanged (size of set_id = size of ps)
             hbounds_acc
+            hnonred_acc
         exact ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f,
                fun k hk => hmono_f k (by
                  by_cases hkj : k = j
@@ -403,11 +507,12 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                  | head =>
                    right; exact hmono_f j (by simp [ids_set_self])
                  | tail _ hk' => exact hpost_f k hk',
-               hbounds_f⟩
+               hbounds_f,
+               hnonred_f⟩
       · -- Non-redundant: add ((lid, hid), j) to accumulator; recurse unchanged.
         have hlid_bound : lid.Bounded ps.state.size := get_id_bounded inv (hchild _ (Edge.low  rfl))
         have hhid_bound : hid.Bounded ps.state.size := get_id_bounded inv (hchild _ (Edge.high rfl))
-        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f⟩ :=
+        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f⟩ :=
           populate_queue O i (⟨⟨lid, hid⟩, j⟩ :: acc) tail ps inv
             (fun k hk => hvar   k (.tail _ hk))
             (fun k hk => hreach k (.tail _ hk))
@@ -416,6 +521,11 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
               cases he with
               | head => exact ⟨hlid_bound, hhid_bound⟩
               | tail _ he' => exact hbounds_acc entry he')
+            -- non-redundancy: new entry has lid ≠ hid, old acc entries are non-redundant
+            (fun entry he => by
+              cases he with
+              | head => exact heq
+              | tail _ he' => exact hnonred_acc entry he')
         exact ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f,
                fun e he => hacc_f e (.tail _ he),
                hmono_f,
@@ -423,7 +533,8 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                  cases hk with
                  | head => left; exact ⟨⟨lid, hid⟩, hacc_f _ (.head _)⟩
                  | tail _ hk' => exact hpost_f k hk',
-               hbounds_f⟩
+               hbounds_f,
+               hnonred_f⟩
 
 /-- Pushing a new node to the heap preserves reducedness of existing sub-BDDs,
 because old reachable nodes are unchanged. Proved using push_evaluate + push_ordered. -/
@@ -764,6 +875,116 @@ private def process_record {n m : Nat} {i : Nat} (O : OBdd n m)
      -- size grows by 1:
      hps₁_size ▸ Nat.le_succ _⟩
 
+/-- After processing one record, the new curkey'/curptr' pair correctly represents
+any entry in the remaining queue whose key matches curkey'. -/
+private lemma process_record_curptr_sem {n m : Nat} {i : Nat} (O : OBdd n m)
+    (curkey : RawPointer × RawPointer) (curptr : RawPointer)
+    (head : (RawPointer × RawPointer) × Fin m)
+    (tail : List ((RawPointer × RawPointer) × Fin m))
+    (ps : ProvedState n m)
+    (inv : Invariant O ps i)
+    (hbounds : ∀ entry ∈ head :: tail, entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size)
+    (hcurptr_sem : ∀ entry ∈ head :: tail, entry.1 = curkey →
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : curptr.Bounded ps.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I)
+    (hnewnode_sem : ∀ entry ∈ head :: tail,
+        (hbound_entry : entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
+        ¬(entry.1 = curkey) →
+        let hN : (RawNode.mk O.1.heap[entry.2].var entry.1.1 entry.1.2).Bounded ps.state.size :=
+              ⟨hbound_entry.1, hbound_entry.2⟩
+        let ps₁' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).1
+        let ptr' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).2
+        let ps₂' := set_id ps₁' entry.2 ptr'
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : ptr'.Bounded ps₂'.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) :
+    let result := process_record O curkey curptr head ps inv (hbounds head (.head _))
+          (hcurptr_sem head (.head _))
+          (hnewnode_sem head (.head _) (hbounds head (.head _)))
+    let ps' := result.1.1
+    let curkey' := result.1.2.1
+    let curptr' := result.1.2.2
+    ∀ entry ∈ tail, entry.1 = curkey' →
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : curptr'.Bounded ps'.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps'.state.heap ps'.hh, curptr'.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps'.state.heap ps'.hh, curptr'.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps'.state.heap ps'.hh, curptr'.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I := by
+  sorry
+
+/-- After processing one record, pushing a fresh node for non-matching tail entries is correct. -/
+private lemma process_record_newnode_sem {n m : Nat} {i : Nat} (O : OBdd n m)
+    (curkey : RawPointer × RawPointer) (curptr : RawPointer)
+    (head : (RawPointer × RawPointer) × Fin m)
+    (tail : List ((RawPointer × RawPointer) × Fin m))
+    (ps : ProvedState n m)
+    (inv : Invariant O ps i)
+    (hbounds : ∀ entry ∈ head :: tail, entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size)
+    (hcurptr_sem : ∀ entry ∈ head :: tail, entry.1 = curkey →
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : curptr.Bounded ps.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I)
+    (hnewnode_sem : ∀ entry ∈ head :: tail,
+        (hbound_entry : entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
+        ¬(entry.1 = curkey) →
+        let hN : (RawNode.mk O.1.heap[entry.2].var entry.1.1 entry.1.2).Bounded ps.state.size :=
+              ⟨hbound_entry.1, hbound_entry.2⟩
+        let ps₁' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).1
+        let ptr' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).2
+        let ps₂' := set_id ps₁' entry.2 ptr'
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : ptr'.Bounded ps₂'.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) :
+    let result := process_record O curkey curptr head ps inv (hbounds head (.head _))
+          (hcurptr_sem head (.head _))
+          (hnewnode_sem head (.head _) (hbounds head (.head _)))
+    let ps' := result.1.1
+    let curkey' := result.1.2.1
+    let curptr' := result.1.2.2
+    let hsize_rec := result.2.2.2.2
+    ∀ entry ∈ tail,
+        (hbound_entry : entry.1.1.Bounded ps'.state.size ∧ entry.1.2.Bounded ps'.state.size) →
+        ¬(entry.1 = curkey') →
+        let hN : (RawNode.mk O.1.heap[entry.2].var entry.1.1 entry.1.2).Bounded ps'.state.size :=
+              ⟨hbound_entry.1, hbound_entry.2⟩
+        let ps₁' := (push_node ps' ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).1
+        let ptr' := (push_node ps' ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).2
+        let ps₂' := set_id ps₁' entry.2 ptr'
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : ptr'.Bounded ps₂'.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I := by
+  sorry
+
+/-- In a non-redundant queue, no entry's key matches the sentinel ⟨.inl false, .inl false⟩. -/
+private lemma sentinel_no_match
+    (Q : List ((RawPointer × RawPointer) × Fin m))
+    (hnonred : ∀ entry ∈ Q, entry.1.1 ≠ entry.1.2) :
+    ∀ entry ∈ Q, entry.1 ≠ ((.inl false : RawPointer), (.inl false : RawPointer)) := by
+  intro entry hmem heq
+  have h := hnonred entry hmem
+  have : entry.1.1 = entry.1.2 := by
+    have h1 : entry.1.1 = .inl false := congrArg Prod.fst heq
+    have h2 : entry.1.2 = .inl false := congrArg Prod.snd heq
+    rw [h1, h2]
+  exact h this
+
 /-- Thread `process_record` through the entire sorted queue. -/
 private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
     (curkey : RawPointer × RawPointer) (curptr : RawPointer) :
@@ -771,15 +992,46 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
     (ps : ProvedState n m) →
     Invariant O ps i →
     (∀ entry ∈ Q, entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
+    -- Semantic correctness: when entry's key matches curkey, curptr represents entry.2.
+    (hcurptr_sem : ∀ entry ∈ Q, entry.1 = curkey →
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : curptr.Bounded ps.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, curptr.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) →
+    -- Semantic correctness: when entry's key differs from curkey, the fresh push is correct.
+    (hnewnode_sem : ∀ entry ∈ Q,
+        (hbound_entry : entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
+        ¬(entry.1 = curkey) →
+        let hN : (RawNode.mk O.1.heap[entry.2].var entry.1.1 entry.1.2).Bounded ps.state.size :=
+              ⟨hbound_entry.1, hbound_entry.2⟩
+        let ps₁' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).1
+        let ptr' := (push_node ps ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩ hN).2
+        let ps₂' := set_id ps₁' entry.2 ptr'
+        ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
+        ∃ hp : ptr'.Bounded ps₂'.state.size,
+        ∃ ho : Bdd.Ordered ⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩,
+          OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
+          ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) →
     { ps' : ProvedState n m //
         Invariant O ps' i ∧
         (∀ k : Fin m, (ps.state.ids[k]).isSome → (ps'.state.ids[k]).isSome) ∧
         ∀ entry ∈ Q, (ps'.state.ids[entry.2]).isSome }
-  | [], ps, inv, _ =>
+  | [], ps, inv, _, _, _ =>
       ⟨ps, inv, fun _ hk => hk, fun _ h => by simp at h⟩
-  | head :: tail, ps, inv, hbounds =>
-      let ⟨⟨ps', curkey', curptr'⟩, inv', hhead, hmono_rec, hsize_rec⟩ :=
-        process_record O curkey curptr head ps inv (hbounds head (.head _)) sorry sorry
+  | head :: tail, ps, inv, hbounds, hcurptr_sem, hnewnode_sem =>
+      let result := process_record O curkey curptr head ps inv (hbounds head (.head _))
+          (hcurptr_sem head (.head _))
+          (hnewnode_sem head (.head _) (hbounds head (.head _)))
+      let ps' := result.1.1
+      let curkey' := result.1.2.1
+      let curptr' := result.1.2.2
+      let inv' := result.2.1
+      let hhead := result.2.2.1
+      let hmono_rec := result.2.2.2.1
+      let hsize_rec := result.2.2.2.2
       -- Lift the tail bounds to the (possibly larger) ps'.state.size.
       have hbounds' : ∀ entry ∈ tail,
           entry.1.1.Bounded ps'.state.size ∧ entry.1.2.Bounded ps'.state.size := by
@@ -789,6 +1041,8 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
                RawPointer.bounded_of_le this.2 hsize_rec⟩
       let ⟨ps'', inv'', hmono_tail, htail⟩ :=
         process_queue O curkey' curptr' tail ps' inv' hbounds'
+          (process_record_curptr_sem O curkey curptr head tail ps inv hbounds hcurptr_sem hnewnode_sem)
+          (process_record_newnode_sem O curkey curptr head tail ps inv hbounds hcurptr_sem hnewnode_sem)
       ⟨ps'', inv'',
        -- isSome monotone: compose record's and tail's monotonicity.
        fun k hk => hmono_tail k (hmono_rec k hk),
@@ -816,11 +1070,13 @@ private def step {n m : Nat} (O : OBdd n m)
         ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } :=
   -- Build the queue: redundant nodes (lid = hid) are resolved immediately;
   -- non-redundant nodes are collected in `queue` as ((lid, hid), j) entries.
-  let ⟨⟨ps₁, queue⟩, inv₁, hsize₁, _, hmono₁, hpost₁, hbounds₁⟩ :=
+  let ⟨⟨ps₁, queue⟩, inv₁, hsize₁, _, hmono₁, hpost₁, hbounds₁, hnonred₁⟩ :=
     populate_queue O i [] vlist[i] ps inv
       (fun j hj => (hdiscover_inv j hj).1)
       (fun j hj => (hdiscover_inv j hj).2)
       -- empty accumulator: trivially bounded
+      (fun _ h => by simp at h)
+      -- empty accumulator: trivially non-redundant
       (fun _ h => by simp at h)
   -- Sort the queue so that equal-key entries are adjacent (enables iso-merging).
   -- Sentinel (⟨.inl false, .inl false⟩, .inl false): all real entries have key.1 ≠ key.2
@@ -834,8 +1090,15 @@ private def step {n m : Nat} (O : OBdd n m)
     intro entry hmem
     have := hbounds₁ entry ((List.Perm.mem_iff (List.mergeSort_perm _ _)).mp hmem)
     exact this
+  have hnonred_sorted : ∀ entry ∈ sorted, entry.1.1 ≠ entry.1.2 := by
+    intro entry hmem
+    exact hnonred₁ entry ((List.Perm.mem_iff (List.mergeSort_perm _ _)).mp hmem)
   let pq := process_queue O ⟨.inl false, .inl false⟩ (.inl false)
               sorted ps₁ inv₁ hbounds_sorted
+              -- hcurptr_sem: sentinel key never matches any real entry (key.1 ≠ key.2 for all entries).
+              (fun entry hmem heq => absurd heq (sentinel_no_match sorted hnonred_sorted entry hmem))
+              -- hnewnode_sem: pushing a fresh node for non-redundant entries is correct.
+              (sorry)
   ⟨pq.1, pq.2.1, by
     -- Every j ∈ vlist[i] ends up with ids[j].isSome:
     -- either it was resolved as redundant by populate_queue (hpost₁ right branch),
