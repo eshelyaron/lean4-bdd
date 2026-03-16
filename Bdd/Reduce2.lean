@@ -755,15 +755,22 @@ private def zero_vars_to_bool : Bdd 0 m → Bool
     | .terminal b => b
     | .node j     => False.elim (Nat.not_lt_zero _ B.heap[j].var.2)
 
-def oreduce2 (O : OBdd n m) : (s : Nat) × OBdd n s :=
+def oreduce2 (O : OBdd n m) :
+    { p : (s : Nat) × OBdd n s // OBdd.Reduced p.2 ∧ p.2.evaluate = O.evaluate } :=
   match n with
   | .zero =>
-    ⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal (zero_vars_to_bool O.1)⟩,
-         Bdd.Ordered_of_terminal⟩⟩
+    match hroot : O.1.root with
+    | .terminal b =>
+      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩⟩,
+       Bdd.reduced_of_terminal,
+       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal' hroot]⟩
+    | .node j => absurd O.1.heap[j].var.isLt (Nat.not_lt_zero _)
   | .succ nn =>
     match hroot : O.1.root with
     | .terminal b =>
-      ⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩⟩
+      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩⟩,
+       Bdd.reduced_of_terminal,
+       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal' hroot]⟩
     | .node r =>
       let ⟨ps, hrisSome, hcorr⟩ :=
         loop_helper O r hroot (OBdd.discover O)
@@ -777,11 +784,15 @@ def oreduce2 (O : OBdd n m) : (s : Nat) × OBdd n s :=
       let hptr : rid.Bounded ps.state.size        := hrid.choose
       let ho   : Bdd.Ordered ⟨cook_heap ps.state.heap ps.hh, rid.cook hptr⟩ :=
         hrid.choose_spec.choose
-      ⟨ps.state.size, ⟨⟨cook_heap ps.state.heap ps.hh, rid.cook hptr⟩, ho⟩⟩
+      let hred  := hrid.choose_spec.choose_spec.1
+      let heval := hrid.choose_spec.choose_spec.2
+      ⟨⟨ps.state.size, ⟨⟨cook_heap ps.state.heap ps.hh, rid.cook hptr⟩, ho⟩⟩,
+       hred, funext heval⟩
 
-lemma oreduce2_reduced {O : OBdd n m} : OBdd.Reduced (oreduce2 O).2 := sorry
+lemma oreduce2_reduced {O : OBdd n m} : OBdd.Reduced (oreduce2 O).1.2 := (oreduce2 O).2.1
 
 @[simp]
-lemma oreduce2_evaluate {O : OBdd n m} : (oreduce2 O).2.evaluate = O.evaluate := sorry
+lemma oreduce2_evaluate {O : OBdd n m} : (oreduce2 O).1.2.evaluate = O.evaluate :=
+  (oreduce2 O).2.2
 
 end Reduce2
