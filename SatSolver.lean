@@ -4,14 +4,14 @@ import Std.Sat.CNF.Basic
 def parseDimacs (n : Nat) [NeZero n] (lines : List String) : Std.Sat.CNF (Fin n) :=
   lines.filter (fun l => ¬l.startsWith "p" ∧ ¬l.startsWith "c")
        |>.map (fun l =>
-         l.trim.splitOn " "
+         l.trimAscii.toString.splitOn " "
          |>.filterMap (fun s =>
            match s.toInt? with
            | some 0 => none
            | some i => some (
               if i > 0
-              then ⟨⟨i.natAbs % n, by refine Nat.mod_lt i.natAbs ?_; simp only [gt_iff_lt]; exact Nat.pos_of_neZero n⟩, true⟩
-              else ⟨⟨i.natAbs % n, by refine Nat.mod_lt i.natAbs ?_; simp only [gt_iff_lt]; exact Nat.pos_of_neZero n⟩, false⟩
+              then ⟨⟨i.natAbs % n, by exact Nat.mod_lt i.natAbs (Nat.pos_of_neZero n)⟩, true⟩
+              else ⟨⟨i.natAbs % n, by exact Nat.mod_lt i.natAbs (Nat.pos_of_neZero n)⟩, false⟩
             )
            | none   => none)
        )

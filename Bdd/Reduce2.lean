@@ -667,14 +667,49 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
            exact hmono_tail head.2 hhead
          | tail _ h => exact htail entry h⟩
 
+/-- Lexicographic comparison on key pairs, used for sorting the queue. -/
+private def leKeyPair (a b : RawPointer × RawPointer) : Bool :=
+  match decEq a.1 b.1 with
+  | isTrue _  => decide (a.2 ≤ b.2)
+  | isFalse _ => decide (a.1 ≤ b.1)
+
 /-- Process all input nodes at variable level `i`. -/
 private def step {n m : Nat} (O : OBdd n m)
     (vlist : Vector (List (Fin m)) n) (i : Fin n)
     (ps : ProvedState n m) (inv : Invariant O ps i.1) :
     { ps' : ProvedState n m //
         Invariant O ps' i.1 ∧
-        ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } := by
-  sorry
+        ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } :=
+  -- Build the queue: redundant nodes (lid = hid) are resolved immediately;
+  -- non-redundant nodes are collected in `queue` as ((lid, hid), j) entries.
+  let ⟨⟨ps₁, queue⟩, inv₁, _, _, hmono₁, hpost₁⟩ :=
+    populate_queue O i [] vlist[i] ps inv
+      (fun j _ => by sorry)  -- hvar : var[j].1 = i.1 for j ∈ vlist[i]
+      (fun j _ => by sorry)  -- hreach : Reachable for j ∈ vlist[i]
+  -- Sort the queue so that equal-key entries are adjacent (enables iso-merging).
+  -- Sentinel (⟨.inl false, .inl false⟩, .inl false): all real entries have key.1 ≠ key.2
+  -- (populate_queue only enqueues non-redundant nodes), so the sentinel never matches
+  -- any entry — the first element always starts a fresh equivalence class.
+  let sorted := queue.mergeSort (fun a b => leKeyPair a.1 b.1)
+  -- Process the sorted queue, assigning output pointers to each equivalence class.
+  let pq := process_queue O ⟨.inl false, .inl false⟩ (.inl false)
+              sorted ps₁ inv₁ (by sorry)  -- bounds: key pointers bounded by ps₁.state.size
+  ⟨pq.1, pq.2.1, by
+    -- Every j ∈ vlist[i] ends up with ids[j].isSome:
+    -- either it was resolved as redundant by populate_queue (hpost₁ right branch),
+    -- or it was enqueued and process_queue set it (hpost₁ left branch + pq.2.2.2).
+    intro j hmem hreach
+    have h := hpost₁ j hmem
+    cases h with
+    | inl hqueue =>
+      obtain ⟨key, hmem_q⟩ := hqueue
+      -- j was enqueued; sorting is a permutation, so it's still in sorted.
+      have hmem_sorted : (key, j) ∈ sorted := List.Perm.mem_iff
+        (List.mergeSort_perm _ _) |>.mpr hmem_q
+      exact pq.2.2.2 ⟨key, j⟩ hmem_sorted
+    | inr hset =>
+      -- j was already resolved; process_queue is monotone for isSome.
+      exact pq.2.2.1 j hset⟩
 
 -- ---------------------------------------------------------------------------
 -- Proof-carrying helpers

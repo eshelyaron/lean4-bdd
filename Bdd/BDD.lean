@@ -1,4 +1,5 @@
 import Bdd.Reduce
+import Bdd.Reduce2
 import Bdd.Apply
 import Bdd.Relabel
 import Bdd.Choice
@@ -7,7 +8,7 @@ import Bdd.Evaluate
 import Bdd.Sim
 import Bdd.Size
 import Bdd.Count
-import Bdd.OrderedDecide
+-- import Bdd.OrderedDecide
 
 /-- Abstract BDD type. -/
 structure BDD where
@@ -294,7 +295,8 @@ def var (n : Nat) : BDD :=
 
 See also `apply_denotation`. -/
 def apply : (Bool → Bool → Bool) → BDD → BDD → BDD := fun op B C ↦
-  ⟨_, _, (Reduce.oreduce (Apply.oapply op B.obdd C.obdd).2.1).2, Reduce.oreduce_reduced⟩
+  let r := Reduce2.oreduce2 (Apply.oapply op B.obdd C.obdd).2.1
+  ⟨_, _, r.1.2, r.2.1⟩
 
 @[simp]
 lemma apply_nvars {B C : BDD} {o} : (apply o B C).nvars = B.nvars ⊔ C.nvars := by
@@ -347,7 +349,7 @@ lemma apply_denotation' {B C : BDD} {op} I :
   unfold apply
   generalize he : (apply op B C) = e
   unfold apply at he
-  simp only [denotation, Evaluate.evaluate_evaluate, lift, Lift.olift_evaluate, Reduce.oreduce_evaluate]
+  simp only [denotation, Evaluate.evaluate_evaluate, lift, Lift.olift_evaluate, Reduce2.oreduce2_evaluate]
   calc _
     _ = (Apply.oapply op (BDD.obdd B) (BDD.obdd C)).2.1.evaluate I := by simp
   exact (Apply.oapply op (BDD.obdd B) (BDD.obdd C)).2.2 I
@@ -606,7 +608,8 @@ lemma find_some {B : BDD} {I} : B.find = some I → B.denotation' I = true := by
   next hf => injection h with heq; simp [← heq]
 
 private def restrict' (B : BDD) (b : Bool) (i : Fin B.nvars) : BDD :=
-  ⟨_, _, (Reduce.oreduce (Restrict.orestrict b i B.obdd).2.1).2, Reduce.oreduce_reduced⟩
+  let r := Reduce2.oreduce2 (Restrict.orestrict b i B.obdd).2.1
+  ⟨_, _, r.1.2, r.2.1⟩
 
 /-- Return a `BDD` denoting the restriction of a given `BDD` at an index `i` to a Boolean `b`.
 
@@ -640,7 +643,7 @@ lemma restrict_denotation {B : BDD} {I : Vector Bool n} {i} {hi : i < n} {h} :
   split
   next hlt =>
     simp only [restrict', denotation, lift, evaluate, Evaluate.evaluate_evaluate, Lift.olift_evaluate]
-    simp only [Reduce.oreduce_evaluate]
+    simp only [Reduce2.oreduce2_evaluate]
     have := (Restrict.orestrict b ⟨i, hlt⟩ (BDD.obdd B)).2.2
     rw [this]
     simp only [Nary.restrict, Vector.take_eq_extract, Lift.olift_evaluate]
