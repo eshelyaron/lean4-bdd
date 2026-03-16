@@ -215,7 +215,76 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
             · subst hkj
               rw [ids_set_self] at hkptr
               simp only [Option.some.injEq] at hkptr; subst hkptr
-              exact by sorry  -- lid correctly represents sub-BDD at j
+              -- lid correctly represents sub-BDD at k (redundant case: lid = hid)
+              have hj : Bdd.Ordered ⟨O.1.heap, Pointer.node k⟩ :=
+                Bdd.ordered_of_reachable hreach_j
+              have hlow_ord : Bdd.Ordered ⟨O.1.heap, O.1.heap[k].low⟩ :=
+                Bdd.ordered_of_reachable (Relation.ReflTransGen.tail hreach_j (Edge.low rfl))
+              have hhigh_ord : Bdd.Ordered ⟨O.1.heap, O.1.heap[k].high⟩ :=
+                Bdd.ordered_of_reachable (Relation.ReflTransGen.tail hreach_j (Edge.high rfl))
+              -- For any child pointer, extract bounded/ordered/reduced/eval from inv.
+              have child_inv : ∀ (p : Pointer m) (hp : Bdd.Ordered ⟨O.1.heap, p⟩)
+                  (hch : ∀ l, p = .node l → (ps.state.ids[l]).isSome),
+                  ∃ (hptr : (get_id ps p hch).Bounded ps.state.size)
+                    (ho : Bdd.Ordered ⟨cook_heap ps.state.heap ps.hh,
+                                       (get_id ps p hch).cook hptr⟩),
+                    OBdd.Reduced ⟨⟨cook_heap ps.state.heap ps.hh,
+                                    (get_id ps p hch).cook hptr⟩, ho⟩ ∧
+                    ∀ I, OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh,
+                                         (get_id ps p hch).cook hptr⟩, ho⟩ I =
+                         OBdd.evaluate ⟨⟨O.1.heap, p⟩, hp⟩ I := by
+                intro p hp hch
+                cases p with
+                | terminal b =>
+                  refine ⟨fun h => absurd h (by simp [get_id]), Bdd.Ordered_of_terminal,
+                           Bdd.reduced_of_terminal, fun I => ?_⟩
+                  change OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, .terminal b⟩, _⟩ I =
+                         OBdd.evaluate ⟨⟨O.1.heap, .terminal b⟩, hp⟩ I
+                  simp [OBdd.evaluate_terminal]
+                | node l =>
+                  simp only [get_id]
+                  obtain ⟨_, hptr, ho, hred, heval⟩ :=
+                    inv.2 l _ (Option.get_mem (hch l rfl))
+                  exact ⟨hptr, ho, hred, heval⟩
+              obtain ⟨hptr, ho, hred, heval_low⟩ :=
+                child_inv _ hlow_ord (hchild _ (Edge.low rfl))
+              obtain ⟨hptr_h, ho_h, _, heval_high⟩ :=
+                child_inv _ hhigh_ord (hchild _ (Edge.high rfl))
+              refine ⟨hj, hptr, ho, hred, fun I => ?_⟩
+              -- cook with equal raw pointers gives equal Pointer m (bounds are Props).
+              have cook_eq_of_eq : ∀ (p q : RawPointer)
+                  (hp : p.Bounded ps.state.size) (hq : q.Bounded ps.state.size),
+                  p = q → p.cook hp = q.cook hq := fun p q hp hq hpq => by
+                subst hpq
+                cases p with
+                | inl b => rfl
+                | inr i => exact congrArg Pointer.node (Fin.ext rfl)
+              have hcook_eq : hid.cook hptr_h = lid.cook hptr :=
+                cook_eq_of_eq hid lid hptr_h hptr heq.symm
+              -- evaluations at hid and lid in cook_heap coincide.
+              have heval_hid_eq_lid :
+                  OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, hid.cook hptr_h⟩, ho_h⟩ I =
+                  OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hptr⟩, ho⟩ I :=
+                congrArg (OBdd.evaluate · I)
+                  (Subtype.ext (by simp [hcook_eq]))
+              -- eval(high in old) = eval(low in old): both children reduce to lid = hid.
+              have branches_eq :
+                  OBdd.evaluate ⟨⟨O.1.heap, O.1.heap[k].high⟩, hhigh_ord⟩ I =
+                  OBdd.evaluate ⟨⟨O.1.heap, O.1.heap[k].low⟩, hlow_ord⟩ I :=
+                (heval_high I).symm.trans (heval_hid_eq_lid.trans (heval_low I))
+              -- Proof of ordered-proof-irrelevance for evaluate.
+              have eval_pi : ∀ (B : Bdd n m) (h1 h2 : B.Ordered) (I : Vector Bool n),
+                  OBdd.evaluate ⟨B, h1⟩ I = OBdd.evaluate ⟨B, h2⟩ I :=
+                fun B h1 h2 I => congrArg (OBdd.evaluate · I) (Subtype.ext rfl)
+              calc OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hptr⟩, ho⟩ I
+                  = OBdd.evaluate ⟨⟨O.1.heap, O.1.heap[k].low⟩, hlow_ord⟩ I :=
+                    heval_low I
+                _ = if I[O.1.heap[k].var]
+                      then OBdd.evaluate ⟨⟨O.1.heap, O.1.heap[k].high⟩, hhigh_ord⟩ I
+                      else OBdd.evaluate ⟨⟨O.1.heap, O.1.heap[k].low⟩, hlow_ord⟩ I := by
+                    rw [branches_eq]; simp
+                _ = OBdd.evaluate ⟨⟨O.1.heap, Pointer.node k⟩, hj⟩ I := by
+                    symm; rw [OBdd.evaluate_node]
             · rw [ids_set_ne k hkj] at hkptr
               exact inv.2 k ptr hkptr
         obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f⟩ :=
@@ -656,7 +725,12 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
       hi_eq ▸ hdiscover r (by rw [← hr]; exact .refl)
     have hrisSome : (ps₁.state.ids[r]).isSome :=
       hset₁ r hr_in (by rw [← hr]; exact .refl)
-    ⟨ps₁, hrisSome, by sorry⟩
+    ⟨ps₁, hrisSome, fun ptr hkptr =>
+      let ⟨hj, hptr, ho, hred, heval⟩ := inv₁.2 r ptr hkptr
+      ⟨hptr, ho, hred, fun I => (heval I).trans
+        (congrArg (OBdd.evaluate · I)
+          (Subtype.ext
+            (congrArg (fun root => ({ heap := O.1.heap, root } : Bdd n m)) hr.symm)))⟩⟩
   | Nat.succ j =>
     have hlt    : j + O.1.heap[r].var.1 < n := by
       have := i.isLt; simp only [Nat.succ_eq_add_one] at h; omega
