@@ -1155,7 +1155,7 @@ private lemma process_record_curptr_sem {n m : Nat} {i : Nat} (O : OBdd n m)
           obtain ⟨_, hbnd2, ho2, _, heval2⟩ := inv.2 l2 (.inl b1) hids2
           have hb1 : OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, RawPointer.cook (.inl b1) hbnd2⟩, ho2⟩ =
                      Function.const _ b1 := OBdd.evaluate_terminal' rfl
-          simp only [OBdd.evaluate_terminal, Function.const_apply]
+          simp only [Function.const_apply]
           have h := heval2 I
           rw [hb1, Function.const_apply] at h
           exact h
@@ -1178,7 +1178,7 @@ private lemma process_record_curptr_sem {n m : Nat} {i : Nat} (O : OBdd n m)
           have hOBdd_eq : (⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hbnd1⟩, ho1⟩ : OBdd n _) =
                            ⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hbnd2⟩, ho2⟩ := by
             apply Subtype.ext
-            simp only [Bdd.mk.injEq, true_and]
+            simp only []
           rw [hOBdd_eq] at heval1
           exact (heval1 I).symm.trans (heval2 I)
     -- head.2 and entry.2 evaluate equally in O
