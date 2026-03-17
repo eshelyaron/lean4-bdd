@@ -930,6 +930,7 @@ private def process_record {n m : Nat} {i : Nat} (O : OBdd n m)
         Invariant O p.1 i ∧
         (p.1.state.ids[entry.2]).isSome ∧
         (∀ k : Fin m, (ps.state.ids[k]).isSome → (p.1.state.ids[k]).isSome) ∧
+        (∀ k : Fin m, k ≠ entry.2 → p.1.state.ids[k] = ps.state.ids[k]) ∧
         ps.state.size ≤ p.1.state.size } :=
   let ⟨key, j⟩ := entry
   -- Helpers for reasoning about ids after set_id.
@@ -969,6 +970,8 @@ private def process_record {n m : Nat} {i : Nat} (O : OBdd n m)
          simp only [Option.isSome_iff_exists]
          exact ⟨curptr, ids_set_self ps curptr⟩
        · rw [ids_set_ne ps curptr k hkj]; exact hk,
+     -- ids exact for k ≠ j:
+     fun k hkj => ids_set_ne ps curptr k hkj,
      -- size unchanged:
      le_refl _⟩
   else
@@ -1020,6 +1023,8 @@ private def process_record {n m : Nat} {i : Nat} (O : OBdd n m)
          simp only [Option.isSome_iff_exists]
          exact ⟨ptr, ids_set_self ps₁ ptr⟩
        · rw [ids_set_ne ps₁ ptr k hkj, hps₁_ids k]; exact hk,
+     -- ids exact for k ≠ j:
+     fun k hkj => by rw [ids_set_ne ps₁ ptr k hkj, hps₁_ids k],
      -- size grows by 1:
      hps₁_size ▸ Nat.le_succ _⟩
 
@@ -1052,7 +1057,8 @@ private lemma process_record_curptr_sem {n m : Nat} {i : Nat} (O : OBdd n m)
         ∃ ho : Bdd.Ordered ⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩,
           OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
           ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
-               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) :
+               OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I)
+    (hec : ∀ entry ∈ head :: tail, EntryCorrect O ps i entry) :
     let result := process_record O curkey curptr head ps inv (hbounds head (.head _))
           (hcurptr_sem head (.head _))
           (hnewnode_sem head (.head _) (hbounds head (.head _)))
@@ -1066,7 +1072,137 @@ private lemma process_record_curptr_sem {n m : Nat} {i : Nat} (O : OBdd n m)
           OBdd.Reduced ⟨⟨cook_heap ps'.state.heap ps'.hh, curptr'.cook hp⟩, ho⟩ ∧
           ∀ I, OBdd.evaluate ⟨⟨cook_heap ps'.state.heap ps'.hh, curptr'.cook hp⟩, ho⟩ I =
                OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I := by
-  sorry
+  by_cases heq_h : head.1 = curkey
+  · -- ISO branch: process_record returns (set_id ps head.2 curptr, curkey, curptr)
+    intro result ps' curkey' curptr' entry hmem heq_entry
+    have hcurkey' : curkey' = curkey := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.2.1 = curkey
+      simp only [process_record, dif_pos heq_h]
+    have hcurptr' : curptr' = curptr := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.2.2 = curptr
+      simp only [process_record, dif_pos heq_h]
+    have hps' : ps' = set_id ps head.2 curptr := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.1 = set_id ps head.2 curptr
+      simp only [process_record, dif_pos heq_h]
+    rw [hcurkey'] at heq_entry
+    rw [hps', hcurptr']
+    exact hcurptr_sem entry (.tail _ hmem) heq_entry
+  · -- NEW-CLASS branch: ¬(head.1 = curkey), so curkey' = head.1
+    intro result ps' curkey' curptr' entry hmem heq_entry
+    -- Name the NC-branch components to match hnewnode_sem's lets
+    let hN : (RawNode.mk O.1.heap[head.2].var head.1.1 head.1.2).Bounded ps.state.size :=
+      ⟨(hbounds head (.head _)).1, (hbounds head (.head _)).2⟩
+    let ps₁' := (push_node ps ⟨O.1.heap[head.2].var, head.1.1, head.1.2⟩ hN).1
+    let ptr' := (push_node ps ⟨O.1.heap[head.2].var, head.1.1, head.1.2⟩ hN).2
+    let ps₂' := set_id ps₁' head.2 ptr'
+    have hcurkey' : curkey' = head.1 := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.2.1 = head.1
+      simp only [process_record, dif_neg heq_h]
+    have hcurptr' : curptr' = ptr' := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.2.2 = ptr'
+      simp only [process_record, dif_neg heq_h]
+      rfl
+    have hps' : ps' = ps₂' := by
+      show (process_record O curkey curptr head ps inv (hbounds head (.head _))
+        (hcurptr_sem head (.head _))
+        (hnewnode_sem head (.head _) (hbounds head (.head _)))).val.1 = ps₂'
+      simp only [process_record, dif_neg heq_h]
+      rfl
+    obtain ⟨hj_h, hp_h, ho_h, hred_h, heval_h⟩ :=
+      hnewnode_sem head (.head _) (hbounds head (.head _)) heq_h
+    -- entry.1 = head.1 from heq_entry
+    have hentry_key : entry.1 = head.1 := hcurkey' ▸ heq_entry
+    have hnotiso_entry : ¬(entry.1 = curkey) := hentry_key ▸ heq_h
+    -- Ordering for entry.2
+    have hj_entry : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩ :=
+      Bdd.ordered_of_reachable (hec entry (.tail _ hmem)).1
+    -- Both at the same variable index i
+    have hvar_eq : O.1.heap[head.2].var = O.1.heap[entry.2].var :=
+      Fin.ext ((hec head (.head _)).2.1.trans (hec entry (.tail _ hmem)).2.1.symm)
+    have hkey_lo : entry.1.1 = head.1.1 := congrArg Prod.fst hentry_key
+    have hkey_hi : entry.1.2 = head.1.2 := congrArg Prod.snd hentry_key
+    -- Helper: two raw pointers both mapped to the same output raw-pointer evaluate equally in O
+    have eval_child_eq : ∀ (lid : RawPointer) (p1 p2 : Pointer m)
+        (hord1 : Bdd.Ordered ⟨O.1.heap, p1⟩) (hord2 : Bdd.Ordered ⟨O.1.heap, p2⟩)
+        (h1n : ∀ l : Fin m, p1 = .node l → ps.state.ids[l] = some lid)
+        (h1t : ∀ b : Bool, p1 = .terminal b → lid = .inl b)
+        (h2n : ∀ l : Fin m, p2 = .node l → ps.state.ids[l] = some lid)
+        (h2t : ∀ b : Bool, p2 = .terminal b → lid = .inl b)
+        (I : Vector Bool n),
+        OBdd.evaluate ⟨⟨O.1.heap, p1⟩, hord1⟩ I = OBdd.evaluate ⟨⟨O.1.heap, p2⟩, hord2⟩ I := by
+      intro lid p1 p2 hord1 hord2 h1n h1t h2n h2t I
+      cases p1 with
+      | terminal b1 =>
+        have hlid1 : lid = .inl b1 := h1t b1 rfl
+        simp only [OBdd.evaluate_terminal]
+        cases p2 with
+        | terminal b2 =>
+          have hlid2 : lid = .inl b2 := h2t b2 rfl
+          simp only [OBdd.evaluate_terminal, Function.const_apply]
+          exact Sum.inl.inj (hlid1.symm.trans hlid2)
+        | node l2 =>
+          have hids2 : ps.state.ids[l2] = some (.inl b1) := hlid1 ▸ h2n l2 rfl
+          obtain ⟨_, hbnd2, ho2, _, heval2⟩ := inv.2 l2 (.inl b1) hids2
+          have hb1 : OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, RawPointer.cook (.inl b1) hbnd2⟩, ho2⟩ =
+                     Function.const _ b1 := OBdd.evaluate_terminal' rfl
+          simp only [OBdd.evaluate_terminal, Function.const_apply]
+          have h := heval2 I
+          rw [hb1, Function.const_apply] at h
+          exact h
+      | node l1 =>
+        have hids1 : ps.state.ids[l1] = some lid := h1n l1 rfl
+        obtain ⟨_, hbnd1, ho1, _, heval1⟩ := inv.2 l1 lid hids1
+        cases p2 with
+        | terminal b2 =>
+          have hlid2 : lid = .inl b2 := h2t b2 rfl
+          subst hlid2
+          have hb2 : OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, RawPointer.cook (.inl b2) hbnd1⟩, ho1⟩ =
+                     Function.const _ b2 := OBdd.evaluate_terminal' rfl
+          simp only [OBdd.evaluate_terminal, Function.const_apply]
+          have h := heval1 I
+          rw [hb2, Function.const_apply] at h
+          exact h.symm
+        | node l2 =>
+          have hids2 : ps.state.ids[l2] = some lid := h2n l2 rfl
+          obtain ⟨_, hbnd2, ho2, _, heval2⟩ := inv.2 l2 lid hids2
+          have hOBdd_eq : (⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hbnd1⟩, ho1⟩ : OBdd n _) =
+                           ⟨⟨cook_heap ps.state.heap ps.hh, lid.cook hbnd2⟩, ho2⟩ := by
+            apply Subtype.ext
+            simp only [Bdd.mk.injEq, true_and]
+          rw [hOBdd_eq] at heval1
+          exact (heval1 I).symm.trans (heval2 I)
+    -- head.2 and entry.2 evaluate equally in O
+    have heval_eq : ∀ I, OBdd.evaluate ⟨⟨O.1.heap, .node head.2⟩, hj_h⟩ I =
+                         OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj_entry⟩ I := fun I => by
+      simp only [OBdd.evaluate_node]
+      rw [hvar_eq]
+      split_ifs
+      · exact eval_child_eq head.1.2
+            (O.1.heap[head.2].high) (O.1.heap[entry.2].high)
+            (OBdd.ordered_of_high_edge hj_h) (OBdd.ordered_of_high_edge hj_entry)
+            (fun l h => (hec head (.head _)).2.2.2.1 l h)
+            (fun b h => (hec head (.head _)).2.2.2.2.2 b h)
+            (fun l h => hkey_hi ▸ (hec entry (.tail _ hmem)).2.2.2.1 l h)
+            (fun b h => hkey_hi ▸ (hec entry (.tail _ hmem)).2.2.2.2.2 b h) I
+      · exact eval_child_eq head.1.1
+            (O.1.heap[head.2].low) (O.1.heap[entry.2].low)
+            (OBdd.ordered_of_low_edge hj_h) (OBdd.ordered_of_low_edge hj_entry)
+            (fun l h => (hec head (.head _)).2.2.1 l h)
+            (fun b h => (hec head (.head _)).2.2.2.2.1 b h)
+            (fun l h => hkey_lo ▸ (hec entry (.tail _ hmem)).2.2.1 l h)
+            (fun b h => hkey_lo ▸ (hec entry (.tail _ hmem)).2.2.2.2.1 b h) I
+    rw [hps', hcurptr']
+    exact ⟨hj_entry, hp_h, ho_h, hred_h, fun I => (heval_h I).trans (heval_eq I)⟩
 
 /-- After processing one record, pushing a fresh node for non-matching tail entries is correct. -/
 private lemma process_record_newnode_sem {n m : Nat} {i : Nat} (O : OBdd n m)
@@ -1103,7 +1239,7 @@ private lemma process_record_newnode_sem {n m : Nat} {i : Nat} (O : OBdd n m)
     let ps' := result.1.1
     let curkey' := result.1.2.1
     let curptr' := result.1.2.2
-    let hsize_rec := result.2.2.2.2
+    let hsize_rec := result.2.2.2.2.2
     ∀ entry ∈ tail,
         (hbound_entry : entry.1.1.Bounded ps'.state.size ∧ entry.1.2.Bounded ps'.state.size) →
         ¬(entry.1 = curkey') →
@@ -1163,13 +1299,14 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
           OBdd.Reduced ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ ∧
           ∀ I, OBdd.evaluate ⟨⟨cook_heap ps₂'.state.heap ps₂'.hh, ptr'.cook hp⟩, ho⟩ I =
                OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I) →
+    (hec : ∀ entry ∈ Q, EntryCorrect O ps i entry) →
     { ps' : ProvedState n m //
         Invariant O ps' i ∧
         (∀ k : Fin m, (ps.state.ids[k]).isSome → (ps'.state.ids[k]).isSome) ∧
         ∀ entry ∈ Q, (ps'.state.ids[entry.2]).isSome }
-  | [], ps, inv, _, _, _ =>
+  | [], ps, inv, _, _, _, _ =>
       ⟨ps, inv, fun _ hk => hk, fun _ h => by simp at h⟩
-  | head :: tail, ps, inv, hbounds, hcurptr_sem, hnewnode_sem =>
+  | head :: tail, ps, inv, hbounds, hcurptr_sem, hnewnode_sem, hec =>
       let result := process_record O curkey curptr head ps inv (hbounds head (.head _))
           (hcurptr_sem head (.head _))
           (hnewnode_sem head (.head _) (hbounds head (.head _)))
@@ -1179,7 +1316,8 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
       let inv' := result.2.1
       let hhead := result.2.2.1
       let hmono_rec := result.2.2.2.1
-      let hsize_rec := result.2.2.2.2
+      let hmono_exact := result.2.2.2.2.1
+      let hsize_rec := result.2.2.2.2.2
       -- Lift the tail bounds to the (possibly larger) ps'.state.size.
       have hbounds' : ∀ entry ∈ tail,
           entry.1.1.Bounded ps'.state.size ∧ entry.1.2.Bounded ps'.state.size := by
@@ -1187,10 +1325,34 @@ private def process_queue {n m : Nat} {i : Nat} (O : OBdd n m)
         have := hbounds entry (.tail _ hmem)
         exact ⟨RawPointer.bounded_of_le this.1 hsize_rec,
                RawPointer.bounded_of_le this.2 hsize_rec⟩
+      -- Lift EntryCorrect to ps' for tail entries (children of tail nodes have var > i ≠ head.2's var).
+      have hec_tail' : ∀ e ∈ tail, EntryCorrect O ps' i e := by
+        intro e hmem_e
+        obtain ⟨hr, hv, hlo, hhi, hlt, hht⟩ := hec e (.tail _ hmem_e)
+        have hec_hd := hec head (.head _)
+        -- For a child l of e.2, l ≠ head.2 (child has var > i = head.2's var)
+        have child_ne : ∀ l : Fin m,
+            (O.1.heap[e.2].low = .node l ∨ O.1.heap[e.2].high = .node l) → l ≠ head.2 := by
+          intro l hedge h_eq
+          have hedge' : O.1.RelevantEdge ⟨.node e.2, hr⟩
+              ⟨.node l, .tail hr (hedge.elim (Edge.low ·) (Edge.high ·))⟩ :=
+            hedge.elim (Edge.low ·) (Edge.high ·)
+          have hmay : O.1.heap[e.2].var.1 < O.1.heap[l].var.1 := by
+            have h := O.2 hedge'
+            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar,
+                       Fin.mk_lt_mk] at h
+            exact h
+          have h_var_l : O.1.heap[l].var.1 = i := h_eq ▸ hec_hd.2.1
+          omega
+        exact ⟨hr, hv,
+          fun l hl => (hmono_exact l (child_ne l (.inl hl))).trans (hlo l hl),
+          fun l hl => (hmono_exact l (child_ne l (.inr hl))).trans (hhi l hl),
+          hlt, hht⟩
       let ⟨ps'', inv'', hmono_tail, htail⟩ :=
         process_queue O curkey' curptr' tail ps' inv' hbounds'
-          (process_record_curptr_sem O curkey curptr head tail ps inv hbounds hcurptr_sem hnewnode_sem)
+          (process_record_curptr_sem O curkey curptr head tail ps inv hbounds hcurptr_sem hnewnode_sem hec)
           (process_record_newnode_sem O curkey curptr head tail ps inv hbounds hcurptr_sem hnewnode_sem)
+          hec_tail'
       ⟨ps'', inv'',
        -- isSome monotone: compose record's and tail's monotonicity.
        fun k hk => hmono_tail k (hmono_rec k hk),
@@ -1257,6 +1419,8 @@ private def step {n m : Nat} (O : OBdd n m)
               (fun entry hmem hbound_entry _ =>
                 let ⟨hreach_e, hvar_e, hlo_ids, hhi_ids, hlo_t, hhi_t⟩ := hec_sorted entry hmem
                 sorry)
+              -- hec: entry-correctness for all sorted entries.
+              hec_sorted
   ⟨pq.1, pq.2.1, by
     -- Every j ∈ vlist[i] ends up with ids[j].isSome:
     -- either it was resolved as redundant by populate_queue (hpost₁ right branch),
