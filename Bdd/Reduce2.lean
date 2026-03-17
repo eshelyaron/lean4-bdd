@@ -324,6 +324,45 @@ lemma Invariant.ids_isSome {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
     (ps.state.ids[j]).isSome :=
   inv.1 j hvar hreach
 
+/-- When ids[j] = some (.inr k), the output node's var ≥ the input node's var. -/
+private def VarInvariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) : Prop :=
+  ∀ (j : Fin m) (k : Fin ps.state.size),
+    ps.state.ids[j] = some (.inr k.1) →
+    O.1.heap[j].var.1 ≤ ps.state.heap[k].va.1
+
+/-- All heap nodes have variable strictly above level i. -/
+private def AllAbove {n m : Nat} (ps : ProvedState n m) (i : Nat) : Prop :=
+  ∀ k : Fin ps.state.size, i < ps.state.heap[k].va.1
+
+/-- The heap is injective: no two positions have the same raw node. -/
+private def HeapInjective {n : Nat} (ps : ProvedState n m) : Prop :=
+  ∀ k1 k2 : Fin ps.state.size, ps.state.heap[k1] = ps.state.heap[k2] → k1 = k2
+
+private lemma varInvariant_initial {n m : Nat} {O : OBdd n m} :
+    VarInvariant O (provedStateInitial n m) := by
+  intro j k
+  exact absurd k.isLt (by simp [provedStateInitial])
+
+private lemma allAbove_initial {n m : Nat} {i : Nat} :
+    AllAbove (provedStateInitial n m) i := by
+  intro k
+  exact absurd k.isLt (by simp [provedStateInitial])
+
+private lemma heapInjective_initial {n m : Nat} :
+    HeapInjective (provedStateInitial n m) := by
+  intro k1
+  exact absurd k1.isLt (by simp [provedStateInitial])
+
+/-- Bundled correctness predicate for a queue entry. -/
+private def EntryCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat)
+    (entry : (RawPointer × RawPointer) × Fin m) : Prop :=
+  Reachable O.1.heap O.1.root (.node entry.2) ∧
+  O.1.heap[entry.2].var.1 = i ∧
+  (∀ l, O.1.heap[entry.2].low = .node l → ps.state.ids[l] = some entry.1.1) ∧
+  (∀ l, O.1.heap[entry.2].high = .node l → ps.state.ids[l] = some entry.1.2) ∧
+  (∀ b, O.1.heap[entry.2].low = .terminal b → entry.1.1 = .inl b) ∧
+  (∀ b, O.1.heap[entry.2].high = .terminal b → entry.1.2 = .inl b)
+
 -- ---------------------------------------------------------------------------
 -- Pure proof-carrying algorithm functions
 -- ---------------------------------------------------------------------------
@@ -358,6 +397,10 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
     (∀ entry ∈ acc, entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) →
     -- Non-redundancy of accumulator entries.
     (∀ entry ∈ acc, entry.1.1 ≠ entry.1.2) →
+    -- Entry correctness for accumulator entries.
+    (∀ entry ∈ acc, EntryCorrect O ps i.1 entry) →
+    -- VarInvariant is preserved.
+    VarInvariant O ps →
     { p : ProvedState n m × List ((RawPointer × RawPointer) × Fin m) //
         Invariant O p.1 i.1 ∧
         p.1.state.size = ps.state.size ∧
@@ -369,15 +412,21 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
         -- All queue entries have key pointers bounded by the output state's heap size.
         (∀ entry ∈ p.2, entry.1.1.Bounded p.1.state.size ∧ entry.1.2.Bounded p.1.state.size) ∧
         -- All queue entries are non-redundant: key.1 ≠ key.2.
-        (∀ entry ∈ p.2, entry.1.1 ≠ entry.1.2) }
-  | [], ps, inv, _, _, hbounds_acc, hnonred_acc =>
+        (∀ entry ∈ p.2, entry.1.1 ≠ entry.1.2) ∧
+        -- Entry correctness for all queue entries.
+        (∀ entry ∈ p.2, EntryCorrect O p.1 i.1 entry) ∧
+        -- VarInvariant is preserved.
+        VarInvariant O p.1 }
+  | [], ps, inv, _, _, hbounds_acc, hnonred_acc, hec_acc, hvarinv =>
       ⟨⟨ps, acc⟩, inv, rfl,
        fun _ he => he,
        fun _ hk => hk,
        fun _ hj => by simp at hj,
        hbounds_acc,
-       hnonred_acc⟩
-  | j :: tail, ps, inv, hvar, hreach, hbounds_acc, hnonred_acc => by
+       hnonred_acc,
+       hec_acc,
+       hvarinv⟩
+  | j :: tail, ps, inv, hvar, hreach, hbounds_acc, hnonred_acc, hec_acc, hvarinv => by
       have hvar_j   : O.1.heap[j].var.1 = i.1 := hvar   j (.head _)
       have hreach_j : Reachable O.1.heap O.1.root (.node j) := hreach j (.head _)
       -- For any child k of j (via some edge), ids[k] is already set.
@@ -490,13 +539,72 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                     symm; rw [OBdd.evaluate_node]
             · rw [ids_set_ne k hkj] at hkptr
               exact inv.2 k ptr hkptr
-        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f⟩ :=
+        -- EntryCorrect is preserved through set_id ps j lid for acc entries.
+        have hec_acc' : ∀ entry ∈ acc, EntryCorrect O (set_id ps j lid) i.1 entry := by
+          intro entry hmem
+          obtain ⟨hr, hv, hlo, hhi, hlo_t, hhi_t⟩ := hec_acc entry hmem
+          refine ⟨hr, hv, fun l hl => ?_, fun l hl => ?_, hlo_t, hhi_t⟩
+          · -- l is a child of entry.2, so var[l] > i = var[j], hence l ≠ j
+            have hord_j' : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩ := Bdd.ordered_of_reachable hr
+            have hreach_l : Reachable O.1.heap O.1.root (.node l) :=
+              .tail hr (Edge.low hl)
+            have hmay := O.2 (show O.1.RelevantEdge ⟨.node entry.2, hr⟩ ⟨.node l, hreach_l⟩
+              from Edge.low hl)
+            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar, Fin.mk_lt_mk] at hmay
+            have hlj : l ≠ j := fun h => by subst h; linarith [hv]
+            rw [ids_set_ne l hlj]; exact hlo l hl
+          · have hreach_l : Reachable O.1.heap O.1.root (.node l) :=
+              .tail hr (Edge.high hl)
+            have hmay := O.2 (show O.1.RelevantEdge ⟨.node entry.2, hr⟩ ⟨.node l, hreach_l⟩
+              from Edge.high hl)
+            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar, Fin.mk_lt_mk] at hmay
+            have hlj : l ≠ j := fun h => by subst h; linarith [hv]
+            rw [ids_set_ne l hlj]; exact hhi l hl
+        -- VarInvariant is preserved through set_id ps j lid.
+        have hvarinv' : VarInvariant O (set_id ps j lid) := by
+          intro j₀ k₀ hids₀
+          by_cases hjj₀ : j₀ = j
+          · -- j₀ = j: ids[j] was just set to lid
+            rw [hjj₀] at hids₀ ⊢
+            rw [ids_set_self] at hids₀
+            simp only [Option.some.injEq] at hids₀
+            -- hids₀ : lid = .inr k₀.1
+            -- lid = get_id ps O.1.heap[j].low h. Examine O.1.heap[j].low.
+            -- lid = .inr k₀.1 (from hids₀). Need: O.heap[j].var ≤ ps.heap[k₀].va
+            -- lid came from get_id on the low child.
+            -- Use a helper lemma to extract the child node index.
+            have ⟨l, hlow, hids_l⟩ : ∃ l, O.1.heap[j].low = .node l ∧
+                ps.state.ids[l] = some (.inr k₀.1) := by
+              -- lid = get_id ps O.1.heap[j].low _. Case-split on the low pointer.
+              cases hlow_case : O.1.heap[j].low with
+              | terminal b =>
+                have hlid_bool : lid = .inl b := by
+                  simp only [lid]; simp_rw [hlow_case]; rfl
+                exact absurd (hlid_bool ▸ hids₀) (by simp)
+              | node l =>
+                use l, rfl
+                have hlid_eq : lid = (ps.state.ids[l]).get
+                    (hchild (.node l) (Edge.low hlow_case) l rfl) := by
+                  simp only [lid]; simp_rw [hlow_case]; rfl
+                rw [hlid_eq] at hids₀
+                exact (Option.some_get _).symm.trans (congrArg some hids₀)
+            have hvi := hvarinv l k₀ hids_l
+            have hmay := O.2 (show O.1.RelevantEdge ⟨.node j, hreach_j⟩
+              ⟨.node l, .tail hreach_j (Edge.low hlow)⟩ from Edge.low hlow)
+            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar,
+                       Fin.mk_lt_mk] at hmay
+            exact Nat.le_trans (Nat.le_of_lt hmay) hvi
+          · rw [ids_set_ne j₀ hjj₀] at hids₀
+            exact hvarinv j₀ k₀ hids₀
+        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f, hec_f, hvarinv_f⟩ :=
           populate_queue O i acc tail (set_id ps j lid) hinv'
             (fun k hk => hvar   k (.tail _ hk))
             (fun k hk => hreach k (.tail _ hk))
             -- accumulator bounds unchanged (size of set_id = size of ps)
             hbounds_acc
             hnonred_acc
+            hec_acc'
+            hvarinv'
         exact ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f,
                fun k hk => hmono_f k (by
                  by_cases hkj : k = j
@@ -508,11 +616,43 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                    right; exact hmono_f j (by simp [ids_set_self])
                  | tail _ hk' => exact hpost_f k hk',
                hbounds_f,
-               hnonred_f⟩
+               hnonred_f,
+               hec_f,
+               hvarinv_f⟩
       · -- Non-redundant: add ((lid, hid), j) to accumulator; recurse unchanged.
         have hlid_bound : lid.Bounded ps.state.size := get_id_bounded inv (hchild _ (Edge.low  rfl))
         have hhid_bound : hid.Bounded ps.state.size := get_id_bounded inv (hchild _ (Edge.high rfl))
-        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f⟩ :=
+        -- EntryCorrect for the new entry ((lid, hid), j)
+        -- Helper: get_id on a node pointer yields (ids[l]).get
+        have get_id_node : ∀ (l : Fin m) (h : ∀ k, Pointer.node l = .node k → (ps.state.ids[k]).isSome),
+            get_id ps (.node l) h = (ps.state.ids[l]).get (h l rfl) := fun _ _ => rfl
+        -- Helper: get_id on terminal yields .inl b
+        have get_id_terminal : ∀ (b : Bool) (h : ∀ k, Pointer.terminal b = .node k → (ps.state.ids[k]).isSome),
+            get_id ps (.terminal b) h = .inl b := fun _ _ => rfl
+        have hec_new : EntryCorrect O ps i.1 ⟨⟨lid, hid⟩, j⟩ := by
+          refine ⟨hreach_j, hvar_j, fun l hl => ?_, fun l hl => ?_, fun b hb => ?_, fun b hb => ?_⟩
+          · -- lid = get_id ps (.node l) _, i.e., (ids[l]).get _
+            have hlid : lid = (ps.state.ids[l]).get (hchild _ (Edge.low rfl) l hl) := by
+              simp only [lid]
+              simp_rw [hl]
+              rfl
+            rw [hlid]; exact (Option.some_get _).symm
+          · have hhid : hid = (ps.state.ids[l]).get (hchild _ (Edge.high rfl) l hl) := by
+              simp only [hid]
+              simp_rw [hl]
+              rfl
+            rw [hhid]; exact (Option.some_get _).symm
+          · have : lid = .inl b := by
+              simp only [lid]
+              simp_rw [hb]
+              rfl
+            exact this
+          · have : hid = .inl b := by
+              simp only [hid]
+              simp_rw [hb]
+              rfl
+            exact this
+        obtain ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f, hacc_f, hmono_f, hpost_f, hbounds_f, hnonred_f, hec_f, hvarinv_f⟩ :=
           populate_queue O i (⟨⟨lid, hid⟩, j⟩ :: acc) tail ps inv
             (fun k hk => hvar   k (.tail _ hk))
             (fun k hk => hreach k (.tail _ hk))
@@ -526,6 +666,12 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
               cases he with
               | head => exact heq
               | tail _ he' => exact hnonred_acc entry he')
+            -- entry correctness for new entry + old acc entries
+            (fun entry he => by
+              cases he with
+              | head => exact hec_new
+              | tail _ he' => exact hec_acc entry he')
+            hvarinv
         exact ⟨⟨ps_f, list_f⟩, hinv_f, hsize_f,
                fun e he => hacc_f e (.tail _ he),
                hmono_f,
@@ -534,7 +680,9 @@ private def populate_queue {n m : Nat} (O : OBdd n m)
                  | head => left; exact ⟨⟨lid, hid⟩, hacc_f _ (.head _)⟩
                  | tail _ hk' => exact hpost_f k hk',
                hbounds_f,
-               hnonred_f⟩
+               hnonred_f,
+               hec_f,
+               hvarinv_f⟩
 
 /-- Pushing a new node to the heap preserves reducedness of existing sub-BDDs,
 because old reachable nodes are unchanged. Proved using push_evaluate + push_ordered. -/
@@ -1064,13 +1212,15 @@ private def step {n m : Nat} (O : OBdd n m)
     (vlist : Vector (List (Fin m)) n) (i : Fin n)
     (ps : ProvedState n m) (inv : Invariant O ps i.1)
     (hdiscover_inv : ∀ j ∈ vlist[i],
-        O.1.heap[j].var.1 = i.1 ∧ Reachable O.1.heap O.1.root (.node j)) :
+        O.1.heap[j].var.1 = i.1 ∧ Reachable O.1.heap O.1.root (.node j))
+    (hvarinv : VarInvariant O ps) (hallabove : AllAbove ps i.1)
+    (hheapinj : HeapInjective ps) :
     { ps' : ProvedState n m //
         Invariant O ps' i.1 ∧
         ∀ j ∈ vlist[i], Reachable O.1.heap O.1.root (.node j) → (ps'.state.ids[j]).isSome } :=
   -- Build the queue: redundant nodes (lid = hid) are resolved immediately;
   -- non-redundant nodes are collected in `queue` as ((lid, hid), j) entries.
-  let ⟨⟨ps₁, queue⟩, inv₁, hsize₁, _, hmono₁, hpost₁, hbounds₁, hnonred₁⟩ :=
+  let ⟨⟨ps₁, queue⟩, inv₁, hsize₁, _, hmono₁, hpost₁, hbounds₁, hnonred₁, hec₁, hvarinv₁⟩ :=
     populate_queue O i [] vlist[i] ps inv
       (fun j hj => (hdiscover_inv j hj).1)
       (fun j hj => (hdiscover_inv j hj).2)
@@ -1078,6 +1228,9 @@ private def step {n m : Nat} (O : OBdd n m)
       (fun _ h => by simp at h)
       -- empty accumulator: trivially non-redundant
       (fun _ h => by simp at h)
+      -- empty accumulator: trivially entry-correct
+      (fun _ h => by simp at h)
+      hvarinv
   -- Sort the queue so that equal-key entries are adjacent (enables iso-merging).
   -- Sentinel (⟨.inl false, .inl false⟩, .inl false): all real entries have key.1 ≠ key.2
   -- (populate_queue only enqueues non-redundant nodes), so the sentinel never matches
@@ -1093,12 +1246,17 @@ private def step {n m : Nat} (O : OBdd n m)
   have hnonred_sorted : ∀ entry ∈ sorted, entry.1.1 ≠ entry.1.2 := by
     intro entry hmem
     exact hnonred₁ entry ((List.Perm.mem_iff (List.mergeSort_perm _ _)).mp hmem)
+  have hec_sorted : ∀ entry ∈ sorted, EntryCorrect O ps₁ i.1 entry := by
+    intro entry hmem
+    exact hec₁ entry ((List.Perm.mem_iff (List.mergeSort_perm _ _)).mp hmem)
   let pq := process_queue O ⟨.inl false, .inl false⟩ (.inl false)
               sorted ps₁ inv₁ hbounds_sorted
               -- hcurptr_sem: sentinel key never matches any real entry (key.1 ≠ key.2 for all entries).
               (fun entry hmem heq => absurd heq (sentinel_no_match sorted hnonred_sorted entry hmem))
               -- hnewnode_sem: pushing a fresh node for non-redundant entries is correct.
-              (sorry)
+              (fun entry hmem hbound_entry _ =>
+                let ⟨hreach_e, hvar_e, hlo_ids, hhi_ids, hlo_t, hhi_t⟩ := hec_sorted entry hmem
+                sorry)
   ⟨pq.1, pq.2.1, by
     -- Every j ∈ vlist[i] ends up with ids[j].isSome:
     -- either it was resolved as redundant by populate_queue (hpost₁ right branch),
@@ -1150,7 +1308,9 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
         O.1.heap[j].var.1 = ii.1 ∧ Reachable O.1.heap O.1.root (.node j))
     (i    : Fin n)
     (h_le : O.1.heap[r].var.1 ≤ i.1)
-    (ps : ProvedState n m) (inv : Invariant O ps i.1) :
+    (ps : ProvedState n m) (inv : Invariant O ps i.1)
+    (hvarinv : VarInvariant O ps) (hallabove : AllAbove ps i.1)
+    (hheapinj : HeapInjective ps) :
     { ps' : ProvedState n m //
         (ps'.state.ids[r]).isSome ∧
         ∀ (ptr : RawPointer), ps'.state.ids[r] = some ptr →
@@ -1160,6 +1320,7 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
               ∀ I, OBdd.evaluate ⟨⟨cook_heap ps'.state.heap ps'.hh, ptr.cook hptr⟩, ho⟩ I =
                    O.evaluate I } :=
   let ⟨ps₁, inv₁, hset₁⟩ := step O vlist i ps inv (fun j hj => hdiscover_inv j i hj)
+    hvarinv hallabove hheapinj
   match h : i.1 - O.1.heap[r].var.1 with
   | Nat.zero =>
     have hi_eq  : O.1.heap[r].var = i :=
@@ -1186,6 +1347,7 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
       convert hbase using 1; omega
     loop_helper O r hr vlist hdiscover hdiscover_inv
       ⟨j + O.1.heap[r].var.1, hlt⟩ (Nat.le_add_left _ _) ps₁ inv₁'
+      sorry sorry sorry
 termination_by i.1 - O.1.heap[r].var.1
 decreasing_by simp_all
 
@@ -1222,6 +1384,7 @@ def oreduce2 (O : OBdd n m) :
           ⟨nn, Nat.lt_add_one nn⟩ (Nat.lt_succ_iff.mp O.1.heap[r].var.isLt)
           (provedStateInitial (nn + 1) m)
           (inv_initial (fun j => Nat.lt_succ_iff.mp O.1.heap[j].var.isLt))
+          varInvariant_initial allAbove_initial heapInjective_initial
       -- hh is now a direct field on ps — no Classical.choose needed for hh!
       let rid  := (ps.state.ids[r]).get hrisSome
       let hrid := hcorr rid (Option.get_mem hrisSome)
