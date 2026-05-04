@@ -435,21 +435,7 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
         (s0.cache[k]? = none → (∃ p, r.1.cache[k]? = some p) → Pointer.Reachable O.1.heap O.1.root k.1 ∧ Pointer.Reachable U.1.heap U.1.root k.2))
     } :=
   match hc : cache_get O.1.root U.1.root s0 with
-  | some root =>
-    ⟨ ⟨s0, root⟩, ⟨inv, hc, .refl,
-      by
-        intro k
-        constructor
-        · intro p h
-          exact h
-        · constructor
-          · intro h
-            exact h
-          · rintro h ⟨_, c⟩
-            rw [h] at c
-            contradiction,
-      ⟩
-    ⟩
+  | some root => ⟨⟨s0, root⟩, ⟨inv, hc, .refl, by grind only⟩⟩
   | none =>
     match O_root_def : O.1.root with
     | .terminal b =>
@@ -549,17 +535,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   rfl
                   rfl
                 symm
-                have := (invh.2 ⟨O.1.root, (U.high U_root_def).1.root⟩ rh hh).2
-                calc _
-                  _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                    rw [push_evaluate]
-                    · exact this.2.2.1
-                    · exact push_ordered this.2.2.2.1
-                    · exact this.2.2.2.1
-                  _ = _ := by
-                    have := this.2.2.2.2 I
-                    simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                    exact this
+                have h := invh.2 ⟨O.1.root, (U.high U_root_def).1.root⟩ rh hh
+                rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                exact h6 I
               · conv =>
                   rhs
                   congr
@@ -573,17 +552,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                 have : sh.cache[(⟨O.1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
                   apply (hhp _).1
                   exact hl
-                have := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
-                calc _
-                  _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                    rw [push_evaluate]
-                    · exact this.2.2.2.1
-                    · exact push_ordered this.2.2.2.2.1
-                    · exact this.2.2.2.2.1
-                  _ = _ := by
-                    have := this.2.2.2.2.2 I
-                    simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                    exact this
+                have h := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
+                rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                exact h6 I
             )
             (by
               simp only [cache_get] at hc
@@ -705,17 +677,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   rfl
                   rfl
                 symm
-                have := (invh.2 ⟨(O.high O_root_def).1.root, U.1.root⟩ rh hh).2
-                calc _
-                  _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                    rw [push_evaluate]
-                    · exact this.2.2.1
-                    · exact push_ordered this.2.2.2.1
-                    · exact this.2.2.2.1
-                  _ = _ := by
-                    have := this.2.2.2.2 I
-                    simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                    exact this
+                have h := invh.2 ⟨(O.high O_root_def).1.root, U.1.root⟩ rh hh
+                rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                exact h6 I
               · conv =>
                   rhs
                   congr
@@ -729,17 +694,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                 have : sh.cache[(⟨(O.low O_root_def).1.root, U.1.root⟩ : Pointer m × Pointer m')]? = some rl := by
                   apply (hhp _).1
                   exact hl
-                have := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
-                calc _
-                  _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                    rw [push_evaluate]
-                    · exact this.2.2.2.1
-                    · exact push_ordered this.2.2.2.2.1
-                    · exact this.2.2.2.2.1
-                  _ = _ := by
-                    have := this.2.2.2.2.2 I
-                    simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                    exact this
+                have h := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
+                rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                exact h6 I
             )
             (by
               simp only [cache_get] at hc
@@ -862,17 +820,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                     rfl
                     rfl
                   symm
-                  have := (invh.2 ⟨(O.high O_root_def).1.root, U.1.root⟩ rh hh).2
-                  calc _
-                    _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                      rw [push_evaluate]
-                      · exact this.2.2.1
-                      · exact push_ordered this.2.2.2.1
-                      · exact this.2.2.2.1
-                    _ = _ := by
-                      have := this.2.2.2.2 I
-                      simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                      exact this
+                  have h := invh.2 ⟨(O.high O_root_def).1.root, U.1.root⟩ rh hh
+                  rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                  rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                  exact h6 I
                 · conv =>
                     rhs
                     congr
@@ -886,17 +837,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                   have : sh.cache[(⟨(O.low O_root_def).1.root, U.1.root⟩ : Pointer m × Pointer m')]? = some rl := by
                     apply (hhp _).1
                     exact hl
-                  have := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
-                  calc _
-                    _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                      rw [push_evaluate]
-                      · exact this.2.2.2.1
-                      · exact push_ordered this.2.2.2.2.1
-                      · exact this.2.2.2.2.1
-                    _ = _ := by
-                      have := this.2.2.2.2.2 I
-                      simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                      exact this
+                  have h := invh.2 ⟨(O.low O_root_def).1.root, U.1.root⟩ rl this
+                  rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                  rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                  exact h6 I
               )
               (by
                 simp only [cache_get] at hc
@@ -1019,17 +963,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       rfl
                       rfl
                     symm
-                    have := (invh.2 ⟨O.1.root, (U.high U_root_def).1.root⟩ rh hh).2
-                    calc _
-                      _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                        rw [push_evaluate]
-                        · exact this.2.2.1
-                        · exact push_ordered this.2.2.2.1
-                        · exact this.2.2.2.1
-                      _ = _ := by
-                        have := this.2.2.2.2 I
-                        simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                        exact this
+                    have h := invh.2 ⟨O.1.root, (U.high U_root_def).1.root⟩ rh hh
+                    rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                    rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                    exact h6 I
                   · conv =>
                       rhs
                       congr
@@ -1043,17 +980,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                     have : sh.cache[(⟨O.1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
                       apply (hhp _).1
                       exact hl
-                    have := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
-                    calc _
-                      _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                        rw [push_evaluate]
-                        · exact this.2.2.2.1
-                        · exact push_ordered this.2.2.2.2.1
-                        · exact this.2.2.2.2.1
-                      _ = _ := by
-                        have := this.2.2.2.2.2 I
-                        simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                        exact this
+                    have h := invh.2 ⟨O.1.root, (U.low U_root_def).1.root⟩ rl this
+                    rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                    rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                    exact h6 I
                 )
                 (by
                   simp only [cache_get] at hc
@@ -1195,17 +1125,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                       rfl
                       rfl
                     symm
-                    have := (invh.2 ⟨(O.high O_root_def).1.root, (U.high U_root_def).1.root⟩ rh hh).2.2
-                    calc _
-                      _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                        rw [push_evaluate]
-                        · exact this.2.1
-                        · exact push_ordered this.2.2.1
-                        · exact this.2.2.1
-                      _ = _ := by
-                        have := this.2.2.2 I
-                        simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                        exact this
+                    have h := invh.2 ⟨(O.high O_root_def).1.root, (U.high U_root_def).1.root⟩ rh hh
+                    rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                    rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                    exact h6 I
                   ·
                     conv =>
                       rhs
@@ -1220,17 +1143,10 @@ private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBd
                     have : sh.cache[(⟨(O.low O_root_def).1.root, (U.low U_root_def).1.root⟩ : Pointer m × Pointer m')]? = some rl := by
                       apply (hhp _).1
                       exact hl
-                    have := invh.2 ⟨(O.low O_root_def).1.root, (U.low U_root_def).1.root⟩ rl this
-                    calc _
-                      _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                        rw [push_evaluate]
-                        · exact this.2.2.2.1
-                        · exact push_ordered this.2.2.2.2.1
-                        · exact this.2.2.2.2.1
-                      _ = _ := by
-                        have := this.2.2.2.2.2 I
-                        simp only [Vector.take_eq_extract, OBdd.high_heap_eq_heap] at this
-                        exact this
+                    have h := invh.2 ⟨(O.low O_root_def).1.root, (U.low U_root_def).1.root⟩ rl this
+                    rcases h with ⟨h1, h2, h3, h4, h5, h6⟩
+                    rw [push_evaluate (ho := push_ordered h5) (hu := h5)]
+                    exact h6 I
                 )
                 (by
                   simp only [cache_get] at hc

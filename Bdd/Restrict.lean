@@ -586,8 +586,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                 · simp only [Nary.restrict, cook_heap, RawNode.cook, Fin.getElem_fin,
                   Vector.getElem_ofFn, Vector.getElem_push_eq, eq_iff_iff, Bool.coe_iff_coe]
                   exact Vector.getElem_set_ne _ _ (fun contra ↦ by simp only [Fin.val_eq_val] at contra; rw [contra] at hlt; contradiction)
-                · have := (invh.2 (O.high O_root_def).1.root rh hh).2
-                  conv =>
+                · conv =>
                     rhs
                     congr
                     congr
@@ -597,17 +596,11 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                     rfl
                     rfl
                   symm
-                  calc _
-                    _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rh.cook _⟩, _⟩ I := by
-                      rw [push_evaluate]
-                      · exact this.2.1
-                      · exact push_ordered this.2.2.1
-                      · exact this.2.2.1
-                    _ = _ := by
-                      have := this.2.2.2
-                      simp only [OBdd.high_heap_eq_heap] at this
-                      rw [this]
-                      rfl
+                  have h := invh.2 (O.high O_root_def).1.root rh hh
+                  rcases h with ⟨h1, h2, h3, h4, h5⟩
+                  simp only [OBdd.high_heap_eq_heap] at h5
+                  rw [push_evaluate (ho := push_ordered h4) (hu := h4), h5]
+                  rfl
                 · conv =>
                     rhs
                     congr
@@ -621,18 +614,11 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                   have : sh.cache[(O.low O_root_def).1.root]? = some rl := by
                     apply (hhp _).1
                     exact hl
-                  have := invh.2 (O.low O_root_def).1.root rl this
-                  calc _
-                    _ = OBdd.evaluate ⟨⟨cook_heap sh.heap _, rl.cook _⟩, _⟩ I := by
-                      rw [push_evaluate]
-                      · exact this.2.2.1
-                      · exact push_ordered this.2.2.2.1
-                      · exact this.2.2.2.1
-                    _ = _ := by
-                      have := this.2.2.2.2
-                      simp only [OBdd.high_heap_eq_heap] at this
-                      rw [this]
-                      rfl
+                  have h := invh.2 (O.low O_root_def).1.root rl this
+                  rcases h with ⟨h1, h2, h3, h4, h5⟩
+                  simp only [OBdd.high_heap_eq_heap] at h5
+                  rw [push_evaluate (ho := push_ordered h4) (hu := h4), h5]
+                  rfl
               )
               (by
                 cases heq : sh.cache[O.1.root]? with
