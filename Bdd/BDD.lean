@@ -334,7 +334,7 @@ lemma var_denotation : (var i).denotation h I = I[i] := by
   rw [var_nvars] at h
   have : (I.take (i + 1))[i] = I[i] := by
     apply Vector.getElem_take
-  rw [← this]
+  erw [← this]
   rfl
 
 @[simp]

@@ -326,6 +326,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
             let ⟨⟨sl, rl⟩, ⟨invl, hl, hsl, hlp⟩⟩ := restrict_helper (O.high O_root_def) b i s0 inv
             ⟨ ⟨⟨sl.size, sl.heap, sl.cache.insert O.1.root rl⟩, rl⟩,
               by
+                subst hlt
                 constructor
                 · intro k p
                   simp only
@@ -349,13 +350,11 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                       have := (invl.2 _ _ hl).1 _ hj1 rfl
                       split at this
                       next hsp =>
-                        rw [← hlt] at hsp
                         rw [← hsp] at that
                         absurd that
                         simp only [Nat.succ_eq_add_one, OBdd.high_heap_eq_heap, lt_self_iff_false,
                           not_false_eq_true]
                       next hsp =>
-                        rw [← hlt]
                         simp_all only [getElem?_eq_none_iff,
                           Fin.getElem_fin, forall_exists_index,
                           Nat.succ_eq_add_one, Pointer.toVar_node_eq,
@@ -371,7 +370,6 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                       have that := OBdd.evaluate_node'' O_root_def
                       rw [that]
                       rw [Nary.restrict_if]
-                      rw [hlt]
                       simp only [OBdd.high_heap_eq_heap, hb, Fin.getElem_fin]
                       ext I
                       conv =>
@@ -418,6 +416,7 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
             let ⟨⟨sl, rl⟩, ⟨invl, hl, hsl, hlp⟩⟩ := restrict_helper (O.low O_root_def) b i s0 inv
             ⟨⟨⟨sl.size, sl.heap, sl.cache.insert O.1.root rl⟩, rl⟩,
               by
+                subst hlt
                 constructor
                 · intro k p
                   simp only
@@ -441,13 +440,11 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                       have := (invl.2 _ _ hl).1 _ hj1 rfl
                       split at this
                       next hsp =>
-                        rw [← hlt] at hsp
                         rw [← hsp] at that
                         absurd that
                         simp only [Nat.succ_eq_add_one, OBdd.low_heap_eq_heap, lt_self_iff_false,
                           not_false_eq_true]
                       next hsp =>
-                        rw [← hlt]
                         simp_all only [getElem?_eq_none_iff,
                           Fin.getElem_fin, OBdd.low_heap_eq_heap, forall_exists_index,
                           Nat.succ_eq_add_one, Pointer.toVar_node_eq, gt_iff_lt, ite_true]
@@ -461,7 +458,6 @@ private def restrict_helper (O : OBdd n m) (b : Bool) (i : Fin n) (s0 : State n 
                       have that := OBdd.evaluate_node'' O_root_def
                       rw [that]
                       rw [Nary.restrict_if]
-                      rw [hlt]
                       simp only [OBdd.low_heap_eq_heap, hb, Fin.getElem_fin]
                       ext I
                       conv =>
