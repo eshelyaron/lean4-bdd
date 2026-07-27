@@ -1,3 +1,5 @@
+module
+
 import Bdd.Sat
 import Std.Sat.CNF.Basic
 
@@ -14,7 +16,7 @@ def parseDimacs (n : Nat) [NeZero n] (lines : Array String) : Std.Sat.CNF (Fin n
         | none   => none)
       )
 
-def main (args : List String) : IO Unit := do
+public def main (args : List String) : IO Unit := do
   match args with
   | [ns, fs] =>
     try

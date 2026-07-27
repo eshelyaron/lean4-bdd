@@ -1,1 +1,3 @@
-import Bdd.BDD
+module
+
+public import Bdd.BDD

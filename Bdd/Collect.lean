@@ -1,9 +1,10 @@
+module
 
-import Bdd.Basic
+public import Bdd.Basic
 
 namespace Collect
 
-private def collect_helper (O : OBdd n m) : Vector Bool m × List (Fin m) → Vector Bool m × List (Fin m) :=
+def collect_helper (O : OBdd n m) : Vector Bool m × List (Fin m) → Vector Bool m × List (Fin m) :=
   match h : O.1.root with
   | .terminal _ => id
   | .node j =>
@@ -11,16 +12,16 @@ private def collect_helper (O : OBdd n m) : Vector Bool m × List (Fin m) → Ve
 termination_by O
 
 /-- Return a list of all reachable node indices. -/
-def collect (O : OBdd n m) : List (Fin m) := (collect_helper O ⟨Vector.replicate m false, []⟩).2
+public def collect (O : OBdd n m) : List (Fin m) := (collect_helper O ⟨Vector.replicate m false, []⟩).2
 
-private lemma collect_helper_terminal {v : Vector (Node n m) m} {h : Bdd.Ordered {heap := v, root := .terminal b}} :
+lemma collect_helper_terminal {v : Vector (Node n m) m} {h : Bdd.Ordered {heap := v, root := .terminal b}} :
     collect_helper ⟨{heap := v, root := .terminal b}, h⟩ I = I := by
   conv =>
     lhs
     unfold collect_helper
   congr
 
-private lemma collect_helper_terminal' {O : OBdd n m} (h : O.1.root = .terminal b) :
+lemma collect_helper_terminal' {O : OBdd n m} (h : O.1.root = .terminal b) :
     collect_helper O I = I := by
   rcases O with ⟨⟨M, r⟩, o⟩
   simp only at h
@@ -28,11 +29,11 @@ private lemma collect_helper_terminal' {O : OBdd n m} (h : O.1.root = .terminal 
   simp_rw [h]
   assumption
 
-lemma collect_terminal {O : OBdd n m} (h : O.1.root = .terminal b) :
+public lemma collect_terminal {O : OBdd n m} (h : O.1.root = .terminal b) :
     collect O = [] := by
   simp only [collect, collect_helper_terminal' h]
 
-private lemma collect_helper_node {v : Vector (Node n m) m} {h : Bdd.Ordered {heap := v, root := .node j}} :
+lemma collect_helper_node {v : Vector (Node n m) m} {h : Bdd.Ordered {heap := v, root := .node j}} :
     collect_helper ⟨{heap := v, root := .node j}, h⟩ I =
       if I.1[j]
       then I
@@ -44,7 +45,7 @@ private lemma collect_helper_node {v : Vector (Node n m) m} {h : Bdd.Ordered {he
     unfold collect_helper
   congr
 
-private lemma collect_helper_node' (O : OBdd n m) {j : Fin m} (h : O.1.root = .node j) :
+lemma collect_helper_node' (O : OBdd n m) {j : Fin m} (h : O.1.root = .node j) :
     collect_helper O I = if I.1[j] then I else collect_helper (O.high h) (collect_helper (O.low h) ⟨I.1.set j true, j :: I.2⟩) := by
   rcases O with ⟨⟨M, r⟩, o⟩
   simp only at h
@@ -52,7 +53,7 @@ private lemma collect_helper_node' (O : OBdd n m) {j : Fin m} (h : O.1.root = .n
   simp_rw [h]
   assumption
 
-private theorem collect_helper_retains_found {O : OBdd n m} {I : Vector Bool m × List (Fin m)} :
+theorem collect_helper_retains_found {O : OBdd n m} {I : Vector Bool m × List (Fin m)} :
     j ∈ I.2 → j ∈ (collect_helper O I).2 := by
   intro h
   cases O_root_def : O.1.root with
@@ -74,7 +75,7 @@ private theorem collect_helper_retains_found {O : OBdd n m} {I : Vector Bool m �
       exact collect_helper_retains_found this
 termination_by O
 
-private theorem collect_helper_retains_marked {O : OBdd n m} {I : Vector Bool m × List (Fin m)} {j : Fin m}:
+theorem collect_helper_retains_marked {O : OBdd n m} {I : Vector Bool m × List (Fin m)} {j : Fin m}:
     I.1[j] = true → (collect_helper O I).1[j] = true := by
   intro h
   cases O_root_def : O.1.root with
@@ -101,7 +102,7 @@ private theorem collect_helper_retains_marked {O : OBdd n m} {I : Vector Bool m 
       exact collect_helper_retains_marked this
 termination_by O
 
-private theorem collect_helper_only_marks_reachable {j : Fin m} {O : OBdd n m} {I : Vector Bool m × List (Fin m)} :
+theorem collect_helper_only_marks_reachable {j : Fin m} {O : OBdd n m} {I : Vector Bool m × List (Fin m)} :
     I.1[j] = false → (collect_helper O I).1[j] = true → Pointer.Reachable O.1.heap O.1.root (.node j) := by
   intro h1 h2
   cases O_root_def : O.1.root with
@@ -147,7 +148,7 @@ private theorem collect_helper_only_marks_reachable {j : Fin m} {O : OBdd n m} {
           · assumption
 termination_by O
 
-private theorem collect_helper_spec {O : OBdd n m} :
+theorem collect_helper_spec {O : OBdd n m} :
     (∀ i, (Pointer.Reachable O.1.heap O.1.root (.node i) → I.1[i] = true → i ∈ I.2)) →
     ∀ i, (Pointer.Reachable O.1.heap O.1.root (.node i) → (collect_helper O I).1[i] → i ∈ (collect_helper O I).2) := by
   intro h j re ma
@@ -247,7 +248,7 @@ private theorem collect_helper_spec {O : OBdd n m} :
             · assumption
 termination_by O
 
-private lemma collect_spec' {O : OBdd n m} {j : Fin m} {I : Vector Bool m × List (Fin m)} :
+lemma collect_spec' {O : OBdd n m} {j : Fin m} {I : Vector Bool m × List (Fin m)} :
     Pointer.Reachable O.1.heap O.1.root (.node j) →
     (∀ i, (Pointer.Reachable O.1.heap O.1.root (.node i) → Pointer.Reachable O.1.heap (.node i) (.node j) → I.1[i] = false)) →
     (collect_helper O I).1[j] = true := by
@@ -349,7 +350,7 @@ private lemma collect_spec' {O : OBdd n m} {j : Fin m} {I : Vector Bool m × Lis
 termination_by O
 
 /-- `collect` is correct. -/
-theorem collect_spec {O : OBdd n m} {j : Fin m} : Pointer.Reachable O.1.heap O.1.root (.node j) → j ∈ collect O := by
+public theorem collect_spec {O : OBdd n m} {j : Fin m} : Pointer.Reachable O.1.heap O.1.root (.node j) → j ∈ collect O := by
   intro h
   simp [collect]
   apply collect_helper_spec
@@ -362,7 +363,7 @@ theorem collect_spec {O : OBdd n m} {j : Fin m} : Pointer.Reachable O.1.heap O.1
     intro i re1 re2
     simp only [Fin.getElem_fin, Vector.getElem_replicate]
 
-private theorem collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
+theorem collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
     Pointer.Reachable O.1.heap r O.1.root →
     (∀ i ∈ I.2, Pointer.Reachable O.1.heap r (.node i)) →
     ∀ i ∈ (collect_helper O I).2, Pointer.Reachable O.1.heap r (.node i) := by
@@ -419,7 +420,7 @@ private theorem collect_helper_spec_reverse (O : OBdd n m) (r : Pointer m) I :
               exact h1 i' hi'
 termination_by O
 
-theorem collect_spec_reverse {O : OBdd n m} {j : Fin m} :
+public theorem collect_spec_reverse {O : OBdd n m} {j : Fin m} :
     j ∈ collect O → Pointer.Reachable O.1.heap O.1.root (.node j) := by
   intro h
   simp only [collect] at h
@@ -427,7 +428,7 @@ theorem collect_spec_reverse {O : OBdd n m} {j : Fin m} :
   · simp
   · assumption
 
-private theorem collect_helper_nodup {I : Vector Bool m × List (Fin m)} {O : OBdd n m} :
+theorem collect_helper_nodup {I : Vector Bool m × List (Fin m)} {O : OBdd n m} :
     (∀ i ∈ I.2, I.1[i] = true) ∧ I.2.Nodup →
     (∀ i ∈ (collect_helper O I).2, (collect_helper O I).1[i] = true) ∧ (collect_helper O I).2.Nodup := by
   intro h
@@ -457,10 +458,10 @@ private theorem collect_helper_nodup {I : Vector Bool m × List (Fin m)} {O : OB
         · exact h.2
 termination_by O
 
-theorem mem_collect_iff_reachable {O : OBdd n m} {j : Fin m} :
+public theorem mem_collect_iff_reachable {O : OBdd n m} {j : Fin m} :
     j ∈ collect O ↔ Pointer.Reachable O.1.heap O.1.root (.node j) := ⟨collect_spec_reverse, collect_spec⟩
 
-theorem collect_nodup {O : OBdd n m} : (collect O).Nodup := by
+public theorem collect_nodup {O : OBdd n m} : (collect O).Nodup := by
   simp only [collect]
   exact (collect_helper_nodup (by simp)).2
 

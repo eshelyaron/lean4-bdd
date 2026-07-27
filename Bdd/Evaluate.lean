@@ -1,6 +1,10 @@
-import Bdd.Basic
+module
+
+public import Bdd.Basic
 
 namespace Evaluate
+
+public section
 
 def evaluate (O : OBdd n m) : Vector Bool n → Bool := fun I ↦
   match h : O.1.root with
@@ -28,5 +32,7 @@ lemma evaluate_node {O : OBdd n m} (h : O.1.root = .node j) :
   rw [evaluate_evaluate]
   rw [OBdd.evaluate_node'' h]
   simp [evaluate_evaluate]
+
+end
 
 end Evaluate

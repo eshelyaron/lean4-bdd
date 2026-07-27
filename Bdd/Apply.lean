@@ -1,24 +1,20 @@
-import Bdd.Basic
+module
+
+public import Bdd.Basic
 import Std.Data.HashMap.Lemmas
 
 namespace Apply
 
 open RawBdd
 
-private structure State (n) (n') (m) (m') where
+structure State (n) (n') (m) (m') where
   size : Nat
   heap : Vector (RawNode (max n n')) size
   cache : Std.HashMap (Pointer m × Pointer m') RawPointer
 
-private def initial : State n n' m m' := ⟨_, (Vector.emptyWithCapacity (m ⊔ m')), Std.HashMap.emptyWithCapacity (m ⊔ m')⟩
+def initial : State n n' m m' := ⟨_, (Vector.emptyWithCapacity (m ⊔ m')), Std.HashMap.emptyWithCapacity (m ⊔ m')⟩
 
-@[simp]
-lemma toVar_or_terminal_eq {n m} (w : Vector (Node n m) m) : toVar_or w (.terminal b) i = i := rfl
-
-@[simp]
-lemma toVar_or_node_eq {n m} (w : Vector (Node n m) m) {j} : toVar_or w (.node j) i = w[j].var := rfl
-
-private def Invariant (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' m') (r : State n n' m m') :=
+def Invariant (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' m') (r : State n n' m m') :=
   ∃ hh : (∀ i : Fin r.size, RawNode.Bounded i r.heap[i]),
     ∀ (k : (Pointer m × Pointer m')) (p : RawPointer),
       r.cache[k]? = some p →
@@ -34,17 +30,17 @@ private def Invariant (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' 
                   (OBdd.evaluate ⟨⟨O.1.heap, k.1⟩, hk1⟩ (Vector.cast (by simp) (I.take n)))
                   (OBdd.evaluate ⟨⟨U.1.heap, k.2⟩, hk2⟩ (Vector.cast (by simp) (I.take n')))
 
-private lemma inv_initial {op} {O : OBdd n m} {U : OBdd n' m'} : Invariant op O U initial := by
+lemma inv_initial {op} {O : OBdd n m} {U : OBdd n' m'} : Invariant op O U initial := by
   constructor
   · intro k p hp
     simp only [initial, Std.HashMap.getElem?_emptyWithCapacity, reduceCtorEq] at hp
   · rintro ⟨_, c⟩
-    simp only [initial, not_lt_zero] at c
+    simp only [initial, Nat.not_lt_zero] at c
 
-private def cache_get (O_root : Pointer m) (U_root : Pointer m') (s : (State n n' m m')) : (Option RawPointer) :=
+def cache_get (O_root : Pointer m) (U_root : Pointer m') (s : (State n n' m m')) : (Option RawPointer) :=
   s.cache[(⟨O_root, U_root⟩ : (Pointer m × Pointer m'))]?
 
-private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
+lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
     (hNl : ∃ k : Pointer m × Pointer m', s.cache[k]? = some N.lo)
     (hNh : ∃ k : Pointer m × Pointer m', s.cache[k]? = some N.hi)
     (hNv : N.va.1 = (toVar_or O.1.heap O.1.root (n ⊔ n')) ⊓ (toVar_or U.1.heap U.1.root (n ⊔ n')))
@@ -105,20 +101,19 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
       · simp only [Bdd.low, cook_heap]
         simp only [Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq]
         rw [← cook_low]
-        swap; apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+        swap; apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1; omega
         rcases (inv.2 kl N.lo hkl).2.2.2 with that
         apply push_ordered
         · exact this
         · exact that.2.1
-      ·
-        simp [Nat.succ_eq_add_one, Bdd.var, cook_heap, Bdd.low, RawPointer.cook]
+      · simp [Nat.succ_eq_add_one, Bdd.var, cook_heap, Bdd.low, RawPointer.cook]
         cases heq : N.lo with
         | inl val =>
           rw [← cook_low]
           simp_rw [heq]
-          · simp only [RawPointer.cook, Nat.succ_eq_add_one, Pointer.toVar, RawNode.cook,
-            Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq, Fin.lt_def,
-            Fin.val_last, lt_sup_iff]
+          · simp only [RawNode.cook, RawPointer.cook, Pointer.toVar_terminal_eq,
+              Nat.succ_eq_add_one, Fin.lt_def, Pointer.toVar_node_eq, Fin.getElem_fin,
+              Vector.getElem_ofFn, Vector.getElem_push_eq, lt_sup_iff]
             omega
           · apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
             simp
@@ -127,20 +122,19 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
             apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
           rw [← cook_low]
           simp_rw [heq]
-          · simp only [RawNode.cook, RawPointer.cook, Nat.succ_eq_add_one,
-              Fin.getElem_fin, Vector.getElem_ofFn, Pointer.toVar]
-            simp only [Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
+          · simp only [RawNode.cook, RawPointer.cook, Fin.lt_def, Nat.succ_eq_add_one,
+              Pointer.toVar_node_eq, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq]
             rw [Vector.getElem_push_lt]
             · have hvs : val < s.size := by
                 apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1 .refl heq
               exact hxl _ hvs heq
             · exact hvs
           · apply RawPointer.bounded_of_le (inv.2 kl N.lo hkl).2.2.2.1
-            simp only [le_add_iff_nonneg_right, zero_le]
+            omega
       · simp only [Bdd.high, cook_heap]
         simp only [Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq]
         rw [← cook_high]
-        swap; apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+        swap; apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; omega
         rcases (inv.2 kh N.hi hkh).2.2.2 with that
         apply push_ordered
         · exact this
@@ -151,10 +145,9 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
         | inl val =>
           rw [← cook_high]
           simp_rw [heq]
-          simp only [RawPointer.cook, Nat.succ_eq_add_one,
-            Pointer.toVar]
+          simp only [RawPointer.cook, Fin.lt_def, Nat.succ_eq_add_one, Pointer.toVar_node_eq]
           simp only [RawNode.cook, Fin.getElem_fin, Vector.getElem_ofFn, Vector.getElem_push_eq,
-            Fin.lt_def, Fin.val_last, lt_sup_iff]
+            Pointer.toVar_terminal_eq, Nat.succ_eq_add_one, lt_sup_iff]
           omega
           apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1
           simp
@@ -164,11 +157,11 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
           rw [← cook_high]
           simp_rw [heq]
           simp only [RawNode.cook, RawPointer.cook]
-          simp only [Pointer.toVar, Nat.succ_eq_add_one, Fin.getElem_fin, Vector.getElem_ofFn,
-            Vector.getElem_push_eq, Fin.mk_lt_mk, Fin.val_fin_lt, gt_iff_lt]
+          simp_rw [Fin.lt_def, Nat.succ_eq_add_one, Pointer.toVar_node_eq, Fin.getElem_fin,
+            Vector.getElem_ofFn, Vector.getElem_push_eq]
           rw [Vector.getElem_push_lt]
           exact hxh _ hvs heq
-          apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; simp only [le_add_iff_nonneg_right, zero_le]
+          apply RawPointer.bounded_of_le (inv.2 kh N.hi hkh).2.2.2.1; omega
     use hoo
     rw [show ⟨{ heap := U.1.heap, root := U.1.root }, _⟩ =  U by rfl]
     rw [show ⟨{ heap := O.1.heap, root := O.1.root }, _⟩ =  O by rfl]
@@ -187,7 +180,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
     use that.2.1
     use that.2.2.1
     have hb : ∀ {i}, p = Sum.inr i → i < s.size + 1 :=
-      RawPointer.bounded_of_le that.2.2.2.1 (by simp only [le_add_iff_nonneg_right, zero_le])
+      RawPointer.bounded_of_le that.2.2.2.1 (by omega)
     use hb
     have ho : Bdd.Ordered { heap := cook_heap (s.heap.push N) this, root := p.cook hb } := push_ordered that.2.2.2.2.1
     use ho
@@ -203,7 +196,7 @@ private lemma heap_push_aux (s : (State n n' m m')) (inv : Invariant op O U s)
         · simp only [RawPointer.cook_equiv]
     exact that.2.2.2.2.2 I
 
-private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : Invariant op O U s)
+def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : Invariant op O U s)
     (hNl : ∃ k : Pointer m × Pointer m', s.cache[k]? = some N.lo)
     (hNh : ∃ k : Pointer m × Pointer m', s.cache[k]? = some N.hi)
     (hNv : N.va.1 = (toVar_or O.1.heap O.1.root (n ⊔ n')) ⊓ (toVar_or U.1.heap U.1.root (n ⊔ n')))
@@ -228,7 +221,7 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
     · constructor
       · simp only [Std.HashMap.getElem?_insert_self]
       · constructor
-        · simp only [le_add_iff_nonneg_right, zero_le]
+        · simp only [Nat.le_add_right]
         · intro k
           constructor
           · intro p hkp
@@ -248,7 +241,7 @@ private def heap_push (N : RawNode (n ⊔ n')) (s : (State n n' m m')) (inv : In
               next heqq => rw [hk] at hq; contradiction
   ⟩
 
-private lemma insert_terminal_invariant (s0 : State n n' m m') (inv : Invariant op O U s0) (ho : O.1.root = .terminal b) (hu : U.1.root = .terminal b'):
+lemma insert_terminal_invariant (s0 : State n n' m m') (inv : Invariant op O U s0) (ho : O.1.root = .terminal b) (hu : U.1.root = .terminal b'):
     Invariant op O U { size := s0.size, heap := s0.heap, cache := s0.cache.insert (O.1.root, U.1.root) (Sum.inl (op b b')) } := by
   constructor
   intro k p hp
@@ -274,11 +267,11 @@ private lemma insert_terminal_invariant (s0 : State n n' m m') (inv : Invariant 
     · exact (inv.2 _ _ hp).1
     exact (inv.2 _ _ hp).2
 
-private lemma op_if1 (op : Bool → Bool → Bool) {c l rt rf : Bool} :
+lemma op_if1 (op : Bool → Bool → Bool) {c l rt rf : Bool} :
     op l (if c then rt else rf) = if c then (op l rt) else (op l rf) :=
-      apply_ite (op l) (c = true) rt rf
+  apply_ite (op l) (c = true) rt rf
 
-private lemma op_if2 (op : Bool → Bool → Bool) {c lt lf r : Bool} :
+lemma op_if2 (op : Bool → Bool → Bool) {c lt lf r : Bool} :
     op  (if c then lt else lf) r = if c then (op lt r) else (op lf r) := by
   split
   next h =>
@@ -286,7 +279,7 @@ private lemma op_if2 (op : Bool → Bool → Bool) {c lt lf r : Bool} :
     simp_all only
   next h => simp_all only [Bool.not_eq_true]
 
-private lemma op_if3 (op : Bool → Bool → Bool) {c lt lf rt rf : Bool} :
+lemma op_if3 (op : Bool → Bool → Bool) {c lt lf rt rf : Bool} :
     op (if c then lt else lf) (if c then rt else rf) = if c then (op lt rt) else (op lf rf) := by
   split
   next h =>
@@ -294,42 +287,42 @@ private lemma op_if3 (op : Bool → Bool → Bool) {c lt lf rt rf : Bool} :
     simp_all only
   next h => simp_all only [Bool.not_eq_true]
 
-private lemma aux_lt1_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .terminal b) (U_root_def : U.1.root = .node j') :
+lemma aux_lt1_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .terminal b) (U_root_def : U.1.root = .node j') :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap O.1.root (max n n'))
         (toVar_or U.1.heap (U.low U_root_def).1.root (max n n')) := by
   have := OBdd.var_lt_low_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt1_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .terminal b) (U_root_def : U.1.root = .node j') :
+lemma aux_lt1_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .terminal b) (U_root_def : U.1.root = .node j') :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap O.1.root (max n n'))
         (toVar_or U.1.heap (U.high U_root_def).1.root (max n n')) := by
   have := OBdd.var_lt_low_var (h := U_root_def)
   have := OBdd.var_lt_high_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt2_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .terminal b') :
+lemma aux_lt2_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .terminal b') :
     O.1.heap[j].var.1 <
     min (toVar_or O.1.heap (O.low O_root_def).1.root (max n n'))
         (toVar_or U.1.heap U.1.root (max n n')) := by
   have := OBdd.var_lt_low_var (h := O_root_def)
   have := OBdd.var_lt_high_var (h := O_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt2_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .terminal b') :
+lemma aux_lt2_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .terminal b') :
     O.1.heap[j].var.1 <
     min (toVar_or O.1.heap (O.high O_root_def).1.root (max n n'))
         (toVar_or U.1.heap U.1.root (max n n')) := by
   have := OBdd.var_lt_low_var (h := O_root_def)
   have := OBdd.var_lt_high_var (h := O_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt3_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hleq : O.1.heap[j].var.1 < U.1.heap[j'].var.1) :
+lemma aux_lt3_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hleq : O.1.heap[j].var.1 < U.1.heap[j'].var.1) :
     O.1.heap[j].var.1 <
     min (toVar_or O.1.heap (O.low O_root_def).1.root (max n n'))
         (toVar_or U.1.heap U.1.root (max n n')) := by
@@ -337,10 +330,10 @@ private lemma aux_lt3_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root
   have := OBdd.var_lt_high_var (h := O_root_def)
   have := OBdd.var_lt_low_var (h := U_root_def)
   have := OBdd.var_lt_high_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt3_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hleq : O.1.heap[j].var.1 < U.1.heap[j'].var.1) :
+lemma aux_lt3_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hleq : O.1.heap[j].var.1 < U.1.heap[j'].var.1) :
     O.1.heap[j].var.1 <
     min (toVar_or O.1.heap (O.high O_root_def).1.root (max n n'))
         (toVar_or U.1.heap U.1.root (max n n')) := by
@@ -348,10 +341,10 @@ private lemma aux_lt3_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.roo
   have := OBdd.var_lt_high_var (h := O_root_def)
   have := OBdd.var_lt_low_var (h := U_root_def)
   have := OBdd.var_lt_high_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt4_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hgeq : O.1.heap[j].var.1 > U.1.heap[j'].var.1) :
+lemma aux_lt4_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hgeq : O.1.heap[j].var.1 > U.1.heap[j'].var.1) :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap O.1.root (max n n'))
         (toVar_or U.1.heap (U.low U_root_def).1.root (max n n')) := by
@@ -359,10 +352,10 @@ private lemma aux_lt4_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root
   have := OBdd.var_lt_high_var (h := O_root_def)
   have := OBdd.var_lt_low_var (h := U_root_def)
   have := OBdd.var_lt_high_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt4_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hgeq : O.1.heap[j].var.1 > U.1.heap[j'].var.1) :
+lemma aux_lt4_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (hgeq : O.1.heap[j].var.1 > U.1.heap[j'].var.1) :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap O.1.root (max n n'))
         (toVar_or U.1.heap (U.high U_root_def).1.root (max n n')) := by
@@ -370,10 +363,10 @@ private lemma aux_lt4_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.roo
   have := OBdd.var_lt_high_var (h := O_root_def)
   have := OBdd.var_lt_low_var (h := U_root_def)
   have := OBdd.var_lt_high_var (h := U_root_def)
-  simp_all [OBdd.var, toVar_or, Pointer.toVar]
+  simp_all [OBdd.var, toVar_or]
   split <;> simp_all
 
-private lemma aux_lt5_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (heeq : O.1.heap[j].var.1 = U.1.heap[j'].var.1) :
+lemma aux_lt5_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (heeq : O.1.heap[j].var.1 = U.1.heap[j'].var.1) :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap (O.low O_root_def).1.root (max n n'))
         (toVar_or U.1.heap (U.low U_root_def).1.root (max n n')) := by
@@ -399,7 +392,7 @@ private lemma aux_lt5_low {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root
       simp_all only [Fin.getElem_fin]
       simp_all
 
-private lemma aux_lt5_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (heeq : O.1.heap[j].var.1 = U.1.heap[j'].var.1) :
+lemma aux_lt5_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.root = .node j) (U_root_def : U.1.root = .node j') (heeq : O.1.heap[j].var.1 = U.1.heap[j'].var.1) :
     U.1.heap[j'].var.1 <
     min (toVar_or O.1.heap (O.high O_root_def).1.root (max n n'))
         (toVar_or U.1.heap (U.high U_root_def).1.root (max n n')) := by
@@ -424,7 +417,7 @@ private lemma aux_lt5_high {O : OBdd n m} {U : OBdd n' m'} (O_root_def : O.1.roo
       simp_all only [Fin.getElem_fin]
       simp_all
 
-private def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n' m') (s0 : State n n' m m') (inv : Invariant op O U s0) :
+def apply_helper (op : (Bool → Bool → Bool)) (O : OBdd n m) (U : OBdd n' m') (s0 : State n n' m m') (inv : Invariant op O U s0) :
     { r : State n n' m m' × RawPointer //
       (Invariant op O U r.1) ∧
       (r.1.cache[(⟨O.1.root, U.1.root⟩ : Pointer m × Pointer m')]? = some r.2) ∧
@@ -1228,7 +1221,7 @@ decreasing_by
   · left; exact oedge_of_low
   · left; exact oedge_of_high
 
-def oapply (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' m') :
+public def oapply (op : Bool → Bool → Bool) (O : OBdd n m) (U : OBdd n' m') :
     (s : Nat) ×
     { OU : OBdd (n ⊔ n') s //
       ∀ I,
