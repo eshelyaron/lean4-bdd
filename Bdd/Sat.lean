@@ -1,5 +1,7 @@
-import Std.Sat.CNF.Basic
-import Bdd.BDD
+module
+
+public import Std.Sat.CNF.Basic
+public import Bdd.BDD
 
 namespace Sat
 
@@ -51,7 +53,9 @@ lemma BDD_of_CNF_correct {n} {f : Fin n → Bool} (C : Std.Sat.CNF (Fin n)) :
     simp only [List.all_cons, List.map_cons, List.foldr_cons, BDD.and_denotation]
     rw [ih, BDD_of_clause_correct]
 
-instance instDecidableUnsat {n} (C : Std.Sat.CNF (Fin n)) : Decidable (Std.Sat.CNF.Unsat C) :=
+@[no_expose]
+public instance instDecidableUnsat {n} (C : Std.Sat.CNF (Fin n)) :
+    Decidable (Std.Sat.CNF.Unsat C) :=
   decidable_of_iff ((BDD_of_CNF C).SemanticEquiv (BDD.const false)) ⟨l_to_r, r_to_l⟩ where
     l_to_r h := by
       simp only [BDD.SemanticEquiv] at h
@@ -78,9 +82,7 @@ instance instDecidableUnsat {n} (C : Std.Sat.CNF (Fin n)) : Decidable (Std.Sat.C
       simp only [BDD.const_nvars, Nat.zero_le, sup_of_le_left, BDD_of_CNF_correct] at h2
       refine Eq.trans ?_ h2
       apply BDD.denotation_congr
-      intro i
       simp
-      rfl
 
 -- #eval Std.Sat.CNF.eval (fun _ : Nat ↦ true) ⟨#[]⟩
 -- #eval Std.Sat.CNF.eval (fun _ : Nat ↦ true) ⟨#[]⟩

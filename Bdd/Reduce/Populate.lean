@@ -1,4 +1,8 @@
-import Bdd.Reduce.State
+module
+
+import Mathlib.Tactic.Linarith
+
+public import Bdd.Reduce.State
 
 open Pointer
 open Bdd
@@ -7,7 +11,7 @@ open RawBdd
 namespace Reduce
 
 /-- The output pointer of `get_id` is bounded by `ps.state.size`. -/
-private lemma get_id_bounded {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} {i : Nat}
+lemma get_id_bounded {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} {i : Nat}
     (inv : Invariant O ps i) {p : Pointer m}
     (h : ∀ j, p = .node j → (ps.state.ids[j]).isSome) :
     (get_id ps p h).Bounded ps.state.size := by
@@ -25,7 +29,7 @@ private lemma get_id_bounded {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} {
 
 /-- For any pointer `p` reachable from a node with all children in `ids`, extract the full
     semantic information from the invariant using `get_id`. -/
-private lemma get_id_semantic {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} {i : Nat}
+lemma get_id_semantic {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} {i : Nat}
     (inv : Invariant O ps i) (p : Pointer m)
     (hp : Bdd.Ordered ⟨O.1.heap, p⟩)
     (hch : ∀ l, p = .node l → (ps.state.ids[l]).isSome) :
@@ -48,7 +52,7 @@ private lemma get_id_semantic {n m : Nat} {O : OBdd n m} {ps : ProvedState n m} 
 
 /-- For each node j in l: if lid = hid (redundant), set ids[j] := lid;
 otherwise add to accumulator. -/
-def populate_queue {n m : Nat} (O : OBdd n m)
+public def populate_queue {n m : Nat} (O : OBdd n m)
     (i : Fin n)
     (acc : List ((RawPointer × RawPointer) × Fin m)) :
     (l : List (Fin m)) →
@@ -103,8 +107,7 @@ def populate_queue {n m : Nat} (O : OBdd n m)
         have hmay := O.2
           (show O.1.RelevantEdge ⟨.node j, hreach_j⟩ ⟨.node k, hreach_k⟩ from hedgep)
         -- Unfold the ordered-edge condition to get a Nat inequality.
-        simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar,
-                   Fin.mk_lt_mk] at hmay
+        simp only [RelevantMayPrecede, MayPrecede, Fin.lt_def, toVar_node_eq] at hmay
         -- hmay : var[j].1 < var[k].1;  hvar_j : var[j].1 = i.1
         linarith [hvar_j]
       let lid := get_id ps O.1.heap[j].low  (hchild _ (Edge.low  rfl))
@@ -184,14 +187,14 @@ def populate_queue {n m : Nat} (O : OBdd n m)
               .tail hr (Edge.low hl)
             have hmay := O.2 (show O.1.RelevantEdge ⟨.node entry.2, hr⟩ ⟨.node l, hreach_l⟩
               from Edge.low hl)
-            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar, Fin.mk_lt_mk] at hmay
+            simp only [RelevantMayPrecede, MayPrecede, Fin.lt_def, toVar_node_eq] at hmay
             have hlj : l ≠ j := fun h => by subst h; linarith [hv]
             rw [ids_set_ne l hlj]; exact hlo l hl
           · have hreach_l : Reachable O.1.heap O.1.root (.node l) :=
               .tail hr (Edge.high hl)
             have hmay := O.2 (show O.1.RelevantEdge ⟨.node entry.2, hr⟩ ⟨.node l, hreach_l⟩
               from Edge.high hl)
-            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar, Fin.mk_lt_mk] at hmay
+            simp only [RelevantMayPrecede, MayPrecede, Fin.lt_def, toVar_node_eq] at hmay
             have hlj : l ≠ j := fun h => by subst h; linarith [hv]
             rw [ids_set_ne l hlj]; exact hhi l hl
         -- VarInvariant is preserved through set_id ps j lid.
@@ -225,8 +228,7 @@ def populate_queue {n m : Nat} (O : OBdd n m)
             have hvi := hvarinv l k₀ hids_l
             have hmay := O.2 (show O.1.RelevantEdge ⟨.node j, hreach_j⟩
               ⟨.node l, .tail hreach_j (Edge.low hlow)⟩ from Edge.low hlow)
-            simp only [Bdd.RelevantMayPrecede, Pointer.MayPrecede, Pointer.toVar,
-                       Fin.mk_lt_mk] at hmay
+            simp only [RelevantMayPrecede, MayPrecede, Fin.lt_def, toVar_node_eq] at hmay
             exact Nat.le_trans (Nat.le_of_lt hmay) hvi
           · rw [ids_set_ne j₀ hjj₀] at hids₀
             exact hvarinv j₀ k₀ hids₀
@@ -320,7 +322,7 @@ def populate_queue {n m : Nat} (O : OBdd n m)
 
 /-- Any node reachable in the pushed heap was already reachable in the original heap,
     and its index is strictly less than `s` (the pre-push size). -/
-lemma push_back_lt {n s : Nat} {v : Vector (RawNode n) s} {N : RawNode n}
+public lemma push_back_lt {n s : Nat} {v : Vector (RawNode n) s} {N : RawNode n}
     {hh  : ∀ k : Fin s,       v[k].Bounded k}
     {hh' : ∀ k : Fin (s + 1), (v.push N)[k].Bounded k}
     {p : RawPointer} (hp : p.Bounded s) {hp' : p.Bounded (s + 1)} :

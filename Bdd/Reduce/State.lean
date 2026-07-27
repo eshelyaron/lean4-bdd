@@ -1,5 +1,8 @@
+module
+
+public import Bdd.Basic
 import Bdd.Collect
-import Mathlib.Data.Sum.Order
+public import Mathlib.Data.Sum.Order
 
 open Pointer
 open Bdd
@@ -7,19 +10,21 @@ open RawBdd
 
 namespace Reduce
 
-instance : LinearOrder RawPointer := inferInstanceAs (LinearOrder (Bool ⊕ₗ Nat))
+public instance : LinearOrder RawPointer := inferInstanceAs (LinearOrder (Bool ⊕ₗ Nat))
 
 lemma rawPointer_le_refl (a : RawPointer) : a ≤ a := le_refl a
 lemma rawPointer_le_total (a b : RawPointer) : a ≤ b ∨ b ≤ a := le_total a b
 lemma rawPointer_le_trans {a b c : RawPointer} : a ≤ b → b ≤ c → a ≤ c := le_trans
 lemma rawPointer_le_antisymm {a b : RawPointer} : a ≤ b → b ≤ a → a = b := le_antisymm
 
-def leKeyPair (a b : RawPointer × RawPointer) : Bool :=
+@[expose]
+public def leKeyPair (a b : RawPointer × RawPointer) : Bool :=
   if a.1 = b.1 then decide (a.2 ≤ b.2) else decide (a.1 ≤ b.1)
 
-def KeyLE (a b : RawPointer × RawPointer) : Prop := leKeyPair a b = true
+@[expose]
+public def KeyLE (a b : RawPointer × RawPointer) : Prop := leKeyPair a b = true
 
-lemma keyLE_refl (a : RawPointer × RawPointer) : KeyLE a a := by
+public lemma keyLE_refl (a : RawPointer × RawPointer) : KeyLE a a := by
   unfold KeyLE leKeyPair
   rw [if_pos rfl]
   exact decide_eq_true (rawPointer_le_refl a.2)
@@ -36,7 +41,7 @@ lemma keyLE_total (a b : RawPointer × RawPointer) : KeyLE a b ∨ KeyLE b a := 
     · exact Or.inl (decide_eq_true h)
     · exact Or.inr (decide_eq_true h)
 
-lemma keyLE_antisymm {a b : RawPointer × RawPointer} : KeyLE a b → KeyLE b a → a = b := by
+public lemma keyLE_antisymm {a b : RawPointer × RawPointer} : KeyLE a b → KeyLE b a → a = b := by
   unfold KeyLE leKeyPair
   by_cases h1 : a.1 = b.1
   · rw [if_pos h1, if_pos h1.symm]
@@ -46,7 +51,7 @@ lemma keyLE_antisymm {a b : RawPointer × RawPointer} : KeyLE a b → KeyLE b a 
     intro hab hba
     exact absurd (rawPointer_le_antisymm (of_decide_eq_true hab) (of_decide_eq_true hba)) h1
 
-lemma keyLE_trans {a b c : RawPointer × RawPointer} : KeyLE a b → KeyLE b c → KeyLE a c := by
+public lemma keyLE_trans {a b c : RawPointer × RawPointer} : KeyLE a b → KeyLE b c → KeyLE a c := by
   unfold KeyLE leKeyPair
   intro hab hbc
   by_cases h1 : a.1 = b.1 <;> by_cases h2 : b.1 = c.1
@@ -82,7 +87,7 @@ lemma keyLE_trans {a b c : RawPointer × RawPointer} : KeyLE a b → KeyLE b c �
     rw [if_neg h13]
     exact decide_eq_true hac
 
-lemma keyLE_sorted_mergeSort {m : Nat}
+public lemma keyLE_sorted_mergeSort {m : Nat}
     (l : List ((RawPointer × RawPointer) × Fin m)) :
     (l.mergeSort (fun a b => leKeyPair a.1 b.1)).Pairwise (fun a b => KeyLE a.1 b.1) := by
   have htrans : ∀ (a b c : (RawPointer × RawPointer) × Fin m),
@@ -96,44 +101,47 @@ lemma keyLE_sorted_mergeSort {m : Nat}
       · exact (Bool.or_eq_true _ _).mpr (Or.inr h)
   exact (List.pairwise_mergeSort htrans htotal l).imp (fun h => h)
 
-structure State (n) (m) where
+public structure State (n) (m) where
   size : Nat
   heap : Vector (RawNode n) size
   ids  : Vector (Option RawPointer) m
 
-structure ProvedState (n m : Nat) where
+public structure ProvedState (n m : Nat) where
   state : State n m
   hh    : ∀ k : Fin state.size, state.heap[k].Bounded k
 
 def initial (n m : Nat) : State n m :=
   ⟨0, Vector.emptyWithCapacity 0, Vector.replicate m none⟩
 
-def provedStateInitial (n m : Nat) : ProvedState n m where
+public def provedStateInitial (n m : Nat) : ProvedState n m where
   state := ⟨0, Vector.emptyWithCapacity 0, Vector.replicate m none⟩
   hh := fun k => k.elim0
 
-def get_id {n m : Nat} (ps : ProvedState n m) (p : Pointer m)
+@[expose]
+public def get_id {n m : Nat} (ps : ProvedState n m) (p : Pointer m)
     (h : ∀ j, p = .node j → (ps.state.ids[j]).isSome) : RawPointer :=
   match p with
   | .terminal b => .inl b
   | .node j     => (ps.state.ids[j]).get (h j rfl)
 
 /-- Record that input node `j` maps to output pointer `p`. -/
-def set_id {n m : Nat} (ps : ProvedState n m) (j : Fin m) (p : RawPointer) : ProvedState n m :=
+@[expose]
+public def set_id {n m : Nat} (ps : ProvedState n m) (j : Fin m) (p : RawPointer) : ProvedState n m :=
   { state := { size := ps.state.size, heap := ps.state.heap, ids := ps.state.ids.set j (some p) },
     hh    := ps.hh }
 
-lemma set_id_self {n m : Nat} (ps : ProvedState n m) (j : Fin m) (p : RawPointer) :
+public lemma set_id_self {n m : Nat} (ps : ProvedState n m) (j : Fin m) (p : RawPointer) :
     (set_id ps j p).state.ids[j] = some p := by
   show (ps.state.ids.set j (some p))[j] = some p
   simp [Vector.getElem_set_self]
 
-lemma set_id_ne {n m : Nat} (ps : ProvedState n m) (j k : Fin m) (p : RawPointer)
+public lemma set_id_ne {n m : Nat} (ps : ProvedState n m) (j k : Fin m) (p : RawPointer)
     (h : k ≠ j) : (set_id ps j p).state.ids[k] = ps.state.ids[k] := by
   show (ps.state.ids.set j (some p))[k] = ps.state.ids[k]
   exact Vector.getElem_set_ne _ _ (Fin.val_ne_of_ne h.symm)
 
-def push_node {n m : Nat} (ps : ProvedState n m) (N : RawNode n)
+@[expose]
+public def push_node {n m : Nat} (ps : ProvedState n m) (N : RawNode n)
     (hN : N.Bounded ps.state.size) : ProvedState n m × RawPointer :=
   let hh' : ∀ k : Fin (ps.state.size + 1), (ps.state.heap.push N)[k].Bounded k := fun k => by
     by_cases hlt : k.1 < ps.state.size
@@ -197,7 +205,7 @@ lemma structural_canonical_key {n s : Nat} {M : Vector (Node n s) s}
 
 /-- In a structurally canonical heap (no two positions have the same raw node),
     any ordered BDD is reduced. -/
-lemma structural_canonical_reduced {n s : Nat}
+public lemma structural_canonical_reduced {n s : Nat}
     {v : Vector (RawNode n) s} {hh : ∀ k : Fin s, v[k].Bounded k}
     (hsc : ∀ k1 k2 : Fin s, v[k1] = v[k2] → k1 = k2)
     {root : Pointer s}
@@ -244,7 +252,8 @@ lemma structural_canonical_reduced {n s : Nat}
       Bdd.ordered_of_reachable (O := O) hq_reach
     exact key ⟨⟨M, p⟩, hop⟩ ⟨⟨M, q⟩, hoq⟩ rfl rfl hsim
 
-def Invariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat) : Prop :=
+@[expose]
+public def Invariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat) : Prop :=
   -- Completeness
   (∀ (j : Fin m),
       i < O.1.heap[j].var.1 →
@@ -261,13 +270,13 @@ def Invariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat) : Prop
               OBdd.evaluate ⟨⟨cook_heap ps.state.heap ps.hh, ptr.cook hptr⟩, ho⟩ I =
               OBdd.evaluate ⟨⟨O.1.heap, .node j⟩, hj⟩ I
 
-lemma inv_initial {n m : Nat} {O : OBdd n m} {i : Nat}
+public lemma inv_initial {n m : Nat} {O : OBdd n m} {i : Nat}
     (hi : ∀ j : Fin m, O.1.heap[j].var.1 ≤ i) :
     Invariant O (provedStateInitial n m) i :=
   ⟨fun j h _ => absurd h (Nat.not_lt.mpr (hi j)),
    fun j ptr h => by simp [provedStateInitial] at h⟩
 
-lemma Invariant.ids_isSome {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
+public lemma Invariant.ids_isSome {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
     {i : Nat} (inv : Invariant O ps i)
     {j : Fin m}
     (hvar  : i < O.1.heap[j].var.1)
@@ -276,34 +285,38 @@ lemma Invariant.ids_isSome {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
   inv.1 j hvar hreach
 
 /-- When ids[j] = some (.inr k), the output node's var ≥ the input node's var. -/
-def VarInvariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) : Prop :=
+@[expose]
+public def VarInvariant {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) : Prop :=
   ∀ (j : Fin m) (k : Fin ps.state.size),
     ps.state.ids[j] = some (.inr k.1) →
     O.1.heap[j].var.1 ≤ ps.state.heap[k].va.1
 
-def AllAbove {n m : Nat} (ps : ProvedState n m) (i : Nat) : Prop :=
+@[expose]
+public def AllAbove {n m : Nat} (ps : ProvedState n m) (i : Nat) : Prop :=
   ∀ k : Fin ps.state.size, i < ps.state.heap[k].va.1
 
 /-- The heap is injective: no two positions have the same raw node. -/
-def HeapInjective {n : Nat} (ps : ProvedState n m) : Prop :=
+@[expose]
+public def HeapInjective {n : Nat} (ps : ProvedState n m) : Prop :=
   ∀ k1 k2 : Fin ps.state.size, ps.state.heap[k1] = ps.state.heap[k2] → k1 = k2
 
-lemma varInvariant_initial {n m : Nat} {O : OBdd n m} :
+public lemma varInvariant_initial {n m : Nat} {O : OBdd n m} :
     VarInvariant O (provedStateInitial n m) := by
   intro j k
   exact absurd k.isLt (by simp [provedStateInitial])
 
-lemma allAbove_initial {n m : Nat} {i : Nat} :
+public lemma allAbove_initial {n m : Nat} {i : Nat} :
     AllAbove (provedStateInitial n m) i := by
   intro k
   exact absurd k.isLt (by simp [provedStateInitial])
 
-lemma heapInjective_initial {n m : Nat} :
+public lemma heapInjective_initial {n m : Nat} :
     HeapInjective (provedStateInitial n m) := by
   intro k1
   exact absurd k1.isLt (by simp [provedStateInitial])
 
-def EntryCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat)
+@[expose]
+public def EntryCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat)
     (entry : (RawPointer × RawPointer) × Fin m) : Prop :=
   Reachable O.1.heap O.1.root (.node entry.2) ∧
   O.1.heap[entry.2].var.1 = i ∧
@@ -314,7 +327,7 @@ def EntryCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (i : Nat)
 
 /-- The BDD obtained by pushing a fresh node for `entry` is ordered, reduced, and
     evaluates like the original sub-BDD at `entry.2`. -/
-abbrev NodePushedCorrectly {n m : Nat} (O : OBdd n m) (ps : ProvedState n m)
+public abbrev NodePushedCorrectly {n m : Nat} (O : OBdd n m) (ps : ProvedState n m)
     (entry : (RawPointer × RawPointer) × Fin m)
     (hbound : entry.1.1.Bounded ps.state.size ∧ entry.1.2.Bounded ps.state.size) : Prop :=
   let N    : RawNode n := ⟨O.1.heap[entry.2].var, entry.1.1, entry.1.2⟩
@@ -330,7 +343,7 @@ abbrev NodePushedCorrectly {n m : Nat} (O : OBdd n m) (ps : ProvedState n m)
          OBdd.evaluate ⟨⟨O.1.heap, .node entry.2⟩, hj⟩ I
 
 /-- The current pointer `curptr` correctly represents the sub-BDD at `entry.2`. -/
-abbrev CurptrSemantic {n m : Nat} (O : OBdd n m) (ps : ProvedState n m)
+public abbrev CurptrSemantic {n m : Nat} (O : OBdd n m) (ps : ProvedState n m)
     (curptr : RawPointer) (entry : (RawPointer × RawPointer) × Fin m) : Prop :=
   ∃ hj : Bdd.Ordered ⟨O.1.heap, .node entry.2⟩,
   ∃ hp : curptr.Bounded ps.state.size,

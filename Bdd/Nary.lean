@@ -1,18 +1,23 @@
+module
+
 import Mathlib.Data.Vector.Basic
 
 namespace Nary
 
+public section
+
 abbrev Func n α β := Vector α n → β
 
 /-- `IndependentOf f i` if the output of `f` does not depend on the value of the `i`th input. -/
-@[simp]
+@[simp, expose]
 def IndependentOf (f : Func n α β) (i : Fin n) := ∀ a v, f v = f (Vector.set v i a)
 
 /-- `DependsOn f i` if the output of `f` depends on the value of the `i`th input. -/
-@[simp]
+@[simp, expose]
 def DependsOn (f : Func n α β) (i : Fin n) := ¬ IndependentOf f i
 
 /-- The type of indices that a given function depends on. -/
+@[expose]
 def Dependency (f : Func n α β) := { i // DependsOn f i }
 
 lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} :
@@ -79,7 +84,7 @@ lemma ne_implies_dependency_getElem_ne {f : Func n α β} {I J : Vector α n} :
   simp only [Fin.getElem_fin, ne_eq, not_exists, not_not]
   exact Nary.eq_of_forall_dependency_getElem_eq
 
-@[simp]
+@[expose, simp]
 def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦ f (I.set i a)
 
 @[simp]
@@ -98,5 +103,7 @@ lemma restrict_if {c : Func n α Bool} :
     restrict (fun I ↦ if c I then f I else g I) b i =
     fun I ↦ if (restrict c b i I) then (restrict f b i I) else (restrict g b i I) :=
   funext (fun _ ↦ rfl)
+
+end
 
 end Nary
