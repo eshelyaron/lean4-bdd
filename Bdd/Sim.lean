@@ -1,9 +1,11 @@
-import Bdd.Lift
+module
+
+public import Bdd.Basic
 import Std.Data.HashMap.Lemmas
 
 namespace Sim
 
-private structure State (O : OBdd n m) (U : OBdd n m') where
+structure State (O : OBdd n m) (U : OBdd n m') where
   lr : Std.HashMap (Fin m) (Fin m')
   rl : Std.HashMap (Fin m') (Fin m)
   hl : ∀ j j',
@@ -19,7 +21,7 @@ private structure State (O : OBdd n m) (U : OBdd n m') where
       ∃ hj' : Bdd.Ordered ⟨U.1.heap, .node j'⟩,
         OBdd.HSimilar ⟨⟨O.1.heap, .node j⟩, hj⟩ ⟨⟨U.1.heap, .node j'⟩, hj'⟩
 
-private def sim_helper
+def sim_helper
     (O : OBdd n m) (hO : OBdd.Reduced O)
     (U : OBdd n m') (hU : OBdd.Reduced U)
     (p : Pointer m) (hpr : Pointer.Reachable O.1.heap O.1.root p)
@@ -29,7 +31,7 @@ private def sim_helper
     (Decidable
       (OBdd.HSimilar
         ⟨⟨O.1.heap, p⟩, Bdd.ordered_of_reachable hpr⟩
-        ⟨⟨U.1.heap, q⟩, Bdd.ordered_of_reachable hqr⟩)) := do
+        ⟨⟨U.1.heap, q⟩, Bdd.ordered_of_reachable hqr⟩)) :=
   match hp : p with
   | .terminal b =>
     match hq : q with
@@ -43,7 +45,7 @@ private def sim_helper
     | .terminal b' => return isFalse (by simp [OBdd.HSimilar, OBdd.toTree_terminal', OBdd.toTree_node])
     | .node j' =>
       if hv : O.1.heap[j].var = U.1.heap[j'].var
-      then
+      then do
         let s ← get
         match hl : s.lr[j]? with
         | none =>
@@ -171,9 +173,9 @@ private def sim_helper
 termination_by OBdd.size' (⟨⟨O.1.heap, p⟩, Bdd.ordered_of_reachable hpr⟩ : OBdd n m)
 decreasing_by
   · simp [OBdd.size_node, OBdd.low, Bdd.low]; omega
-  · simp [OBdd.size_node, OBdd.high, Bdd.high]
+  · simp [OBdd.size_node, OBdd.high, Bdd.high]; omega
 
-instance instDecidableRobddHSimilar
+public def decidableRobddHSimilar
     (O : OBdd n m) (hO : O.Reduced)
     (U : OBdd n m') (hU : U.Reduced) :
     Decidable (O.HSimilar U) :=
