@@ -1,3 +1,7 @@
+module
+
+public import Bdd.Basic
+import Bdd.Reduce.Populate
 import Bdd.Reduce.Process
 import Bdd.Reduce.Discover
 
@@ -8,7 +12,7 @@ open RawBdd
 namespace Reduce
 
 /-- Process all input nodes at variable level `i`. -/
-private def step {n m : Nat} (O : OBdd n m)
+def step {n m : Nat} (O : OBdd n m)
     (vlist : Vector (List (Fin m)) n) (i : Fin n)
     (ps : ProvedState n m) (inv : Invariant O ps i.1)
     (hdiscover_inv : ∀ j ∈ vlist[i],
@@ -106,7 +110,7 @@ private def step {n m : Nat} (O : OBdd n m)
 
 /-- After processing variable level `i`, the completeness extends to `i - 1`:
 every reachable node at any level `≥ i` (not just `> i`) has its id set. -/
-private lemma invariant_step_down {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
+lemma invariant_step_down {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
     {i : Nat}
     (inv  : Invariant O ps i)
     (hset : ∀ (j : Fin m), O.1.heap[j].var.1 = i →
@@ -131,7 +135,7 @@ structure RootCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (ptr : R
 /-- Process levels from `i` down to `O.1.heap[r].var`, returning a final state
 in which `r`'s id is set and the correctness invariant holds for the root.
 `h_le` witnesses that `O.1.heap[r].var.1 ≤ i.1`, maintained by the recursion. -/
-private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
+def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
     (hr    : O.1.root = .node r)
     (vlist : Vector (List (Fin m)) n)
     (hdiscover : ∀ (j : Fin m),
@@ -193,12 +197,12 @@ decreasing_by simp_all
 -- Top-level
 -- ---------------------------------------------------------------------------
 
-private def zero_vars_to_bool : Bdd 0 m → Bool
+def zero_vars_to_bool : Bdd 0 m → Bool
   | B => match B.root with
     | .terminal b => b
     | .node j     => False.elim (Nat.not_lt_zero _ B.heap[j].var.2)
 
-def oreduce (O : OBdd n m) :
+public def oreduce (O : OBdd n m) :
     { p : (s : Nat) × OBdd n s // OBdd.Reduced p.2 ∧ p.2.evaluate = O.evaluate } :=
   match n with
   | .zero =>
@@ -231,7 +235,7 @@ def oreduce (O : OBdd n m) :
 lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).1.2 := (oreduce O).2.1
 
 @[simp]
-lemma oreduce_evaluate {O : OBdd n m} : (oreduce O).1.2.evaluate = O.evaluate :=
+public lemma oreduce_evaluate {O : OBdd n m} : (oreduce O).1.2.evaluate = O.evaluate :=
   (oreduce O).2.2
 
 end Reduce

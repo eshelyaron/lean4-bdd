@@ -1,40 +1,45 @@
-import Bdd.Basic
-import Mathlib.Data.Fintype.Vector
+module
+
+public import Bdd.Basic
+public import Mathlib.Data.Fintype.Vector
 import Mathlib.Data.Fintype.BigOperators
 import Std.Data.HashMap.Lemmas
 
 namespace Count
 
-def Solution (O : OBdd n m) := { I : Vector Bool n // O.evaluate I = true}
+@[expose]
+public def Solution (O : OBdd n m) := { I : Vector Bool n // O.evaluate I = true}
 
-private lemma solution_iff_exists (O : OBdd n m) (i : Fin n) : O.evaluate I = true ↔ ∃ b, I[i] = b ∧ O.evaluate I = true := by simp
-private lemma solution_iff_or (O : OBdd n m) (i : Fin n) :
+lemma solution_iff_exists (O : OBdd n m) (i : Fin n) : O.evaluate I = true ↔ ∃ b, I[i] = b ∧ O.evaluate I = true := by simp
+lemma solution_iff_or (O : OBdd n m) (i : Fin n) :
     (fun I ↦ O.evaluate I = true) = (fun I ↦ (I[i] = false ∧ O.evaluate I = true) ∨ (I[i] = true ∧ O.evaluate I = true)) := by
   ext I
   nth_rw 1 [solution_iff_exists O i]
   simp only [Bool.exists_bool]
 
-private def my_vector_equiv_vector : List.Vector α n ≃ Vector α n where
+def my_vector_equiv_vector : List.Vector α n ≃ Vector α n where
   toFun     := fun l ↦ ⟨l.toList.toArray, .trans List.size_toArray   (List.Vector.toList_length _)⟩
   invFun    := fun v ↦ ⟨v.toList,         .trans Array.length_toList (Vector.size_toArray       _)⟩
-  left_inv  := fun x ↦ (by simp)
-  right_inv := fun x ↦ (by simp; try rfl)
+  left_inv _  := rfl
+  right_inv _ := rfl
 
-private instance instVectorFintype [Fintype α] {n : ℕ} : Fintype (Vector α n) := Fintype.ofEquiv (List.Vector α n) my_vector_equiv_vector
+@[no_expose]
+public instance instVectorFintype [Fintype α] {n : ℕ} : Fintype (Vector α n) :=
+  Fintype.ofEquiv (List.Vector α n) my_vector_equiv_vector
 
 @[simp]
-private lemma my_card_vector [Fintype α] (n : Nat) : Fintype.card (Vector α n) = Fintype.card α ^ n :=
+lemma my_card_vector [Fintype α] (n : Nat) : Fintype.card (Vector α n) = Fintype.card α ^ n :=
   .trans (Fintype.ofEquiv_card my_vector_equiv_vector) (card_vector n)
 
-instance instFintypeSolution {O : OBdd n m} : Fintype (Solution O) := Subtype.fintype _
+public instance instFintypeSolution {O : OBdd n m} : Fintype (Solution O) := Subtype.fintype _
 
-abbrev numSolutions (O : OBdd n m) : Nat := Fintype.card (Solution O)
+public abbrev numSolutions (O : OBdd n m) : Nat := Fintype.card (Solution O)
 
-private lemma numSolutions_eq_card_or (O : OBdd n m) (i : Fin n) :
+lemma numSolutions_eq_card_or (O : OBdd n m) (i : Fin n) :
     numSolutions O = Fintype.card {I : Vector Bool n // (I[i] = false ∧ O.evaluate I = true) ∨ (I[i] = true ∧ O.evaluate I = true)} :=
   Fintype.card_congr (Equiv.subtypeEquivProp (solution_iff_or ..))
 
-private lemma card_solution_low (O : OBdd n m) (h : O.1.root = .node j):
+lemma card_solution_low (O : OBdd n m) (h : O.1.root = .node j):
     Fintype.card {I : Vector Bool n // I[O.1.heap[j].var] = false ∧ O.evaluate I = true} = Fintype.card {I : Vector Bool n // I[O.1.heap[j].var] = false ∧ (O.low h).evaluate I = true} :=
   Fintype.card_congr (Equiv.subtypeEquivProp (by
     ext I
@@ -47,7 +52,7 @@ private lemma card_solution_low (O : OBdd n m) (h : O.1.root = .node j):
     simp only [Vector.set_getElem_self]
   ))
 
-private lemma card_solution_high (O : OBdd n m) (h : O.1.root = .node j):
+lemma card_solution_high (O : OBdd n m) (h : O.1.root = .node j):
     Fintype.card {I : Vector Bool n // I[O.1.heap[j].var] = true ∧ O.evaluate I = true} = Fintype.card {I : Vector Bool n // I[O.1.heap[j].var] = true ∧ (O.high h).evaluate I = true} :=
   Fintype.card_congr (Equiv.subtypeEquivProp (by
     ext I
@@ -60,7 +65,7 @@ private lemma card_solution_high (O : OBdd n m) (h : O.1.root = .node j):
     simp only [Vector.set_getElem_self]
   ))
 
-private lemma aux {i : Fin n} {P Q : Vector Bool n → Prop}: Disjoint (fun I ↦ I[i] = false ∧ P I)  (fun I ↦ I[i] = true ∧ Q I) := by
+lemma aux {i : Fin n} {P Q : Vector Bool n → Prop}: Disjoint (fun I ↦ I[i] = false ∧ P I)  (fun I ↦ I[i] = true ∧ Q I) := by
   intro p hp1 hp2
   simp only [le_bot_iff]
   ext I
@@ -70,7 +75,7 @@ private lemma aux {i : Fin n} {P Q : Vector Bool n → Prop}: Disjoint (fun I �
   have hI2 := hp2 I contra
   simp_all
 
-private lemma aux_low {O : OBdd n m} {h : O.1.root = .node j}: (O.low h).evaluate (I.set (O.1.heap[j.1].var : Fin n) b) = (O.low h).evaluate I := by
+lemma aux_low {O : OBdd n m} {h : O.1.root = .node j}: (O.low h).evaluate (I.set (O.1.heap[j.1].var : Fin n) b) = (O.low h).evaluate I := by
   have : Nary.IndependentOf (O.low h).evaluate O.1.heap[j.1].var := by
     apply OBdd.independentOf_lt_root (O := (O.low h)) (i := ⟨O.1.heap[j.1].var.1, ?_⟩)
     have := OBdd.var_lt_low_var (O := O) (h := h)
@@ -80,7 +85,7 @@ private lemma aux_low {O : OBdd n m} {h : O.1.root = .node j}: (O.low h).evaluat
     exact this
   simp_all
 
-private lemma aux_high {O : OBdd n m} {h : O.1.root = .node j}: (O.high h).evaluate (I.set (O.1.heap[j.1].var) b) = (O.high h).evaluate I := by
+lemma aux_high {O : OBdd n m} {h : O.1.root = .node j}: (O.high h).evaluate (I.set (O.1.heap[j.1].var) b) = (O.high h).evaluate I := by
   have : Nary.IndependentOf (O.high h).evaluate O.1.heap[j.1].var := by
     apply OBdd.independentOf_lt_root (O := (O.high h)) (i := ⟨O.1.heap[j.1].var.1, ?_⟩)
     have := OBdd.var_lt_high_var (O := O) (h := h)
@@ -90,7 +95,7 @@ private lemma aux_high {O : OBdd n m} {h : O.1.root = .node j}: (O.high h).evalu
     exact this
   simp_all
 
-private lemma numSolutions_node {O : OBdd n m} {j : Fin m} (h : O.1.root = .node j) : numSolutions O + numSolutions O = numSolutions (O.low h) + numSolutions (O.high h) := by
+lemma numSolutions_node {O : OBdd n m} {j : Fin m} (h : O.1.root = .node j) : numSolutions O + numSolutions O = numSolutions (O.low h) + numSolutions (O.high h) := by
   nth_rw 1 [numSolutions_eq_card_or O O.1.heap[j].var]
   rw [Fintype.card_subtype_or_disjoint _ _ aux]
   · rw [card_solution_low O h]
@@ -123,12 +128,12 @@ private lemma numSolutions_node {O : OBdd n m} {j : Fin m} (h : O.1.root = .node
       rw [← numSolutions_eq_card_or _ O.1.heap[j].var]
       rw [← numSolutions_eq_card_or _ O.1.heap[j].var]
 
-private def Invariant (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat) :=
+def Invariant (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat) :=
   ∀ p (hp : p ∈ s),
     ∃ ho : Bdd.Ordered ⟨O.1.heap, p⟩,
       s[p]'hp = numSolutions ⟨⟨O.1.heap, p⟩, ho⟩
 
-private def PostCond (O : OBdd n m) (s r : Std.HashMap (Pointer m) Nat) :=
+def PostCond (O : OBdd n m) (s r : Std.HashMap (Pointer m) Nat) :=
   (∀ p,
     (∀ i, s[p]? = some i → r[p]? = some i) ∧
     (r[p]? = none → s[p]? = none) ∧
@@ -139,7 +144,7 @@ instance postCond_refl : Std.Refl (PostCond O) where
     intro _ _
     grind only
 
-private lemma postCond_terminal (hr : s[O.1.root]? = none) (h : O.1.root = Pointer.terminal b) :
+lemma postCond_terminal (hr : s[O.1.root]? = none) (h : O.1.root = Pointer.terminal b) :
     PostCond O s (s.insert (Pointer.terminal b) i) := by
   intro p
   constructor
@@ -163,7 +168,7 @@ private lemma postCond_terminal (hr : s[O.1.root]? = none) (h : O.1.root = Point
         left
       next => simp_all
 
-private lemma invariant_false (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
+lemma invariant_false (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
     Invariant O (s.insert (Pointer.terminal false) 0) := by
   intro p hp
   simp only [Std.HashMap.mem_insert, beq_iff_eq] at hp
@@ -180,7 +185,7 @@ private lemma invariant_false (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) 
     next heq => subst heq; simp [numSolutions, Solution]
     next => exact hb
 
-private lemma invariant_true (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
+lemma invariant_true (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
     Invariant O (s.insert (Pointer.terminal true) (2 ^ n)) := by
   intro p hp
   simp only [Std.HashMap.mem_insert, beq_iff_eq] at hp
@@ -197,7 +202,7 @@ private lemma invariant_true (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (
     next heq => subst heq; simp [numSolutions, Solution]
     next => exact hb
 
-private lemma invariant_node (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) (h : O.1.root = Pointer.node j) :
+lemma invariant_node (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) (h : O.1.root = Pointer.node j) :
     Invariant O (s.insert (Pointer.node j) (((numSolutions (O.low h)) + (numSolutions (O.high h))) / 2)) := by
   intro p hp
   simp only [Std.HashMap.mem_insert, beq_iff_eq] at hp
@@ -209,8 +214,8 @@ private lemma invariant_node (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (
     simp only [Std.HashMap.getElem_insert_self]
     symm
     apply Nat.eq_div_of_mul_eq_left
-    · simp only [ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true]
-    · rw [mul_two]
+    · omega
+    · rw [Nat.mul_two]
       exact numSolutions_node h
   | inr hp =>
     obtain ⟨ha, hb⟩ := inv p hp
@@ -223,12 +228,12 @@ private lemma invariant_node (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (
       simp_rw [← h]
       symm
       apply Nat.eq_div_of_mul_eq_left
-      · simp only [ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true]
-      · rw [mul_two]
+      · omega
+      · rw [Nat.mul_two]
         exact numSolutions_node h
     next => exact hb
 
-private def count_helper (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
+def count_helper (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv : Invariant O s) :
     { r : Std.HashMap (Pointer m) Nat //
       Invariant O r ∧
       O.1.root ∈ r ∧
@@ -284,7 +289,6 @@ private def count_helper (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv 
                     rfl
                     simp only [h, OBdd.high, Bdd.high, Fin.getElem_fin]
                     right
-                    rfl
                   · exact (hh2 _).2.2 hm ⟨_, hp2⟩
                 | some val =>
                   trans (O.low h).1.root
@@ -292,16 +296,15 @@ private def count_helper (O : OBdd n m) (s : Std.HashMap (Pointer m) Nat ) (inv 
                     rfl
                     simp only [h, OBdd.low, Bdd.low, Fin.getElem_fin]
                     left
-                    rfl
                   · exact (hl2 _).2.2 hp1 ⟨_, hm⟩
       ⟩
 termination_by O
 
-def count (O : OBdd n m) : Nat :=
+public def count (O : OBdd n m) : Nat :=
   let ⟨r, _, hin, _⟩ := count_helper O (Std.HashMap.emptyWithCapacity) (by simp [Invariant])
   r[O.1.root]'hin
 
-lemma count_corrent {O : OBdd n m} : count O = numSolutions O := by
+public lemma count_corrent {O : OBdd n m} : count O = numSolutions O := by
   simp only [count]
   split
   next _ inv hin _ _ => exact (inv _ hin).2

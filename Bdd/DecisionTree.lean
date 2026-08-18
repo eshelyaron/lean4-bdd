@@ -1,4 +1,8 @@
+module
+
 import Mathlib.Data.Vector.Basic
+
+public section
 
 inductive DecisionTree n where
   | leaf   : Bool  → DecisionTree _
@@ -7,10 +11,12 @@ deriving DecidableEq
 
 namespace DecisionTree
 
+@[expose]
 def evaluate : DecisionTree n → Vector Bool n → Bool
   | leaf b, _ => b
   | branch j l h, v => if v[j] then h.evaluate v else l.evaluate v
 
+@[expose]
 def size {n} : DecisionTree n → Nat
   | leaf _ => 0
   | branch _ l h => 1 + l.size + h.size
@@ -36,6 +42,7 @@ lemma usesVar_iff (i : Fin n) (T : DecisionTree n) :
       | inl => simp_all [usesVar.low]
       | inr => simp_all [usesVar.high]
 
+@[expose]
 def lift : n ≤ n' → DecisionTree n → DecisionTree n'
   | _, .leaf b => .leaf b
   | e, .branch j l h => .branch ⟨j.1, by omega⟩ (lift e l) (lift e h)
@@ -74,6 +81,7 @@ lemma lift_evaluate {h : n ≤ n'} {T : DecisionTree n} {I : Vector Bool n'} :
     rw [← this]
     rfl
 
+@[expose, simp]
 def relabel {f : Nat → Nat} (hf : ∀ i : Fin n, f i < f n) : DecisionTree n → DecisionTree (f n)
   | .leaf b => .leaf b
   | .branch i l h => .branch ⟨f i, hf i⟩ (relabel hf l) (relabel hf h)
@@ -105,3 +113,5 @@ lemma relabel_injective {f : Nat → Nat} {hf : ∀ i : Fin n, f i < f n} {h : �
         apply h _ _ (usesVar.low hii) (usesVar.low hii') hfi
 
 end DecisionTree
+
+end

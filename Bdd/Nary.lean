@@ -1,18 +1,40 @@
+module
+
 import Mathlib.Data.Vector.Basic
 
 namespace Nary
 
+public section
+
 abbrev Func n α β := Vector α n → β
 
 /-- `IndependentOf f i` if the output of `f` does not depend on the value of the `i`th input. -/
-@[simp]
+@[simp, expose]
 def IndependentOf (f : Func n α β) (i : Fin n) := ∀ a v, f v = f (Vector.set v i a)
 
 /-- `DependsOn f i` if the output of `f` depends on the value of the `i`th input. -/
-@[simp]
+@[simp, expose]
 def DependsOn (f : Func n α β) (i : Fin n) := ¬ IndependentOf f i
 
+-- TODO : use this as the definition instead?
+lemma dependsOn_iff {n α β} {f : Func n α β} {i : Fin n} :
+    DependsOn f i ↔ ∃ v1 v2, (∀ i' ≠ i, v1[i'] = v2[i']) ∧ f v1 ≠ f v2 := by
+  simp only [DependsOn, IndependentOf, not_forall, ne_eq, Fin.getElem_fin]
+  constructor
+  · grind only [= Vector.getElem_set]
+  · contrapose
+    simp only [not_exists, not_not, not_and]
+    intro h1 v1 v2 h2
+    rw[h1 v2[i] v1]
+    congr
+    ext i' hi'
+    by_contra h
+    simp at h
+    specialize h2 ⟨i', hi'⟩
+    grind only [= Vector.getElem_set]
+
 /-- The type of indices that a given function depends on. -/
+@[expose]
 def Dependency (f : Func n α β) := { i // DependsOn f i }
 
 lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} :
@@ -40,7 +62,7 @@ lemma eq_of_forall_dependency_getElem_eq {f : Func n α β} {I J : Vector α n} 
     by_cases hf : DependsOn f ⟨n, Nat.lt_add_one n⟩
     · have h1 := h ⟨⟨n, Nat.lt_add_one n⟩, hf⟩
       rw [h2 I rfl]
-      rw [h2 J (by convert h1)]
+      rw [h2 J h1]
       apply ih
       rintro ⟨x, hx⟩
       simp only [g] at hx
@@ -79,7 +101,7 @@ lemma ne_implies_dependency_getElem_ne {f : Func n α β} {I J : Vector α n} :
   simp only [Fin.getElem_fin, ne_eq, not_exists, not_not]
   exact Nary.eq_of_forall_dependency_getElem_eq
 
-@[simp]
+@[expose, simp]
 def restrict (f : Func n α β) : α → Fin n → Func n α β := fun a i I ↦ f (I.set i a)
 
 @[simp]
@@ -98,5 +120,7 @@ lemma restrict_if {c : Func n α Bool} :
     restrict (fun I ↦ if c I then f I else g I) b i =
     fun I ↦ if (restrict c b i I) then (restrict f b i I) else (restrict g b i I) :=
   funext (fun _ ↦ rfl)
+
+end
 
 end Nary
