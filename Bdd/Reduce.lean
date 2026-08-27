@@ -1,1 +1,3 @@
-import Bdd.Reduce.Main
+module
+
+public import Bdd.Reduce.Main

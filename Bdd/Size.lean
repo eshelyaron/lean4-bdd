@@ -1,29 +1,14 @@
+module
+
+public import Bdd.Basic
 import Bdd.Collect
 
 namespace Size
 
-def size : OBdd n m → Nat := List.length ∘ Collect.collect
+public def size {n m} : OBdd n m → Nat := List.length ∘ Collect.collect
 
-lemma isTerminal_iff_size_eq_zero {n m} {O : OBdd n m} : size O = 0 ↔ O.isTerminal := by
-  constructor
-  · intro h
-    simp only [size, Function.comp_apply, List.length_eq_zero_iff] at h
-    cases O_root_def : O.1.root with
-    | terminal b => use b
-    | node j =>
-      have := Collect.collect_spec (j := j) (by rw [O_root_def]; exact Relation.ReflTransGen.refl)
-      rw [h] at this
-      contradiction
-  · rintro ⟨b, hb⟩
-    simp [size, Collect.collect_terminal hb]
-
-def bool_of_size_eq_zero {n m} (O : OBdd n m) (h : size O = 0) : Bool :=
-  match O_root_def : O.1.root with
-  | .terminal b => b
-  | .node _ => False.elim (not_isTerminal_of_root_eq_node O_root_def (isTerminal_iff_size_eq_zero.mp h))
-
-lemma size_spec {O : OBdd n m} : size O = OBdd.size O := by
-  simp only [size, OBdd.size, Function.comp_apply]
+public lemma size_spec {O : OBdd n m} : size O = OBdd.size O := by
+  simp only [size, OBdd.size_eq_card_reachable, Function.comp_apply]
   simp_rw [Fintype.card, Finset.univ]
   have : (Collect.collect O).length = (Multiset.ofList (Collect.collect O)).card := by rfl
   rw [this]
@@ -38,20 +23,18 @@ lemma size_spec {O : OBdd n m} : size O = OBdd.size O := by
     simp only [List.get_eq_getElem, Subtype.mk.injEq] at heq
     exact (List.Nodup.getElem_inj_iff Collect.collect_nodup).mp heq
 
-lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
+public lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
     size O ≤ 1 + (size (O.low h)) + (size (O.high h)) := by
   repeat rw [size_spec]
-  repeat rw [OBdd.size]
   rw [show 1 = Fintype.card {j' // j' = j} by simp]
   rw [add_assoc]
-  rw [← Fintype.card_sum]
-  rw [← Fintype.card_sum]
+  simp only [OBdd.size_eq_card_reachable, ← Fintype.card_sum]
   refine Fintype.card_le_of_embedding ⟨?_, ?_⟩
   · exact
     fun ⟨j', hj'⟩ ↦ match decEq j' j with
       | isTrue ht => .inl ⟨j', ht⟩
       | isFalse hf => .inr (
-        match Pointer.instDecidableReachable (O.low h) (.node j') with
+        match OBdd.instDecidableReachable (O.low h) (.node j') with
         | isTrue htt => .inl ⟨j', htt⟩
         | isFalse hff => .inr ⟨j', by
           apply OBdd.reachable_or_eq_low_high at hj'
@@ -64,11 +47,11 @@ lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
             subst that
             cases hjj2 with
             | inl hhh => simp_all
-            | inr hhh => exact hhh
+            | inr hhh => simp_all
           ⟩
         )
   · intro x y hxy
-    simp only [OBdd.low_heap_eq_heap, OBdd.high_heap_eq_heap] at hxy
+    simp only at hxy
     split at hxy
     next =>
       split at hxy <;> (refine Subtype.ext ?_; simp_all)
@@ -79,9 +62,10 @@ lemma size_node_le {O : OBdd n m} {h : O.1.root = .node j} :
         next => simp_all
         next => split at hxy <;> (refine Subtype.ext ?_; simp_all))
 
-private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
+lemma size_le_helper {n m} {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1 := by
   cases O_root_def : O.1.root with
-  | terminal b => simp [isTerminal_iff_size_eq_zero.mpr ⟨b, O_root_def⟩]
+  | terminal b =>
+    simp only [size_spec, O.size_terminal O_root_def, Nat.zero_le]
   | node j =>
     calc _
       _ ≤ 1 + (size (O.low O_root_def)) + (size (O.high O_root_def)) := size_node_le
@@ -90,28 +74,28 @@ private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1
         have := size_le_helper (O := O.high O_root_def)
         omega
       _ ≤ 1 + (2 ^ (n - (O.1.var.1 + 1)) - 1) + (2 ^ (n - (O.high O_root_def).1.var.1) - 1) := by
-        simp only [Nat.succ_eq_add_one, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, Nat.add_le_add_iff_right, Nat.add_le_add_iff_left, Nat.sub_le_iff_le_add]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
-        apply pow_le_pow_right' (by simp)
+        apply Nat.pow_le_pow_right (by simp)
         have := OBdd.var_lt_low_var (h := O_root_def)
-        simp only [OBdd.var] at this
+        simp only [OBdd.var_eq_bdd_var] at this
         omega
       _ ≤ 1 + (2 ^ (n - (O.1.var.1 + 1)) - 1) + (2 ^ (n - (O.1.var.1 + 1)) - 1) := by
-        simp only [Nat.succ_eq_add_one, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, Nat.add_le_add_iff_left, Nat.sub_le_iff_le_add]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
-        apply pow_le_pow_right' (by simp)
+        apply Nat.pow_le_pow_right (by simp)
         have := OBdd.var_lt_high_var (h := O_root_def)
-        simp only [OBdd.var] at this
+        simp only [OBdd.var_eq_bdd_var] at this
         omega
       _ ≤ 1 + (2 ^ ((n - O.1.var.1) - 1) - 1) + (2 ^ (n - (O.1.var.1 + 1)) - 1) := by
-        simp only [Nat.succ_eq_add_one, add_le_add_iff_right, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, Nat.add_le_add_iff_right, Nat.add_le_add_iff_left, Nat.sub_le_iff_le_add]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
-        apply pow_le_pow_right' (by simp)
+        apply Nat.pow_le_pow_right (by simp)
         omega
       _ ≤ 1 + (2 ^ ((n - O.1.var.1) - 1) - 1) + (2 ^ ((n - O.1.var.1) - 1) - 1) := by
-        simp only [Nat.succ_eq_add_one, add_le_add_iff_left, tsub_le_iff_right]
+        simp only [Nat.succ_eq_add_one, Nat.add_le_add_iff_left, Nat.sub_le_iff_le_add]
         rw [Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
-        apply pow_le_pow_right' (by simp)
+        apply Nat.pow_le_pow_right (by simp)
         omega
       _ ≤ 2 ^ ((n - O.1.var.1) - 1) + 2 ^ ((n - O.1.var.1) - 1) - 1 := by
         simp only [Nat.succ_eq_add_one]
@@ -122,14 +106,14 @@ private lemma size_le_helper {O : OBdd n m} : size O ≤ 2 ^ (n - O.1.var.1) - 1
         refine Nat.sub_le_sub_right ?_ 1
         apply le_of_eq
         refine mul_pow_sub_one ?_ 2
-        simp [O_root_def]
+        simp only [Bdd.var_node O_root_def, Fin.val_castSucc]
         omega
 termination_by O
 
-lemma size_le {O : OBdd n m} : size O ≤ 2 ^ n - 1 := by
+public lemma size_le {O : OBdd n m} : size O ≤ 2 ^ n - 1 := by
   trans 2 ^ (n - O.1.var.1) - 1
   · exact size_le_helper
-  · rw [tsub_le_iff_right, Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
+  · rw [Nat.sub_le_iff_le_add, Nat.sub_add_cancel (by exact Nat.one_le_two_pow)]
     apply Nat.pow_le_pow_right <;> omega
 
 end Size

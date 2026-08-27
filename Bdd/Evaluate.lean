@@ -1,6 +1,10 @@
-import Bdd.Basic
+module
+
+public import Bdd.Basic
 
 namespace Evaluate
+
+public section
 
 def evaluate (O : OBdd n m) : Vector Bool n → Bool := fun I ↦
   match h : O.1.root with
@@ -12,21 +16,23 @@ lemma evaluate_evaluate : evaluate O = OBdd.evaluate O := by
   ext I
   unfold evaluate
   split
-  next b hb => simp [OBdd.evaluate_terminal' hb]
+  next b hb => simp [OBdd.evaluate_terminal hb]
   next j hj =>
     have := evaluate_evaluate (O := O.low hj)
     have := evaluate_evaluate (O := O.high hj)
-    simp [OBdd.evaluate_node'' hj, *]
+    simp only [Pointer.node.injEq, OBdd.evaluate_node, *]
 termination_by O
 
 lemma evaluate_terminal {O : OBdd n m} : O.1.root = .terminal b → evaluate O = Function.const _ b := by
   rw [evaluate_evaluate]
-  exact OBdd.evaluate_terminal'
+  exact OBdd.evaluate_terminal
 
 lemma evaluate_node {O : OBdd n m} (h : O.1.root = .node j) :
     evaluate O = fun I ↦ if I[O.1.heap[j].var] then evaluate (O.high h) I else evaluate (O.low h) I := by
   rw [evaluate_evaluate]
-  rw [OBdd.evaluate_node'' h]
+  rw [OBdd.evaluate_node' h]
   simp [evaluate_evaluate]
+
+end
 
 end Evaluate

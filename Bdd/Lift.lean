@@ -1,104 +1,46 @@
-import Bdd.Basic
+module
+
+public import Bdd.Basic
 
 namespace Lift
 
-@[simp]
-private def lift (h : n ≤ n') (B : Bdd n m) : Bdd n' m :=
+def lift {n n' m} (h : n ≤ n') (B : Bdd n m) : Bdd n' m :=
   ⟨ Vector.map
       (fun N ↦ ⟨⟨N.var.1, Fin.val_lt_of_le N.var h⟩, N.low, N.high⟩)
       B.heap,
     B.root
   ⟩
 
-private lemma lift_edge_iff {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
-    Edge B.heap p q ↔ Edge (lift h B).heap p q := by
-  constructor
-  · intro e
-    cases e with
-    | low  _ => left;  simpa
-    | high _ => right; simpa
-  · intro e
-    cases e with
-    | low  _ => left;  simp_all
-    | high _ => right; simp_all
+lemma lift_root {n n' m} {h : n ≤ n'} {B : Bdd n m} : (lift h B).root = B.root := (rfl)
 
-private lemma lift_reachable_iff {h : n ≤ n'} {B : Bdd n m} {p : Pointer m} :
-    Pointer.Reachable B.heap B.root p ↔ Pointer.Reachable (lift h B).heap (lift h B).root p := by
-  constructor
-  · intro r
-    induction r with
-    | refl => left
-    | tail _ e ih =>
-      right
-      · exact ih
-      · exact (lift_edge_iff.mp e)
-  · intro r
-    induction r with
-    | refl => left
-    | tail _ e ih =>
-      right
-      · exact ih
-      · exact (lift_edge_iff.mpr e)
+lemma lift_edge {n n' m} {h : n ≤ n'} {B : Bdd n m} : Edge (lift h B).heap = Edge B.heap := by
+  ext p q
+  simp_all only [edge_iff, Fin.getElem_fin, lift, Vector.getElem_map]
 
-private lemma lift_preserves_MayPrecede {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
-    Pointer.MayPrecede (lift h B).heap p q ↔ Pointer.MayPrecede B.heap p q := by
-  constructor
-  · intro hm
-    cases p with
-    | terminal _ =>
-      absurd hm
-      exact Pointer.not_terminal_MayPrecede
-    | node j =>
-      cases q with
-      | terminal _ =>
-        apply Pointer.MayPrecede_node_terminal
-      | node j' =>
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, Pointer.toVar, lift, Fin.getElem_fin,
-          Vector.getElem_map, Fin.mk_lt_mk, Fin.val_fin_lt] at hm
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one]
-        aesop
-  · intro hm
-    cases p with
-    | terminal _ =>
-      absurd hm
-      exact Pointer.not_terminal_MayPrecede
-    | node j =>
-      cases q with
-      | terminal _ =>
-        apply Pointer.MayPrecede_node_terminal
-      | node j' =>
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one] at hm
-        simp only [Pointer.MayPrecede, Nat.succ_eq_add_one, lift]
-        simp_all [Vector.getElem_map, Pointer.toVar]
+lemma lift_reachable_iff {n n' m} (h : n ≤ n') {B : Bdd n m} {p : Pointer m} :
+    Pointer.Reachable (lift h B).heap (lift h B).root p ↔ Pointer.Reachable B.heap B.root p := by
+  rw [lift_root]
+  rw [Pointer.Reachable.eq_of_eq_edge lift_edge]
 
-private lemma lift_preserves_RelevantEdge {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
-    ( ∃ (hp : Pointer.Reachable (lift h B).heap (lift h B).root p)
-        (hq : Pointer.Reachable (lift h B).heap (lift h B).root q), Bdd.RelevantEdge (lift h B) ⟨p, hp⟩ ⟨q, hq⟩) ↔
-    ( ∃ (hp : Pointer.Reachable B.heap B.root p)
-        (hq : Pointer.Reachable B.heap B.root q), Bdd.RelevantEdge B ⟨p, hp⟩ ⟨q, hq⟩) := by
-  constructor
-  · rintro ⟨hp, hq, hr⟩
-    use (lift_reachable_iff.mpr hp)
-    use (lift_reachable_iff.mpr hq)
-    cases hr with
-    | low  hl => simp at hl; left ; assumption
-    | high hh => simp at hh; right; assumption
-  · rintro ⟨hp, hq, hr⟩
-    use (lift_reachable_iff.mp hp)
-    use (lift_reachable_iff.mp hq)
-    cases hr with
-    | low  hl => simp at hl; left ; simpa
-    | high hh => simp at hh; right; simpa
+lemma lift_preserves_MayPrecede {n n' m} {h : n ≤ n'} {B : Bdd n m} {p q : Pointer m} :
+    (lift h B).MayPrecede p q ↔ B.MayPrecede p q := by
+  simp only [Bdd.mayPrecede_iff, Fin.getElem_fin]
+  grind only [lift, Vector.getElem_map, Fin.lt_def]
 
-private lemma lift_ordered {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (lift h B).Ordered := by
-  rintro ho ⟨x, hx⟩ ⟨y, hy⟩ e
+lemma lift_ordered {n n' m} {h : n ≤ n'} {B : Bdd n m} : B.Ordered → (lift h B).Ordered := by
+  simp only [Bdd.ordered_iff]
+  intro h1 p q h2 e
   apply lift_preserves_MayPrecede.mpr
-  exact ho (lift_preserves_RelevantEdge.mp ⟨hx, hy, e⟩).2.2
+  rw [lift_edge] at e
+  rw [lift_reachable_iff] at h2
+  exact h1 p q h2 e
 
-def olift (h : n ≤ n') (O : OBdd n m) : OBdd n' m := ⟨(lift h O.1), lift_ordered O.2⟩
+public def olift {n n' m} (h : n ≤ n') (O : OBdd n m) : OBdd n' m :=
+  ⟨(lift h O.1), lift_ordered O.2⟩
 
 @[simp]
-lemma olift_trivial_eq {h : n = n'} {O : OBdd n m} : (olift (n' := n') (by rw [h]) O) = h ▸ O := by
+public lemma olift_trivial_eq {n n' m} {h : n = n'} {O : OBdd n m} :
+    (olift (n' := n') (by rw [h]) O) = h ▸ O := by
   rcases O with ⟨⟨M, r⟩, o⟩
   simp only [olift, lift]
   congr
@@ -110,21 +52,30 @@ lemma olift_trivial_eq {h : n = n'} {O : OBdd n m} : (olift (n' := n') (by rw [h
     simp
 
 @[simp]
-private lemma olift_preserves_root {h : n ≤ n'} {O : OBdd n m} : (olift h O).1.root = O.1.root := by simp [olift]
+public lemma olift_preserves_root {n n' m} {h : n ≤ n'} {O : OBdd n m} :
+    (olift h O).1.root = O.1.root := by
+  simp [olift, lift_root]
 
-private lemma olift_low {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (hr : O.1.root = .node j): (olift h O).low hr = olift h (O.low hr) := by
-  simp only [OBdd.low, olift, lift]
-  simp_rw [Bdd.low_heap_eq_heap]
-  simp_rw [hr]
-  simp [Bdd.low]
+public lemma olift_low {n n' m} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (hr : O.1.root = .node j):
+    (olift h O).low (olift_preserves_root ▸ hr) = olift h (O.low hr) := by
+  simp only [olift, lift]
+  simp only [OBdd.low_heap_eq_heap, OBdd.low_root_eq_low, Fin.getElem_fin, OBdd.eq_iff_bdd_eq,
+    Vector.getElem_map, and_self]
 
-private lemma olift_high {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (hr : O.1.root = .node j): (olift h O).high hr = olift h (O.high hr) := by
-  simp only [OBdd.high, olift, lift]
-  simp_rw [Bdd.high_heap_eq_heap]
-  simp_rw [hr]
-  simp [Bdd.high]
+public lemma olift_high {n n' m} {h : n ≤ n'} {O : OBdd n m} {j : Fin m} (hr : O.1.root = .node j):
+    (olift h O).high (olift_preserves_root ▸ hr) = olift h (O.high hr) := by
+  simp only [olift, lift]
+  simp only [OBdd.high_heap_eq_heap, OBdd.high_root_eq_high, Fin.getElem_fin, OBdd.eq_iff_bdd_eq,
+    Vector.getElem_map, and_self]
 
-private lemma NoRedundancy_of_olift {h : n ≤ n'} {O : OBdd n m} : O.1.NoRedundancy → (olift h O).1.NoRedundancy := by
+lemma toTree_subBdd_olift {n n' m} {h : n ≤ n'} {O : OBdd n m} {p} :
+    ((olift h O).subBdd p).toTree =
+    (olift h (O.subBdd ⟨p.1, (lift_reachable_iff h).mp p.2⟩)).toTree := by
+  simp only [OBdd.subBdd_eq]
+  rfl
+
+lemma NoRedundancy_of_olift {n n' m} {h : n ≤ n'} {O : OBdd n m} :
+    O.1.NoRedundancy → (olift h O).1.NoRedundancy := by
   rintro hnr ⟨p, hp⟩ contra
   simp only at contra
   cases p_def : p with
@@ -136,16 +87,19 @@ private lemma NoRedundancy_of_olift {h : n ≤ n'} {O : OBdd n m} : O.1.NoRedund
     cases contra with
     | red red =>
       simp only [olift, lift, Fin.getElem_fin] at red
-      apply hnr ⟨p, (lift_reachable_iff (h := h)).mpr hp⟩
+      apply hnr ⟨p, (lift_reachable_iff h).mp hp⟩
       simp_rw [p_def]
       constructor
       simp_all
 
-private lemma olift_preserves_toTree {h : n ≤ n'} {O : OBdd n m} : (olift h O).toTree = DecisionTree.lift h O.toTree := by
+lemma olift_preserves_toTree {n n' m} {h : n ≤ n'} {O : OBdd n m} :
+    (olift h O).toTree = DecisionTree.lift h O.toTree := by
   cases O_root_def : O.1.root with
   | terminal b =>
-    simp only [OBdd.toTree_terminal' O_root_def, DecisionTree.lift, olift, lift]
-    simp_rw [O_root_def, OBdd.toTree_terminal]
+    simp only [OBdd.toTree_terminal O_root_def, DecisionTree.lift]
+    have h1 : (olift h O).bdd.root = Pointer.terminal b := by
+      rw [olift_preserves_root, O_root_def]
+    rw [OBdd.toTree_terminal h1]
   | node j =>
     simp only [OBdd.toTree_node O_root_def, DecisionTree.lift]
     rw [← olift_preserves_toTree (h := h) (O := (O.low  O_root_def))]
@@ -154,46 +108,38 @@ private lemma olift_preserves_toTree {h : n ≤ n'} {O : OBdd n m} : (olift h O)
     simp only [OBdd.toTree_node O_root_def]
     simp only [DecisionTree.branch.injEq]
     constructor
-    · simp [olift]
+    · simp [olift, lift]
     · constructor
       · rw [olift_low]
       · rw [olift_high]
 termination_by O
 
 @[simp]
-lemma olift_evaluate {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
+public lemma olift_evaluate {n n' m} {h : n ≤ n'} {O : OBdd n m} {I : Vector Bool n'} :
     (olift h O).evaluate I = O.evaluate (Vector.cast (by simpa) (I.take n)) := by
-  simp only [OBdd.evaluate, Function.comp_apply, olift_preserves_toTree]
+  simp only [OBdd.evaluate_def, olift_preserves_toTree]
   rw [DecisionTree.lift_evaluate]
 
-private lemma olift_SimilarRP {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m}
+lemma olift_SimilarRP {n n' m} {h : n ≤ n'} {O : OBdd n m} {p q : Pointer m}
     {hp : Pointer.Reachable (olift h O).1.heap (olift h O).1.root p}
     {hq : Pointer.Reachable (olift h O).1.heap (olift h O).1.root q} :
     (olift h O).SimilarRP ⟨p, hp⟩ ⟨q, hq⟩ →
-    O.SimilarRP ⟨p, (lift_reachable_iff (h := h)).mpr hp⟩ ⟨q, (lift_reachable_iff (h := h)).mpr hq⟩ := by
+    O.SimilarRP ⟨p, (lift_reachable_iff h).mp hp⟩ ⟨q, (lift_reachable_iff h).mp hq⟩ := by
   intro sim
-  simp only [OBdd.SimilarRP, OBdd.Similar, OBdd.HSimilar] at sim
-  have : OBdd.toTree ⟨{heap := (olift h O).1.heap, root := p}, Bdd.ordered_of_reachable hp⟩ = OBdd.toTree (olift h ⟨{heap := O.1.heap, root := p}, Bdd.ordered_of_reachable ((lift_reachable_iff (h := h)).mpr hp)⟩) := by
-    rfl
-  rw [this] at sim
-  have : OBdd.toTree ⟨{heap := (olift h O).1.heap, root := q}, Bdd.ordered_of_reachable hq⟩ = OBdd.toTree (olift h ⟨{heap := O.1.heap, root := q}, Bdd.ordered_of_reachable ((lift_reachable_iff (h := h)).mpr hq)⟩) := by
-    rfl
-  rw [this] at sim
-  rw [olift_preserves_toTree] at sim
-  rw [olift_preserves_toTree] at sim
-  clear this
-  clear this
-  simp only [OBdd.SimilarRP, OBdd.Similar,OBdd.HSimilar]
+  simp only [OBdd.similarRP_iff] at ⊢ sim
+  simp only [toTree_subBdd_olift] at sim
+  simp only [olift_preserves_toTree] at sim
   rw [DecisionTree.lift_injective sim]
 
-lemma olift_reduced {h : n ≤ n'} {O : OBdd n m} : O.Reduced → (olift h O).Reduced := by
+public lemma olift_reduced {n n' m} {h : n ≤ n'} {O : OBdd n m} : O.Reduced → (olift h O).Reduced := by
   rintro ⟨r1, r2⟩
   constructor
   · exact NoRedundancy_of_olift r1
   · rintro _ _ sim; exact r2 (olift_SimilarRP sim)
 
 @[simp]
-lemma olift_olift {h1 : n ≤ n'} {h2 : n' ≤ n''} {O : OBdd n m} : olift h2 (olift h1 O) = olift (.trans h1 h2) O := by
+public lemma olift_olift {n n' n'' m} {h1 : n ≤ n'} {h2 : n' ≤ n''} {O : OBdd n m} :
+    olift h2 (olift h1 O) = olift (.trans h1 h2) O := by
   simp only [olift, lift, Vector.map_map]
   congr
 

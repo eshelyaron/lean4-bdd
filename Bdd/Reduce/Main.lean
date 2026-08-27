@@ -1,3 +1,7 @@
+module
+
+public import Bdd.Basic
+import Bdd.Reduce.Populate
 import Bdd.Reduce.Process
 import Bdd.Reduce.Discover
 
@@ -8,7 +12,7 @@ open RawBdd
 namespace Reduce
 
 /-- Process all input nodes at variable level `i`. -/
-private def step {n m : Nat} (O : OBdd n m)
+def step {n m : Nat} (O : OBdd n m)
     (vlist : Vector (List (Fin m)) n) (i : Fin n)
     (ps : ProvedState n m) (inv : Invariant O ps i.1)
     (hdiscover_inv : ∀ j ∈ vlist[i],
@@ -106,7 +110,7 @@ private def step {n m : Nat} (O : OBdd n m)
 
 /-- After processing variable level `i`, the completeness extends to `i - 1`:
 every reachable node at any level `≥ i` (not just `> i`) has its id set. -/
-private lemma invariant_step_down {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
+lemma invariant_step_down {n m : Nat} {O : OBdd n m} {ps : ProvedState n m}
     {i : Nat}
     (inv  : Invariant O ps i)
     (hset : ∀ (j : Fin m), O.1.heap[j].var.1 = i →
@@ -131,7 +135,7 @@ structure RootCorrect {n m : Nat} (O : OBdd n m) (ps : ProvedState n m) (ptr : R
 /-- Process levels from `i` down to `O.1.heap[r].var`, returning a final state
 in which `r`'s id is set and the correctness invariant holds for the root.
 `h_le` witnesses that `O.1.heap[r].var.1 ≤ i.1`, maintained by the recursion. -/
-private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
+def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
     (hr    : O.1.root = .node r)
     (vlist : Vector (List (Fin m)) n)
     (hdiscover : ∀ (j : Fin m),
@@ -163,9 +167,7 @@ private def loop_helper {n m : Nat} (O : OBdd n m) (r : Fin m)
     ⟨ps₁, hrisSome, fun ptr hkptr =>
       let ⟨hj, hptr, ho, hred, heval⟩ := inv₁.2 r ptr hkptr
       ⟨hptr, ho, hred, fun I => (heval I).trans
-        (congrArg (OBdd.evaluate · I)
-          (Subtype.ext
-            (congrArg (fun root => ({ heap := O.1.heap, root } : Bdd n m)) hr.symm)))⟩⟩
+        (congrArg (OBdd.evaluate · I) (by congr; exact hr.symm))⟩⟩
   | Nat.succ j =>
     have hlt    : j + O.1.heap[r].var.1 < n := by
       have := i.isLt; simp only [Nat.succ_eq_add_one] at h; omega
@@ -193,27 +195,27 @@ decreasing_by simp_all
 -- Top-level
 -- ---------------------------------------------------------------------------
 
-private def zero_vars_to_bool : Bdd 0 m → Bool
+def zero_vars_to_bool : Bdd 0 m → Bool
   | B => match B.root with
     | .terminal b => b
     | .node j     => False.elim (Nat.not_lt_zero _ B.heap[j].var.2)
 
-def oreduce (O : OBdd n m) :
+public def oreduce (O : OBdd n m) :
     { p : (s : Nat) × OBdd n s // OBdd.Reduced p.2 ∧ p.2.evaluate = O.evaluate } :=
   match n with
   | .zero =>
     match hroot : O.1.root with
     | .terminal b =>
-      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩⟩,
+      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.ordered_of_terminal rfl⟩⟩,
        Bdd.reduced_of_terminal,
-       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal' hroot]⟩
+       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal hroot]⟩
     | .node j => absurd O.1.heap[j].var.isLt (Nat.not_lt_zero _)
   | .succ nn =>
     match hroot : O.1.root with
     | .terminal b =>
-      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.Ordered_of_terminal⟩⟩,
+      ⟨⟨0, ⟨⟨Vector.emptyWithCapacity 0, .terminal b⟩, Bdd.ordered_of_terminal rfl⟩⟩,
        Bdd.reduced_of_terminal,
-       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal' hroot]⟩
+       by simp [OBdd.evaluate_terminal, OBdd.evaluate_terminal hroot]⟩
     | .node r =>
       let ⟨ps, hrisSome, hcorr⟩ :=
         loop_helper O r hroot (OBdd.discover O)
@@ -231,7 +233,7 @@ def oreduce (O : OBdd n m) :
 lemma oreduce_reduced {O : OBdd n m} : OBdd.Reduced (oreduce O).1.2 := (oreduce O).2.1
 
 @[simp]
-lemma oreduce_evaluate {O : OBdd n m} : (oreduce O).1.2.evaluate = O.evaluate :=
+public lemma oreduce_evaluate {O : OBdd n m} : (oreduce O).1.2.evaluate = O.evaluate :=
   (oreduce O).2.2
 
 end Reduce
